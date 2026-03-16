@@ -2,11 +2,11 @@ name: Java 21 CI with Gradle
 
 on:
   push:
-    branches: [ "main", "develop", "Feat/CICD" ]
+    branches: [ "main", "develop" ]
     paths:
       - 'backend/**'  # backend 폴더 안의 파일이 변했을 때만 실행!
   pull_request:
-    branches: [ "main", "develop", "Feat/CICD" ]
+    branches: [ "main", "develop" ]
     paths:
       - 'backend/**'
 
