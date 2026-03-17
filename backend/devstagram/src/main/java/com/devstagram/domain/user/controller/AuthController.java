@@ -1,9 +1,9 @@
 package com.devstagram.domain.user.controller;
 
+import com.devstagram.domain.user.dto.LoginDto;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
-import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.AuthService;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
-    private final JwtProvider jwtProvider;
     private final Rq rq;
     private final UserSecurityService userSecurityService;
 
@@ -36,21 +35,21 @@ public class AuthController {
 
     @PostMapping("/login")
     public RsData<String> login(@Valid @RequestBody LoginRequest request) {
-        User user = authService.login(request);
+        LoginDto loginDto = authService.login(request);
 
-        String accessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
+        rq.setCookie("accessToken", loginDto.accessToken());
+        rq.setCookie("apiKey", loginDto.apiKey());
 
-        rq.setCookie("accessToken", accessToken);
-        rq.setCookie("apiKey", user.getApiKey());
-
-        return RsData.success("로그인 성공", accessToken);
+        return RsData.success("로그인 성공", loginDto.accessToken());
     }
 
     @GetMapping("/me")
     public RsData<SignupResponse> me() {
         SecurityUser user = SecurityUtil.getCurrentUser();
-        User entity = userSecurityService.findById(user.getId());
-        return RsData.success("내 정보 조회 성공", SignupResponse.from(entity));
+
+        SignupResponse response = userSecurityService.getMyInfo(user.getId());
+
+        return RsData.success("내 정보 조회 성공", response);
     }
 
     @PostMapping("/logout")

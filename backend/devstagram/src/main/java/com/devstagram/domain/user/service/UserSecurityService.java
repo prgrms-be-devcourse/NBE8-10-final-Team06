@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.service;
 
+import com.devstagram.domain.user.dto.SignupResponse;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
@@ -36,5 +37,10 @@ public class UserSecurityService {
                 user.getPassword(),
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
+    }
+
+    public SignupResponse getMyInfo(Long id) {
+        User user = findById(id);
+        return SignupResponse.from(user);
     }
 }
