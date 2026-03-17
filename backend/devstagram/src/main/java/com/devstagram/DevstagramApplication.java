@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class DevstagramApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(DevstagramApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(DevstagramApplication.class, args);
+    }
 }

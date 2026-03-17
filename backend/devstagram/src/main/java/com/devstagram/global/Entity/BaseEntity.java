@@ -1,9 +1,9 @@
 package com.devstagram.global.Entity;
 
+import java.util.Date;
+
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.Date;
 
 @Getter
 @Setter
@@ -14,5 +14,4 @@ public class BaseEntity {
     Date createdAt;
 
     Date modifiedAt;
-
 }
