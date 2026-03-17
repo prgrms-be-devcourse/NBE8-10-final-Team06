@@ -1,8 +1,8 @@
 package com.devstagram.domain.DM.Entity;
 
-import com.devstagram.domain.User.Entity.User;
-
 import java.util.Date;
+
+import com.devstagram.domain.User.Entity.User;
 
 public class ChatParticipant {
     Long id;
