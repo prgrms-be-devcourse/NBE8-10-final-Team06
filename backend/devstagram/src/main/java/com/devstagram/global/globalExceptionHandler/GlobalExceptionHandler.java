@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.devstagram.global.exception.serviceException;
+import com.devstagram.global.exception.ServiceException;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,10 +13,10 @@ import lombok.extern.slf4j.Slf4j;
 
 @RestControllerAdvice
 @Slf4j
-public class globalExceptionHandler {
+public class GlobalExceptionHandler {
 
-    @ExceptionHandler(serviceException.class)
-    public ResponseEntity<ErrorResponse> handleServiceException(serviceException ex) {
+    @ExceptionHandler(ServiceException.class)
+    public ResponseEntity<ErrorResponse> handleServiceException(ServiceException ex) {
 
         log.error("[{}] {} : {}", ex.getLocation(), ex.getResultCode(), ex.getMsg());
         HttpStatus httpStatus = checkStatus(ex.getResultCode());
