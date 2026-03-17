@@ -1,4 +1,4 @@
-package com.devstagram.domain.story.Entity;
+package com.devstagram.domain.story.entity;
 
 import java.util.Date;
 import java.util.List;

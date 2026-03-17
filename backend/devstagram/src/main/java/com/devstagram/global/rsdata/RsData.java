@@ -19,7 +19,6 @@ public record RsData<T>(String resultCode, @JsonIgnore int statusCode, String ms
         return new RsData<>("400-F-1", msg, null);
     }
 
-
     @JsonIgnore
     public boolean isSuccess() {
         return statusCode >= 200 && statusCode < 400;

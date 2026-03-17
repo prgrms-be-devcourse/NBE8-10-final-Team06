@@ -1,4 +1,4 @@
-package com.devstagram.global.globalExceptionHandler;
+package com.devstagram.global.globalexceptionhandler;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
