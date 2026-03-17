@@ -1,4 +1,4 @@
-package com.devstagram.global.rsData;
+package com.devstagram.global.rsdata;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
