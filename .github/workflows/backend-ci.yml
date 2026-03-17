@@ -1,0 +1,47 @@
+name: Java 21 CI with Gradle
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'backend/**'  # backend 폴더 안의 파일이 변했을 때만 실행!
+  pull_request:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'backend/**'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend/devstagram
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build and Test with Gradle
+        run: ./gradlew build
+
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: '**/build/test-results/test/**/*.xml'
