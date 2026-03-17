@@ -15,11 +15,10 @@ public class ServiceException extends RuntimeException {
 
     public ServiceException(String resultCode, String msg, Throwable cause) {
         super(resultCode + " : " + msg, cause);
-        this.resultCode
-                =
-                resultCode;
+        this.resultCode = resultCode;
         this.msg
                 =
+
                 msg;
     }
 
