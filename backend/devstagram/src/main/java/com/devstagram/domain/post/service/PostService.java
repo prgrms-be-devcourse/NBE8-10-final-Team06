@@ -27,8 +27,10 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostDetailRes getPostDetail(Long id) {
-        Post post = postRepository.findById(id).orElse(null);
+    public PostDetailRes getPostDetail(Long postId) {
+        Post post = postRepository
+                .findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("해당 게시글이 존재하지 않습니다. ID: " + postId));
         return PostDetailRes.from(post);
     }
 
