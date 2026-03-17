@@ -2,13 +2,7 @@ package com.devstagram.global.rsData;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-public record RsData<T>(
-        String resultCode,
-        @JsonIgnore
-        int statusCode,
-        String msg,
-        T data
-) {
+public record RsData<T>(String resultCode, @JsonIgnore int statusCode, String msg, T data) {
     public static <T> RsData<T> success(T data) {
         return new RsData<>("200-S-1", "성공", data);
     }
@@ -20,6 +14,9 @@ public record RsData<T>(
     public static <T> RsData<T> success() {
         return success(null);
     }
+
+
+
 
     public static <T> RsData<T> fail(String msg) {
         return new RsData<>("400-F-1", msg, null);
