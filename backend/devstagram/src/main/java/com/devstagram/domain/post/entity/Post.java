@@ -1,25 +1,49 @@
 package com.devstagram.domain.post.entity;
 
-import java.util.List;
-
-import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.global.entity.BaseEntity;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import lombok.*;
+
+@Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Post extends BaseEntity {
 
-    String title;
+    @Column(nullable = false, length = 255)
+    private String title;
 
-    String content;
+    @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
+    private String content;
 
-    String thumbnailUrl;
+    private String thumbnailUrl;
 
-    Long likeCount;
+    @Column(nullable = false)
+    private Long likeCount = 0L;
 
-    Long commentCount;
+    @Column
+    private Long commentCount = 0L;
 
-    List<PostMedia> postMedia;
+    //    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
+    //    private List<PostMedia> postMedia;
 
-    List<Comment> comment;
+    //    @Column
+    //    private List<Comment> comment;
 
-    List<PostLike> postLikeList;
+    //    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
+    //    private List<PostLike> postLikeList;
+
+    @Builder
+    public Post(String content, String title) {
+        this.title = title;
+        this.content = content;
+        this.likeCount = 0L;
+        this.commentCount = 0L;
+    }
+
+    public void update(String title, String content) {
+        this.title = title;
+        this.content = content;
+    }
 }
