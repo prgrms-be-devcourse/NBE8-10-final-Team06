@@ -1,9 +1,12 @@
 package com.devstagram.domain.post.controller;
 
+import java.net.URI;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.post.dto.PostCreateReq;
@@ -23,12 +26,11 @@ public class PostController {
     private final PostService postService;
 
     @PostMapping
-    public RsData<Void> createPost(@Valid @RequestBody PostCreateReq req) {
+    public ResponseEntity<Void> createPost(@Valid @RequestBody PostCreateReq req) {
 
         Long postId = postService.createPost(req);
 
-        // TODO: 추후에 RSDATA에 created.URI추가하면 수정할 것.
-        return RsData.success("게시물 생성 성공", null);
+        return ResponseEntity.created(URI.create("/api/posts/" + postId)).build();
     }
 
     @PutMapping("/{postId}")
@@ -36,7 +38,6 @@ public class PostController {
 
         postService.updatePost(postId, req);
 
-        // TODO: 추후에 RSDATA에 created.URI추가하면 수정할 것.
         return RsData.success();
     }
 
