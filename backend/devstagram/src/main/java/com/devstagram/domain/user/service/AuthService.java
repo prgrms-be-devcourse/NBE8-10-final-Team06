@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.service;
 
+import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
 import com.devstagram.domain.user.entity.User;
@@ -26,6 +27,18 @@ public class AuthService {
         User user = request.toEntity(encodedPassword);
 
         return SignupResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public User login(LoginRequest request) { // String 대신 User 반환
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ServiceException("401-F-1", "이메일 또는 비밀번호가 일치하지 않습니다."));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new ServiceException("401-F-1", "이메일 또는 비밀번호가 일치하지 않습니다.");
+        }
+
+        return user;
     }
 
     private void validateDuplicateUser(String email, String nickname) {
