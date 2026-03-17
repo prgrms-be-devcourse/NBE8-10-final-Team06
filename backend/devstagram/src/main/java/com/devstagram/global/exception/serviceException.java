@@ -3,17 +3,17 @@ package com.devstagram.global.exception;
 import lombok.Getter;
 
 @Getter
-public class ServiceException extends RuntimeException {
+public class serviceException extends RuntimeException {
     private final String resultCode;
     private final String msg;
 
-    public ServiceException(String resultCode, String msg) {
+    public serviceException(String resultCode, String msg) {
         super(resultCode + " : " + msg);
         this.resultCode = resultCode;
         this.msg = msg;
     }
 
-    public ServiceException(String resultCode, String msg, Throwable cause) {
+    public serviceException(String resultCode, String msg, Throwable cause) {
         super(resultCode + " : " + msg, cause);
         this.resultCode = resultCode;
         this.msg = msg;

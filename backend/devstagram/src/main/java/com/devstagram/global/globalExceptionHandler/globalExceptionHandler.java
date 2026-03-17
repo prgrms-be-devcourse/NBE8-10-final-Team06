@@ -1,20 +1,22 @@
 package com.devstagram.global.globalExceptionHandler;
 
-import com.devstagram.global.exception.ServiceException;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.devstagram.global.exception.serviceException;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
 @RestControllerAdvice
 @Slf4j
-public class GlobalExceptionHandler {
+public class globalExceptionHandler {
 
-    @ExceptionHandler(ServiceException.class)
-    public ResponseEntity<ErrorResponse> handleServiceException(ServiceException ex) {
+    @ExceptionHandler(serviceException.class)
+    public ResponseEntity<ErrorResponse> handleServiceException(serviceException ex) {
 
         log.error("[{}] {} : {}", ex.getLocation(), ex.getResultCode(), ex.getMsg());
         HttpStatus httpStatus = checkStatus(ex.getResultCode());
@@ -31,7 +33,8 @@ public class GlobalExceptionHandler {
                 HttpStatus status = HttpStatus.resolve(code);
                 if (status != null) return status;
             }
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         return HttpStatus.INTERNAL_SERVER_ERROR;
     }
@@ -39,7 +42,7 @@ public class GlobalExceptionHandler {
     @Getter
     @AllArgsConstructor
     public static class ErrorResponse {
-    private String resultCode;
-    private String msg;
+        private String resultCode;
+        private String msg;
     }
 }
