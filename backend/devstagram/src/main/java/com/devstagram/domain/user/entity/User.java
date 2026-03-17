@@ -1,24 +1,9 @@
 package com.devstagram.domain.user.entity;
 
-import com.devstagram.domain.user.entity.Gender;
-import com.devstagram.domain.user.entity.UserInfo;
-import com.devstagram.global.entity.BaseEntity;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
+import com.devstagram.global.entity.BaseEntity; // 팀원이 만든 기본 클래스
+import jakarta.persistence.*;
 import java.time.LocalDate;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "users")
@@ -26,11 +11,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public class User extends BaseEntity { // 팀원이 만든 BaseEntity 상속!
+public class User extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(unique = true, nullable = false, length = 50)
+    private String nickname;
 
     @Column(unique = true, nullable = false, length = 50)
     private String email;
@@ -41,9 +29,12 @@ public class User extends BaseEntity { // 팀원이 만든 BaseEntity 상속!
     @Column(nullable = false)
     private LocalDate birthDate;
 
-    @Enumerated(EnumType.STRING) // DB에 문자열로 저장
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Gender gender;
+
+    @Column(unique = true)
+    private String apiKey;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserInfo userInfo;
