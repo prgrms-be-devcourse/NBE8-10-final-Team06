@@ -37,7 +37,7 @@ public class JwtProvider {
                 .compact();
     }
 
-    public Claims getClaims(String token) {
+    public Claims payload(String token) {
         return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
@@ -47,7 +47,7 @@ public class JwtProvider {
 
     public boolean isValid(String token) {
         try {
-            getClaims(token);
+            payload(token);
             return true;
         } catch (Exception e) {
             return false;
@@ -55,14 +55,14 @@ public class JwtProvider {
     }
 
     public Long getUserId(String token) {
-        return Long.parseLong(getClaims(token).getSubject());
+        return Long.parseLong(payload(token).getSubject());
     }
 
     public String getEmail(String token) {
-        return getClaims(token).get("email", String.class);
+        return payload(token).get("email", String.class);
     }
 
     public String getNickname(String token) {
-        return getClaims(token).get("nickname", String.class);
+        return payload(token).get("nickname", String.class);
     }
 }
