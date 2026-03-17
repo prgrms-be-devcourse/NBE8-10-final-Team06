@@ -1,17 +1,20 @@
 package com.devstagram.global.entity;
 
-import java.util.Date;
-
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
+import java.time.LocalDateTime;
 import lombok.Getter;
-import lombok.Setter;
 
 @Getter
-@Setter
-public class BaseEntity {
+@MappedSuperclass
+public abstract class BaseEntity {
 
-    Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    protected Long id;
 
-    Date createdAt;
-
-    Date modifiedAt;
+    protected LocalDateTime createdAt;
+    protected LocalDateTime modifiedAt;
 }

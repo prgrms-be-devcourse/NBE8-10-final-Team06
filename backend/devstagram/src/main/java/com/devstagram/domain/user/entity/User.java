@@ -1,9 +1,19 @@
 package com.devstagram.domain.user.entity;
 
-import com.devstagram.global.entity.BaseEntity; // 팀원이 만든 기본 클래스
-import jakarta.persistence.*;
+import com.devstagram.global.entity.BaseEntity;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 import java.time.LocalDate;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "users")
@@ -12,10 +22,6 @@ import lombok.*;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class User extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
 
     @Column(unique = true, nullable = false, length = 50)
     private String nickname;
@@ -41,6 +47,8 @@ public class User extends BaseEntity {
 
     public void setUserInfo(UserInfo userInfo) {
         this.userInfo = userInfo;
-        userInfo.setUser(this);
+        if (userInfo != null) {
+            userInfo.setUser(this);
+        }
     }
 }
