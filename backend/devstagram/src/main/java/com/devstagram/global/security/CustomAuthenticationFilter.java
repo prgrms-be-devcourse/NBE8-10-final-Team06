@@ -34,7 +34,9 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
         if (!uri.startsWith("/api/")) return true;
 
-        if (uri.startsWith("/api/auth/")) return true;
+        if (uri.equals("/api/auth/login") || uri.equals("/api/auth/signup")) {
+            return true;
+        }
 
         if (uri.startsWith("/v3/api-docs")) return true;
         if (uri.startsWith("/swagger-ui")) return true;
