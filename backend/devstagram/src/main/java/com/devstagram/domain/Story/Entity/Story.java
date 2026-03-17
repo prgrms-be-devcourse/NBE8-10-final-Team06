@@ -1,11 +1,10 @@
 package com.devstagram.domain.Story.Entity;
 
-import com.devstagram.domain.User.Entity.User;
-import com.devstagram.global.Entity.BaseEntity;
-import com.devstagram.global.Enum.MediaType;
-
 import java.util.Date;
 import java.util.List;
+
+import com.devstagram.domain.User.Entity.User;
+import com.devstagram.global.Entity.BaseEntity;
 
 public class Story extends BaseEntity {
     User user;
@@ -19,5 +18,4 @@ public class Story extends BaseEntity {
     List<User> tags;
 
     StoryMedia storyMedia;
-
 }

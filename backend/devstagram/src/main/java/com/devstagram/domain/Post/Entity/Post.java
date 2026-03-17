@@ -1,9 +1,9 @@
 package com.devstagram.domain.Post.Entity;
 
+import java.util.List;
+
 import com.devstagram.domain.Comment.Entity.Comment;
 import com.devstagram.global.Entity.BaseEntity;
-
-import java.util.List;
 
 public class Post extends BaseEntity {
 

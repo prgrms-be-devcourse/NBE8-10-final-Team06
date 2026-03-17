@@ -1,0 +1,31 @@
+name: Checkstyle
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  checkstyle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          build-root-directory: ./backend/devstagram
+
+      - name: Grant permission to gradlew
+        run: chmod +x gradlew
+        working-directory: backend/devstagram
+
+      - name: Run Gradle Checkstyle
+        run: ./gradlew checkstyleMain checkstyleTest --build-cache
+        working-directory: backend/devstagram
