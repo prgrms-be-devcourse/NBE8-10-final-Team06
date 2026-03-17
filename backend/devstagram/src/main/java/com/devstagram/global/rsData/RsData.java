@@ -15,12 +15,11 @@ public record RsData<T>(String resultCode, @JsonIgnore int statusCode, String ms
         return success(null);
     }
 
-
-
-
     public static <T> RsData<T> fail(String msg) {
         return new RsData<>("400-F-1", msg, null);
     }
+
+
 
     @JsonIgnore
     public boolean isSuccess() {
