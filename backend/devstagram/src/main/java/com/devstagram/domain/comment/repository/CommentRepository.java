@@ -1,6 +1,5 @@
 package com.devstagram.domain.comment.repository;
 
-import com.devstagram.domain.comment.entity.Comment;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,22 +7,20 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.devstagram.domain.comment.entity.Comment;
+
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-
-    @Query("select c from Comment c " +
-            "join fetch c.author m " +
-            "left join fetch m.profileImage i " +
-            "where c.post.id = :postId and c.parent is null " +
-            "order by c.createDate desc")
+    @Query("select c from Comment c " + "join fetch c.author m "
+            + "left join fetch m.profileImage i "
+            + "where c.post.id = :postId and c.parent is null "
+            + "order by c.createDate desc")
     Slice<Comment> findCommentsWithMemberAndImageByPostId(@Param("postId") Long postId, Pageable pageable);
 
-
-    @Query("select r from Comment r " +
-            "join fetch r.author m " +
-            "left join fetch m.profileImage i " +
-            "where r.parent.id = :parentId " +
-            "order by r.createDate asc")
+    @Query("select r from Comment r " + "join fetch r.author m "
+            + "left join fetch m.profileImage i "
+            + "where r.parent.id = :parentId "
+            + "order by r.createDate asc")
     Slice<Comment> findRepliesWithMemberAndImageByParentId(@Param("parentId") Long parentId, Pageable pageable);
 
     /**

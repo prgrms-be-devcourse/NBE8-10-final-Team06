@@ -1,13 +1,13 @@
 package com.devstagram.domain.comment.entity;
 
-import java.util.List;
+import org.hibernate.annotations.Formula;
 
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.entity.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.Formula;
 
 @Getter
 @Entity
@@ -35,11 +35,11 @@ public class Comment extends BaseEntity {
     @Builder.Default
     private boolean isDeleted = false;
 
-    public void modify(String content){
+    public void modify(String content) {
         this.content = content;
     }
 
-    public void softDelete(){
+    public void softDelete() {
         this.isDeleted = true;
         this.content = "[삭제된 댓글입니다.]";
     }

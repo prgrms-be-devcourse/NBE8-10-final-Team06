@@ -1,7 +1,8 @@
 package com.devstagram.domain.comment.dto;
 
-import com.devstagram.domain.comment.entity.Comment;
 import java.time.LocalDateTime;
+
+import com.devstagram.domain.comment.entity.Comment;
 
 public record CommentInfoRes(
         long id,
@@ -12,8 +13,7 @@ public record CommentInfoRes(
         long postId,
         LocalDateTime createdAt,
         LocalDateTime modifiedAt,
-        long replyCount
-) {
+        long replyCount) {
     public CommentInfoRes(Comment comment) {
         this(
                 comment.getId(),
@@ -24,7 +24,6 @@ public record CommentInfoRes(
                 comment.getPost().getId(),
                 comment.getCreatedAt(),
                 comment.getModifiedAt(),
-                comment.getReplyCount()
-        );
+                comment.getReplyCount());
     }
 }

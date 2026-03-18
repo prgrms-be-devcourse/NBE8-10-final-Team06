@@ -1,8 +1,10 @@
 package com.devstagram.domain.comment.repository;
 
-import com.devstagram.domain.comment.entity.CommentLike;
-import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.devstagram.domain.comment.entity.CommentLike;
 
 public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> {
 

@@ -1,21 +1,20 @@
 package com.devstagram.domain.comment.entity;
 
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import com.devstagram.domain.user.entity.User;
-import com.devstagram.global.entity.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "comment_id"})
-})
+@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "comment_id"})})
 public class CommentLike {
 
     @Id

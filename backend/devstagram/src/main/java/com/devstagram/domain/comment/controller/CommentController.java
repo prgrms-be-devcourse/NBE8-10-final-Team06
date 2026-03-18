@@ -1,5 +1,12 @@
 package com.devstagram.domain.comment.controller;
 
+import java.net.URI;
+
+import org.springframework.data.domain.Slice;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
 import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
@@ -7,14 +14,9 @@ import com.devstagram.domain.comment.dto.CommentUpdateReq;
 import com.devstagram.domain.comment.dto.ReplyInfoRes;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Slice;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @RestController
 @RequestMapping("/api")
@@ -27,8 +29,7 @@ public class CommentController {
     public RsData<Slice<CommentInfoRes>> getComments(
             @PathVariable Long postId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ) {
+            @AuthenticationPrincipal SecurityUser securityUser) {
         Slice<CommentInfoRes> commentList = commentService.getCommentsByPostId(postId, pageNumber);
 
         return RsData.success("댓글 조회 성공", commentList);
@@ -38,8 +39,7 @@ public class CommentController {
     public RsData<Slice<ReplyInfoRes>> getReplies(
             @PathVariable Long commentId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ) {
+            @AuthenticationPrincipal SecurityUser securityUser) {
 
         Long currentMemberId = (securityUser != null) ? securityUser.getId() : null;
 
@@ -52,22 +52,21 @@ public class CommentController {
     public ResponseEntity<RsData<Long>> createComment(
             @PathVariable Long postId,
             @Valid @RequestBody CommentCreateReq req,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ){
+            @AuthenticationPrincipal SecurityUser securityUser) {
 
         Long commentId = commentService.createComment(postId, securityUser.getId(), req);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "댓글 작성 성공", commentId);
 
-        return ResponseEntity.created(URI.create("/api/posts/" + postId + "/comments/" + commentId)).body(rsData);
+        return ResponseEntity.created(URI.create("/api/posts/" + postId + "/comments/" + commentId))
+                .body(rsData);
     }
 
     @PutMapping("/comments/{commentId}")
     public RsData<Void> updateComment(
             @PathVariable("commentId") Long commentId,
             @RequestBody @Valid CommentUpdateReq req,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ){
+            @AuthenticationPrincipal SecurityUser securityUser) {
         commentService.updateComment(commentId, securityUser.getId(), req.content());
 
         return RsData.success();
@@ -75,12 +74,9 @@ public class CommentController {
 
     @DeleteMapping("/comments/{commentId}")
     public RsData<Void> deleteComment(
-            @PathVariable Long commentId,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ) {
+            @PathVariable Long commentId, @AuthenticationPrincipal SecurityUser securityUser) {
         commentService.deleteComment(commentId, securityUser.getId());
 
         return RsData.success();
     }
-
 }
