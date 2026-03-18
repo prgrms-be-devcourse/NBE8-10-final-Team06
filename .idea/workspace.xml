@@ -5,84 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="feat : StoryService에 &#10;1. 스토리 본 유저들 조회&#10;2. 스토리 좋아요 누른 유저들 조회&#10;3. 내 만료된 스토리 목록 조회&#10;기능 추가">
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/.gitattributes" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/build.gradle.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/config/checkstyle/checkstyle.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/config/checkstyle/configuration_1_3.dtd" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/gradle/wrapper/gradle-wrapper.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/gradlew" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/gradlew.bat" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/settings.gradle.kts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/DevstagramApplication.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/Service/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/controller/CommentController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/dto/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/entity/Comment.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/entity/CommentLike.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/comment/repository/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/controller/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/dto/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/entity/ChatParticipant.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/entity/ChatRoom.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/entity/DM.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/repository/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/dm/service/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/controller/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/dto/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/entity/Post.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/entity/PostLike.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/entity/PostMedia.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/repository/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/post/service/Dummy.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryDetailResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryViewResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryViewerUserResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryMedia.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryTag.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryViewed.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryMediaRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryTagRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryViewedRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/scheduler/StoryScheduler.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/controller/AuthController.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/dto/LoginDto.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/dto/LoginRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/dto/SignupRequest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/dto/SignupResponse.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/entity/Gender.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/entity/Resume.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/entity/User.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/entity/UserInfo.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/repository/UserInfoRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/repository/UserRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/service/AuthService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/user/service/UserSecurityService.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/config/PasswordConfig.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/entity/BaseEntity.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/enumtype/MediaType.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/exception/ServiceException.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/globalexceptionhandler/GlobalExceptionHandler.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/rq/Rq.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/rsdata/RsData.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/security/CustomAuthenticationFilter.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/security/JwtProvider.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/security/SecurityConfig.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/security/SecurityUser.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/global/security/SecurityUtil.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/resources/application-dev.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/resources/application-test.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/resources/application.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/DevstagramApplicationTests.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/controller/StoryControllerTest.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/user/controller/AuthControllerTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
