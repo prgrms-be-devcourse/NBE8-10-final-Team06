@@ -1,5 +1,6 @@
 package com.devstagram.domain.post.dto;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 import com.devstagram.domain.post.entity.Post;
@@ -7,7 +8,7 @@ import com.devstagram.domain.post.entity.Post;
 import lombok.Builder;
 
 @Builder
-public record PostDetailRes(Long id, String title, String content, Long likeCount, Long commentCount, Date createdAt
+public record PostDetailRes(Long id, String title, String content, Long likeCount, Long commentCount, LocalDateTime createdAt
 
         // TODO: 댓글 슬라이스 추가
         ) {
