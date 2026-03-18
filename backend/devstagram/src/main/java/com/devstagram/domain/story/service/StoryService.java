@@ -1,6 +1,9 @@
 package com.devstagram.domain.story.service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -83,6 +86,8 @@ public class StoryService {
 
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
 
+        Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
+
         return stories.stream()
                 .map(story -> {
                     recordingStoryView(story, currentUserId); // storyView 생성
@@ -94,7 +99,7 @@ public class StoryService {
                             .expiredAt(story.getExpiredAt())
                             .content(story.getContent())
                             .totalLikeCount(story.getLikeCount())
-                            .isLiked(isUserLikedStory(story, currentUserId))
+                            .isLiked(likedStoryIds.contains(story.getId()))
                             .tagedUserIds(story.getTags().stream()
                                     .map(tag -> tag.getTarget().getId())
                                     .toList())
@@ -142,8 +147,9 @@ public class StoryService {
 
         recordingStoryView(story, userId); // 조회 기록 없으면 생성
 
-        StoryViewed storyViewed =
-                storyViewedRepository.findByStoryIdAndUserId(storyId, userId).get();
+        StoryViewed storyViewed = storyViewedRepository
+                .findByStoryIdAndUserId(storyId, userId)
+                .orElseThrow(() -> new ServiceException("500", "조회 기록 갱신 실패"));
 
         storyViewed.updateLike(); // 스토리의 좋아요 갱신
 
@@ -160,11 +166,17 @@ public class StoryService {
         });
     }
 
-    // 유저가 좋아요 눌렀는지 확인
-    private boolean isUserLikedStory(Story story, Long userId) {
-        return storyViewedRepository
-                .findByStoryIdAndUserId(story.getId(), userId)
-                .map(StoryViewed::isLiked)
-                .orElse(false);
+    // 스토리 목록 중에서 유저가 좋아요 누른 스토리 ID set 반환
+    private Set<Long> getLikedStoryIds(Long userId, List<Story> stories) {
+        if (stories.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<Long> storyIds = stories.stream().map(Story::getId).toList();
+
+        return storyViewedRepository.findByUserIdAndStoryIdIn(userId, storyIds).stream()
+                .filter(StoryViewed::isLiked)
+                .map(viewed -> viewed.getStory().getId())
+                .collect(Collectors.toSet());
     }
 }

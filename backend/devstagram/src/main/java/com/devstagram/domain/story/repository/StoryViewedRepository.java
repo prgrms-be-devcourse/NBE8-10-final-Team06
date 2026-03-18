@@ -1,5 +1,6 @@
 package com.devstagram.domain.story.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,6 @@ public interface StoryViewedRepository extends JpaRepository<StoryViewed, Long> 
     boolean existsByStoryAndUser(Story story, User user);
 
     Optional<StoryViewed> findByStoryIdAndUserId(Long storyId, Long userId);
+
+    List<StoryViewed> findByUserIdAndStoryIdIn(Long userId, List<Long> storyIds);
 }

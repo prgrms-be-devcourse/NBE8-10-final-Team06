@@ -4,17 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/scheduler/StoryScheduler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="feat : StoryScheduler, StoryViewed 관련 엔티티, DTO 추가 및 관련 로직 수정">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryLikeResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryViewResponse.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryLike.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryViewed.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryLikeRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryViewedRepository.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryViewedRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryViewedRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -288,7 +280,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773805153066</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="feat : StoryScheduler, StoryViewed 관련 엔티티, DTO 추가 및 관련 로직 수정">
+      <option name="closed" value="true" />
+      <created>1773818029906</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1773818029913</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -300,6 +300,7 @@
     <MESSAGE value="rsData, securityUtil 반영" />
     <MESSAGE value="StoryControllerTest 추가 및 DTO 수정" />
     <MESSAGE value="refactor : StoryLike 관련 수정" />
-    <option name="LAST_COMMIT_MESSAGE" value="refactor : StoryLike 관련 수정" />
+    <MESSAGE value="feat : StoryScheduler, StoryViewed 관련 엔티티, DTO 추가 및 관련 로직 수정" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat : StoryScheduler, StoryViewed 관련 엔티티, DTO 추가 및 관련 로직 수정" />
   </component>
 </project>
