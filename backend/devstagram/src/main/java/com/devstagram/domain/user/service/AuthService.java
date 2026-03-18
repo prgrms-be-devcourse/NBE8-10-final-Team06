@@ -26,7 +26,8 @@ public class AuthService {
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
-        validateDuplicateUser(request.email(), request.nickname());
+        checkEmail(request.email());
+        checkNickname(request.nickname());
 
         String encodedPassword = passwordEncoder.encode(request.password());
         User user = request.toEntity(encodedPassword);
@@ -48,12 +49,15 @@ public class AuthService {
         return new LoginDto(accessToken, user.getApiKey(), user.getEmail(), user.getNickname());
     }
 
-    private void validateDuplicateUser(String email, String nickname) {
+    public void checkEmail(String email) {
         if (userRepository.existsByEmail(email)) {
-            throw new ServiceException("409-F-1", "이미 사용 중인 이메일입니다.");
+            throw new ServiceException("409-1", "이미 사용 중인 이메일입니다.");
         }
+    }
+
+    public void checkNickname(String nickname) {
         if (userRepository.existsByNickname(nickname)) {
-            throw new ServiceException("409-F-2", "이미 사용 중인 닉네임입니다.");
+            throw new ServiceException("409-2", "이미 사용 중인 닉네임입니다.");
         }
     }
 }

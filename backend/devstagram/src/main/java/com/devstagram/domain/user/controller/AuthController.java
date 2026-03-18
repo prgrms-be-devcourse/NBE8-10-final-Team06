@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.devstagram.domain.user.dto.LoginDto;
@@ -58,5 +59,17 @@ public class AuthController {
         rq.deleteCookie("accessToken");
         rq.deleteCookie("apiKey");
         return RsData.success("로그아웃 되었습니다.", null);
+    }
+
+    @GetMapping("/check-email")
+    public RsData<Void> checkEmail(@RequestParam String email) {
+        authService.checkEmail(email);
+        return RsData.success("사용 가능한 이메일입니다.", null);
+    }
+
+    @GetMapping("/check-nickname")
+    public RsData<Void> checkNickname(@RequestParam String nickname) {
+        authService.checkNickname(nickname);
+        return RsData.success("사용 가능한 닉네임입니다.", null);
     }
 }
