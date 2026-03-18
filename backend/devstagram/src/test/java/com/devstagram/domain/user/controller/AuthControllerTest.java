@@ -31,8 +31,8 @@ import jakarta.servlet.http.Cookie;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test") // 테스트용 설정을 따로 쓴다면 (없어도 무관)
-@Transactional // 테스트 후 DB 롤백을 위해 필수
+@ActiveProfiles("test")
+@Transactional
 class AuthControllerTest {
 
     @Autowired
