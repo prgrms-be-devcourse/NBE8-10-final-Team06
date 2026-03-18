@@ -1,0 +1,12 @@
+package com.devstagram.domain.comment.repository;
+
+import com.devstagram.domain.comment.entity.CommentLike;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> {
+
+    Optional<CommentLike> findByCommentIdAndMemberId(Long commentId, Long memberId);
+
+    boolean existsByCommentIdAndMemberId(Long commentId, Long memberId);
+}
