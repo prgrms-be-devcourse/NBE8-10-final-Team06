@@ -1,8 +1,9 @@
 package com.devstagram.global.security;
 
-import com.devstagram.global.exception.ServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.devstagram.global.exception.ServiceException;
 
 public class SecurityUtil {
 

@@ -1,23 +1,26 @@
 package com.devstagram.global.security;
 
+import java.io.IOException;
+
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.rsdata.RsData;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 @RequiredArgsConstructor
@@ -46,11 +49,8 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
         try {
             work();
             filterChain.doFilter(request, response);
@@ -98,11 +98,7 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
             User user = userSecurityService.findByApiKey(apiKey);
             setAuthentication(user);
 
-            String newAccessToken = jwtProvider.genAccessToken(
-                    user.getId(),
-                    user.getEmail(),
-                    user.getNickname()
-            );
+            String newAccessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
 
             rq.setCookie("accessToken", newAccessToken);
             return;
@@ -116,10 +112,7 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
         SecurityUser securityUser = userSecurityService.toSecurityUser(user);
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(
-                securityUser,
-                securityUser.getPassword(),
-                securityUser.getAuthorities()
-        );
+                securityUser, securityUser.getPassword(), securityUser.getAuthorities());
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
@@ -129,11 +122,8 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
         response.setStatus(status);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write(
-                objectMapper.writeValueAsString(
-                        new RsData<Void>(e.getResultCode(), e.getMsg(), null)
-                )
-        );
+        response.getWriter()
+                .write(objectMapper.writeValueAsString(new RsData<Void>(e.getResultCode(), e.getMsg(), null)));
     }
 
     private int extractStatus(String resultCode) {

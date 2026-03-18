@@ -1,5 +1,9 @@
 package com.devstagram.domain.user.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.devstagram.domain.user.dto.LoginDto;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
@@ -8,10 +12,8 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.security.JwtProvider;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +36,8 @@ public class AuthService {
 
     @Transactional
     public LoginDto login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository
+                .findByEmail(request.email())
                 .orElseThrow(() -> new ServiceException("401-F-1", "이메일 또는 비밀번호가 일치하지 않습니다."));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
@@ -43,12 +46,7 @@ public class AuthService {
 
         String accessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
 
-        return new LoginDto(
-                accessToken,
-                user.getApiKey(),
-                user.getEmail(),
-                user.getNickname()
-        );
+        return new LoginDto(accessToken, user.getApiKey(), user.getEmail(), user.getNickname());
     }
 
     private void validateDuplicateUser(String email, String nickname) {

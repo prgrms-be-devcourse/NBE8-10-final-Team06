@@ -1,14 +1,16 @@
 package com.devstagram.domain.user.dto;
 
+import java.time.LocalDate;
+
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
 
 public record SignupRequest(
         @NotBlank @Size(max = 50) String nickname,
@@ -17,8 +19,7 @@ public record SignupRequest(
         @NotNull LocalDate birthDate,
         @NotNull Gender gender,
         @Size(max = 200) String githubUrl,
-        @NotNull Resume resume
-) {
+        @NotNull Resume resume) {
     public User toEntity(String encodedPassword) {
         User user = User.builder()
                 .nickname(this.nickname)
@@ -29,10 +30,8 @@ public record SignupRequest(
                 .apiKey(java.util.UUID.randomUUID().toString())
                 .build();
 
-        UserInfo userInfo = UserInfo.builder()
-                .githubUrl(this.githubUrl)
-                .resume(this.resume)
-                .build();
+        UserInfo userInfo =
+                UserInfo.builder().githubUrl(this.githubUrl).resume(this.resume).build();
 
         user.setUserInfo(userInfo);
         return user;

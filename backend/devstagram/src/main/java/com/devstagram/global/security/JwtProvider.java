@@ -1,13 +1,16 @@
 package com.devstagram.global.security;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import javax.crypto.SecretKey;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 @Component
 public class JwtProvider {
@@ -17,8 +20,7 @@ public class JwtProvider {
 
     public JwtProvider(
             @Value("${custom.jwt.secret-key}") String secretKey,
-            @Value("${custom.jwt.access-token-expire-seconds}") long accessTokenExpireSeconds
-    ) {
+            @Value("${custom.jwt.access-token-expire-seconds}") long accessTokenExpireSeconds) {
         this.secretKey = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpireSeconds = accessTokenExpireSeconds;
     }

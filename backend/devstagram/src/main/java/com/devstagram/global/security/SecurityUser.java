@@ -1,9 +1,11 @@
 package com.devstagram.global.security;
 
 import java.util.Collection;
-import lombok.Getter;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
+
+import lombok.Getter;
 
 @Getter
 public class SecurityUser extends User {
@@ -19,8 +21,7 @@ public class SecurityUser extends User {
             String nickname,
             String apiKey,
             String password,
-            Collection<? extends GrantedAuthority> authorities
-    ) {
+            Collection<? extends GrantedAuthority> authorities) {
         super(email, password, authorities);
         this.id = id;
         this.email = email;

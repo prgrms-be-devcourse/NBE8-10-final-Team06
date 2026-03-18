@@ -1,12 +1,12 @@
 package com.devstagram.domain.user.controller;
 
-import com.devstagram.domain.user.dto.SignupRequest;
-import com.devstagram.domain.user.entity.Gender;
-import com.devstagram.domain.user.entity.Resume;
-import com.devstagram.domain.user.repository.UserRepository;
-import com.devstagram.domain.user.service.AuthService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.Cookie;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.time.LocalDate;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,12 +20,14 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import com.devstagram.domain.user.dto.SignupRequest;
+import com.devstagram.domain.user.entity.Gender;
+import com.devstagram.domain.user.entity.Resume;
+import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.domain.user.service.AuthService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import jakarta.servlet.http.Cookie;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -62,8 +64,7 @@ class AuthControllerTest {
                 LocalDate.of(2000, 1, 1),
                 Gender.MALE,
                 "https://github.com/dohwa",
-                Resume.UNDERGRADUATE
-        );
+                Resume.UNDERGRADUATE);
 
         // When
         ResultActions resultActions = mvc.perform(post("/api/auth/signup")
@@ -92,9 +93,8 @@ class AuthControllerTest {
                 """;
 
         // When
-        ResultActions resultActions = mvc.perform(post("/api/auth/login")
-                .content(loginRequest)
-                .contentType(MediaType.APPLICATION_JSON));
+        ResultActions resultActions =
+                mvc.perform(post("/api/auth/login").content(loginRequest).contentType(MediaType.APPLICATION_JSON));
 
         // Then
         resultActions
@@ -121,9 +121,8 @@ class AuthControllerTest {
         Cookie apiCookie = loginResult.getResponse().getCookie("apiKey");
 
         // When (쿠키를 포함하여 /me 호출)
-        ResultActions resultActions = mvc.perform(get("/api/auth/me")
-                .cookie(accessCookie)
-                .cookie(apiCookie));
+        ResultActions resultActions =
+                mvc.perform(get("/api/auth/me").cookie(accessCookie).cookie(apiCookie));
 
         // Then
         resultActions
