@@ -1,6 +1,13 @@
 package com.devstagram.domain.user.entity;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
 public enum Gender {
-    male,
-    female
+    MALE("남성"),
+    FEMALE("여성");
+
+    private final String description;
 }

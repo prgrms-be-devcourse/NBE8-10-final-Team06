@@ -1,3 +1,13 @@
 spring:
-  application:
-    name: devstagram
+  profiles:
+    active: dev
+  config:
+    import: optional:file:./backend/devstagram/.env[.properties]
+
+server:
+  port: 8080
+
+custom:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expire-seconds: ${JWT_ACCESS_TOKEN_EXPIRE_SECONDS}

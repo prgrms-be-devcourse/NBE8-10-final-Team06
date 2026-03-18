@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb_test
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+
+custom:
+  jwt:
+    secret-key: "test_secret_key_for_devstagram_project_at_least_32_chars"
+    access-token-expire-seconds: 3600
