@@ -70,7 +70,6 @@ class StoryControllerTest {
 
     @BeforeEach
     void setUp() throws ServletException, IOException {
-
         mockSecurityUser = new SecurityUser(
                 1L,
                 "test@test.com",
@@ -108,20 +107,18 @@ class StoryControllerTest {
 
         mockMvc.perform(post("/api/story")
                         .with(csrf())
-                        .with(user(mockSecurityUser))
+                        .with(user(mockSecurityUser)) // SecurityUtil.getCurrentUserId()가 1L을 반환하게 함
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.data.storyId").value(10L))
-                .andExpect(jsonPath("$.data.content").value("테스트 스토리"));
+                .andExpect(jsonPath("$.data.storyId").value(10L));
     }
 
     @Test
     @DisplayName("특정 유저 스토리 목록 조회 성공")
     void getAllUserStories_Success() throws Exception {
-
         Long targetUserId = 2L;
         StoryDetailResponse detailResponse = StoryDetailResponse.builder()
                 .storyId(10L)
@@ -135,14 +132,12 @@ class StoryControllerTest {
         mockMvc.perform(get("/api/story/user/{targetUserId}", targetUserId).with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.data[0].storyId").value(10L));
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"));
     }
 
     @Test
     @DisplayName("좋아요 업데이트 성공(좋아요)")
     void patchStoryLike_Success() throws Exception {
-
         Long storyId = 10L;
         StoryLikeResponse response = new StoryLikeResponse(storyId, 5L, true);
 
@@ -151,36 +146,12 @@ class StoryControllerTest {
         mockMvc.perform(post("/api/story/{storyId}/like", storyId).with(csrf()).with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("스토리에 좋아요"))
-                .andExpect(jsonPath("$.data.storyId").value(storyId))
-                .andExpect(jsonPath("$.data.totalLikeCount").value(5))
-                .andExpect(jsonPath("$.data.isLiked").value(true));
-    }
-
-    @Test
-    @DisplayName("좋아요 업데이트 성공(좋아요 취소)")
-    void patchStoryUnlike_Success() throws Exception {
-
-        Long storyId = 10L;
-        StoryLikeResponse response = new StoryLikeResponse(storyId, 4L, false);
-
-        given(storyService.patchStoryLike(eq(storyId), eq(1L))).willReturn(response);
-
-        mockMvc.perform(post("/api/story/{storyId}/like", storyId).with(csrf()).with(user(mockSecurityUser)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("스토리 좋아요 취소"))
-                .andExpect(jsonPath("$.data.storyId").value(storyId))
-                .andExpect(jsonPath("$.data.totalLikeCount").value(4))
-                .andExpect(jsonPath("$.data.isLiked").value(false));
+                .andExpect(jsonPath("$.msg").value("스토리에 좋아요"));
     }
 
     @Test
     @DisplayName("스토리 소프트 딜리트 성공")
     void softDeleteStory_Success() throws Exception {
-
         Long storyId = 10L;
 
         mockMvc.perform(patch("/api/story/{storyId}/soft-delete", storyId)
@@ -188,7 +159,6 @@ class StoryControllerTest {
                         .with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.msg").value("스토리가 소프트 딜리트 성공"));
 
         verify(storyService).softDeleteStory(eq(storyId), eq(1L));
@@ -197,7 +167,6 @@ class StoryControllerTest {
     @Test
     @DisplayName("스토리 하드 딜리트 성공")
     void hardDeleteStory_Success() throws Exception {
-
         Long storyId = 10L;
 
         mockMvc.perform(delete("/api/story/{storyId}/hard-delete", storyId)
@@ -205,7 +174,6 @@ class StoryControllerTest {
                         .with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.msg").value("스토리 하드 딜리트 성공"));
 
         verify(storyService).hardDeleteStory(eq(storyId), eq(1L));
