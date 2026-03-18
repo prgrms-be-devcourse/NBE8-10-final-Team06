@@ -54,7 +54,8 @@ class PostControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk()); // TODO: 201반환으로 바꿀 예정
+                .andExpect(status().isCreated()) // isOk() 대신 isCreated() 사용 (201 상태 코드 확인)
+                .andExpect(header().string("Location", "/api/posts/1")); // Location 헤더에 기대하는 URI가 포함되었는지 확인
     }
 
     @Test

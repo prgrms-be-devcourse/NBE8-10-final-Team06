@@ -86,9 +86,8 @@ class PostServiceTest {
             posts.add(Post.builder().title("제목" + i).build());
         }
 
-        List<Post> firstPageContent = posts.subList(0, 10); // 0~9번까지 10개
-        Slice<Post> slice = new SliceImpl<>(firstPageContent, pageable, true); // true가 hasNext를 의미
-
+        List<Post> firstPageContent = posts.subList(0, 10);
+        Slice<Post> slice = new SliceImpl<>(firstPageContent, pageable, true);
         given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
 
         // when
@@ -109,21 +108,16 @@ class PostServiceTest {
         Long postId = 1L;
         PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
 
-        // 1. 가짜 Post 객체를 미리 생성 (ID가 필요하다면 빌더나 Reflection 활용)
         Post mockPost = Post.builder().title("기존 제목").content("기존 내용").build();
 
-        // 2. 가짜 레포지토리가 이 객체를 찾았다고 가정 (대본 짜기)
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 
         // when
         postService.updatePost(postId, updateReq);
 
         // then
-        // 서비스 로직이 엔티티의 값을 정말 바꿨는지 확인 (변경 감지 로직 검증)
         assertThat(mockPost.getTitle()).isEqualTo("수정된 제목");
         assertThat(mockPost.getContent()).isEqualTo("수정된 내용");
-
-        // 레포지토리의 findById가 호출되었는지 확인
         verify(postRepository, times(1)).findById(postId);
     }
 
