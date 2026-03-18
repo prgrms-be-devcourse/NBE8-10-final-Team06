@@ -4,7 +4,11 @@
   <component name="FrameworkDetectionExcludesConfiguration">
     <file type="web" url="file://$PROJECT_DIR$/backend/devstagram" />
   </component>
+<<<<<<< feat/story-crud-logic
   <component name="ProjectRootManager" version="2" languageLevel="JDK_21" project-jdk-name="openjdk-25" project-jdk-type="JavaSDK">
+=======
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_25" default="true" project-jdk-name="openjdk-25" project-jdk-type="JavaSDK">
+>>>>>>> develop
     <output url="file://$PROJECT_DIR$/out" />
   </component>
 </project>
