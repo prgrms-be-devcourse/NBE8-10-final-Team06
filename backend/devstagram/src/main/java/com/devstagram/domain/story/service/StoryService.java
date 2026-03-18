@@ -6,11 +6,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.story.dto.StoryCreateRequest;
-import com.devstagram.domain.story.dto.StoryCreateResponse;
-import com.devstagram.domain.story.dto.StoryDetailResponse;
-import com.devstagram.domain.story.dto.StoryViewResponse;
+import com.devstagram.domain.story.dto.*;
 import com.devstagram.domain.story.entity.Story;
 import com.devstagram.domain.story.entity.StoryMedia;
 import com.devstagram.domain.story.entity.StoryTag;
@@ -22,7 +20,6 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -178,5 +175,59 @@ public class StoryService {
                 .filter(StoryViewed::isLiked)
                 .map(viewed -> viewed.getStory().getId())
                 .collect(Collectors.toSet());
+    }
+
+    // 스토리 본 유저들 조회
+    @Transactional(readOnly = true)
+    public List<StoryViewerUserResponse> getStoryViewers(Long storyId, Long currentUserId) {
+
+        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+
+        if (!story.getUser().getId().equals(currentUserId)) {
+            throw new ServiceException("403", "본인만 확인 가능");
+        }
+
+        List<StoryViewed> viewers = storyViewedRepository.findByStoryIdOrderByViewedAtDesc(storyId);
+
+        return viewers.stream().map(StoryViewerUserResponse::from).toList();
+    }
+
+    // 스토리 좋아요 누른 유저들 조회
+    @Transactional(readOnly = true)
+    public List<StoryViewerUserResponse> getStoryLiker(Long storyId, Long currentUserId) {
+
+        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+
+        if (!story.getUser().getId().equals(currentUserId)) {
+            throw new ServiceException("403", "본인만 확인 가능");
+        }
+
+        List<StoryViewed> likers = storyViewedRepository.findByStoryIdAndIsLikedTrueOrderByLikedAtDesc(storyId);
+
+        return likers.stream().map(StoryViewerUserResponse::from).toList();
+    }
+
+    // 내 만료된 스토리 목록 조회
+    @Transactional(readOnly = true)
+    public List<StoryDetailResponse> getMyArchivedStories(Long currentUserId) {
+
+        // isDeleted = true인 스토리 목록 조회 -> id들만 뽑아옴
+        List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(currentUserId);
+        Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
+
+        return stories.stream()
+                .map(story -> StoryDetailResponse.builder()
+                        .storyId(story.getId())
+                        .userId(story.getUser().getId())
+                        .createdAt(story.getCreatedAt())
+                        .expiredAt(story.getExpiredAt())
+                        .content(story.getContent())
+                        .totalLikeCount(story.getLikeCount())
+                        .isLiked(likedStoryIds.contains(story.getId()))
+                        .tagedUserIds(story.getTags().stream()
+                                .map(tag -> tag.getTarget().getId())
+                                .toList())
+                        .build())
+                .toList();
     }
 }

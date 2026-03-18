@@ -19,4 +19,9 @@ public interface StoryViewedRepository extends JpaRepository<StoryViewed, Long> 
     Optional<StoryViewed> findByStoryIdAndUserId(Long storyId, Long userId);
 
     List<StoryViewed> findByUserIdAndStoryIdIn(Long userId, List<Long> storyIds);
+
+    List<StoryViewed> findByStoryIdOrderByViewedAtDesc(Long storyId);
+
+    // 좋아요 누른 사람만 최신순(좋아요 누른 시간 기준)으로 가져오기
+    List<StoryViewed> findByStoryIdAndIsLikedTrueOrderByLikedAtDesc(Long storyId);
 }
