@@ -78,7 +78,7 @@ public class StoryController {
     }
 
     // 스토리 좋아요 누른 유저 목록 조회
-    @GetMapping("/{storyId}/liker")
+    @GetMapping("/{storyId}/likers")
     public RsData<List<StoryViewerUserResponse>> getStoryLiker(@PathVariable Long storyId) {
 
         Long currentUserId = SecurityUtil.getCurrentUserId();
