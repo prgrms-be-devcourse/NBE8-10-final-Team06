@@ -7,10 +7,8 @@ import com.devstagram.domain.comment.entity.Comment;
 public record CommentInfoRes(
         long id,
         String content,
-        long authorId,
+        long userId,
         String nickname,
-        String email,
-        long postId,
         LocalDateTime createdAt,
         LocalDateTime modifiedAt,
         long replyCount) {
@@ -20,8 +18,6 @@ public record CommentInfoRes(
                 comment.getContent(),
                 comment.getUser().getId(),
                 comment.getUser().getNickname(),
-                comment.getUser().getEmail(),
-                comment.getPost().getId(),
                 comment.getCreatedAt(),
                 comment.getModifiedAt(),
                 comment.getReplyCount());
