@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.devstagram.domain.story.repository.StoryRepository;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Component
