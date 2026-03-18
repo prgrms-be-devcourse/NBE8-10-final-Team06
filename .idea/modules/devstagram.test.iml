@@ -6,6 +6,9 @@
     <content url="file://$MODULE_DIR$/../../backend/devstagram/src/test">
       <sourceFolder url="file://$MODULE_DIR$/../../backend/devstagram/src/test/java" isTestSource="true" />
     </content>
+    <content url="file://$MODULE_DIR$/../../backend/devstagram/src/test">
+      <sourceFolder url="file://$MODULE_DIR$/../../backend/devstagram/src/test/java" isTestSource="true" />
+    </content>
     <orderEntry type="jdk" jdkName="temurin-21" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="devstagram.main" />
