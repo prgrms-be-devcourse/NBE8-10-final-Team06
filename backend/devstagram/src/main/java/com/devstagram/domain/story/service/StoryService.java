@@ -1,21 +1,20 @@
 package com.devstagram.domain.story.service;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
 import com.devstagram.domain.story.dto.StoryCreateRequest;
 import com.devstagram.domain.story.dto.StoryCreateResponse;
 import com.devstagram.domain.story.dto.StoryDetailResponse;
-import com.devstagram.domain.story.dto.StoryLikeResponse;
+import com.devstagram.domain.story.dto.StoryViewResponse;
 import com.devstagram.domain.story.entity.Story;
-import com.devstagram.domain.story.entity.StoryLike;
 import com.devstagram.domain.story.entity.StoryMedia;
 import com.devstagram.domain.story.entity.StoryTag;
-import com.devstagram.domain.story.repository.StoryLikeRepository;
+import com.devstagram.domain.story.entity.StoryViewed;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
+import com.devstagram.domain.story.repository.StoryViewedRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
@@ -29,7 +28,7 @@ public class StoryService {
     private final StoryRepository storyRepository;
     private final StoryTagRepository storyTagRepository;
     private final UserRepository userRepository;
-    private final StoryLikeRepository storyLikeRepository;
+    private final StoryViewedRepository storyViewedRepository;
 
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
@@ -85,22 +84,22 @@ public class StoryService {
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
 
         return stories.stream()
-                // 리스트의 모든 스토리에 대해 만료 시간 체크
-                .peek(Story::checkExpired)
-                .filter(story -> !story.isDeleted()) // 만료 안된 스토리만 필터링
-                .map(story -> StoryDetailResponse.builder()
-                        .storyId(story.getId())
-                        .userId(story.getUser().getId())
-                        .createdAt(story.getCreatedAt())
-                        .expiredAt(story.getExpiredAt())
-                        .content(story.getContent())
-                        .totalLikeCount(story.getLikeCount())
-                        .isLiked(story.getLikes().stream()
-                                .anyMatch(like -> like.getUser().getId().equals(currentUserId)))
-                        .tagedUserIds(story.getTags().stream()
-                                .map(tag -> tag.getTarget().getId())
-                                .toList())
-                        .build())
+                .map(story -> {
+                    recordingStoryView(story, currentUserId); // storyView 생성
+
+                    return StoryDetailResponse.builder()
+                            .storyId(story.getId())
+                            .userId(story.getUser().getId())
+                            .createdAt(story.getCreatedAt())
+                            .expiredAt(story.getExpiredAt())
+                            .content(story.getContent())
+                            .totalLikeCount(story.getLikeCount())
+                            .isLiked(isUserLikedStory(story, currentUserId))
+                            .tagedUserIds(story.getTags().stream()
+                                    .map(tag -> tag.getTarget().getId())
+                                    .toList())
+                            .build();
+                })
                 .toList();
     }
 
@@ -113,7 +112,6 @@ public class StoryService {
             throw new ServiceException("403", "본인 스토리만 삭제 가능");
         }
 
-        story.checkExpired();
         if (story.isDeleted()) {
             throw new ServiceException("404", "만료된 스토리.");
         } else {
@@ -134,32 +132,39 @@ public class StoryService {
     }
 
     @Transactional
-    public StoryLikeResponse patchStoryLike(Long storyId, Long userId) {
+    public StoryViewResponse patchStoryLike(Long storyId, Long userId) {
 
         Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리."));
 
-        story.checkExpired();
         if (story.isDeleted()) {
             throw new ServiceException("404", "만료/삭제된 스토리.");
         }
 
-        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저"));
-        Optional<StoryLike> existingLike = storyLikeRepository.findByStoryAndUser(story, user);
+        recordingStoryView(story, userId); // 조회 기록 없으면 생성
 
-        boolean isLikedNow;
-        if (existingLike.isPresent()) {
-            storyLikeRepository.delete(existingLike.get());
-            isLikedNow = false;
-        } else {
-            StoryLike newLike = StoryLike.builder().story(story).user(user).build();
-            storyLikeRepository.save(newLike);
-            isLikedNow = true;
-        }
+        StoryViewed storyViewed =
+                storyViewedRepository.findByStoryIdAndUserId(storyId, userId).get();
 
-        return StoryLikeResponse.builder()
-                .storyId(story.getId())
-                .totalLikeCount(story.getLikeCount())
-                .isLiked(isLikedNow)
-                .build();
+        storyViewed.updateLike(); // 스토리의 좋아요 갱신
+
+        return StoryViewResponse.from(storyViewed);
+    }
+
+    // 조회 기록 StoryView 생성/갱신
+    private void recordingStoryView(Story story, Long userId) {
+        userRepository.findById(userId).ifPresent(user -> {
+            if (!storyViewedRepository.existsByStoryAndUser(story, user)) {
+                storyViewedRepository.save(
+                        StoryViewed.builder().story(story).user(user).build());
+            }
+        });
+    }
+
+    // 유저가 좋아요 눌렀는지 확인
+    private boolean isUserLikedStory(Story story, Long userId) {
+        return storyViewedRepository
+                .findByStoryIdAndUserId(story.getId(), userId)
+                .map(StoryViewed::isLiked)
+                .orElse(false);
     }
 }

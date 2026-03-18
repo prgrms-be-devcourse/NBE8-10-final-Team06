@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import com.devstagram.domain.story.dto.StoryCreateRequest;
 import com.devstagram.domain.story.dto.StoryCreateResponse;
 import com.devstagram.domain.story.dto.StoryDetailResponse;
-import com.devstagram.domain.story.dto.StoryLikeResponse;
+import com.devstagram.domain.story.dto.StoryViewResponse;
 import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUtil;
@@ -40,10 +40,10 @@ public class StoryController {
     }
 
     @PostMapping("/{storyId}/like")
-    public RsData<StoryLikeResponse> patchStoryLike(@PathVariable Long storyId) {
+    public RsData<StoryViewResponse> patchStoryLike(@PathVariable Long storyId) {
 
         Long userId = SecurityUtil.getCurrentUserId();
-        StoryLikeResponse response = storyService.patchStoryLike(storyId, userId);
+        StoryViewResponse response = storyService.patchStoryLike(storyId, userId);
 
         String msg = response.isLiked() ? "스토리에 좋아요" : "스토리 좋아요 취소";
 

@@ -4,10 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="refactor : StoryLike 관련 수정">
+    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="">
+      <change afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/scheduler/StoryScheduler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/controller/StoryControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/controller/StoryControllerTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryLikeResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryViewResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryLike.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryViewed.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryLikeRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryViewedRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -19,11 +27,21 @@
       <ProjectState />
     </projectState>
   </component>
+  <component name="ExternalProjectsManager">
+    <system id="GRADLE">
+      <state>
+        <task path="$PROJECT_DIR$/backend/devstagram">
+          <activation />
+        </task>
+        <projects_view />
+      </state>
+    </system>
+  </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Class" />
         <option value="Interface" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -56,27 +74,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Gradle.'devstagram.test'에 있는 테스트.executor": "Run",
-    "Gradle.StoryControllerTest.executor": "Run",
-    "Gradle.StoryServiceTest.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "com.google.cloudcode.ide_session_index": "20260318_0003",
-    "git-widget-placeholder": "feat/story-crud-logic",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/programmers/TeamProject-4/NBE8-10-final-Team06",
-    "project.structure.last.edited": "전역 라이브러리",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.'devstagram.test'에 있는 테스트.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.StoryControllerTest.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.StoryServiceTest.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;com.google.cloudcode.ide_session_index&quot;: &quot;20260318_0003&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feat/story-crud-logic&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/programmers/TeamProject-4/NBE8-10-final-Team06&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;전역 라이브러리&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyClassDialog.RECENTS_KEY">
       <recent name="com.devstagram.domain.story.repository" />
@@ -160,6 +178,17 @@
       <RunAsTest>true</RunAsTest>
       <GradleProfilingDisabled>false</GradleProfilingDisabled>
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="devstagram" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="devstagram" />
+      <option name="filePath" />
       <method v="2" />
     </configuration>
     <recent_temporary>
