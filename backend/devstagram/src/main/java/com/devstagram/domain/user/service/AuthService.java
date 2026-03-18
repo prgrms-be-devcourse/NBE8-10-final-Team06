@@ -51,13 +51,13 @@ public class AuthService {
 
     public void checkEmail(String email) {
         if (userRepository.existsByEmail(email)) {
-            throw new ServiceException("409-1", "이미 사용 중인 이메일입니다.");
+            throw new ServiceException("409-U-1", "이미 사용 중인 이메일입니다.");
         }
     }
 
     public void checkNickname(String nickname) {
         if (userRepository.existsByNickname(nickname)) {
-            throw new ServiceException("409-2", "이미 사용 중인 닉네임입니다.");
+            throw new ServiceException("409-U-2", "이미 사용 중인 닉네임입니다.");
         }
     }
 }
