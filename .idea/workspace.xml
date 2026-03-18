@@ -4,17 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="rsData, securityUtil 반영">
+    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="StoryControllerTest 추가 및 DTO 수정">
+      <change afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/StoryLike.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/repository/StoryLikeRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateRequest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryCreateResponse.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryDetailResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryDetailResponse.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryLikeResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/dto/StoryLikeResponse.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/entity/Story.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/controller/StoryControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/controller/StoryControllerTest.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/test/java/com/devstagram/domain/story/service/StoryServiceTest.java" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,6 +25,7 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Class" />
+        <option value="Interface" />
       </list>
     </option>
   </component>
@@ -249,7 +245,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773800069329</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="StoryControllerTest 추가 및 DTO 수정">
+      <option name="closed" value="true" />
+      <created>1773802930484</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1773802930484</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -259,6 +263,7 @@
     <MESSAGE value="test3" />
     <MESSAGE value="test4" />
     <MESSAGE value="rsData, securityUtil 반영" />
-    <option name="LAST_COMMIT_MESSAGE" value="rsData, securityUtil 반영" />
+    <MESSAGE value="StoryControllerTest 추가 및 DTO 수정" />
+    <option name="LAST_COMMIT_MESSAGE" value="StoryControllerTest 추가 및 DTO 수정" />
   </component>
 </project>

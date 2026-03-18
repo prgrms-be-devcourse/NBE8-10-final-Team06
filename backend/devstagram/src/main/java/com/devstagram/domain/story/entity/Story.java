@@ -9,15 +9,12 @@ import org.springframework.data.annotation.CreatedDate;
 import com.devstagram.domain.user.entity.User;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "story")
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
 public class Story {
@@ -33,18 +30,13 @@ public class Story {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    private int likeCount;
     private String content;
     private String thumbnailUrl;
     private LocalDateTime expiredAt;
 
+    @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "story_likes",
-            joinColumns = @JoinColumn(name = "story_id"),
-            inverseJoinColumns = @JoinColumn(name = "user_id"))
-    private List<User> likes = new ArrayList<>();
+    private List<StoryLike> likes = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -74,20 +66,7 @@ public class Story {
         this.isDeleted = true;
     }
 
-    public boolean patchLike(User user) {
-        // 해당 유저가 좋아요 눌렀는지 여부 확인
-        boolean isLiked = this.likes.stream().anyMatch(u -> u.getId().equals(user.getId()));
-
-        if (isLiked) {
-            // 좋아요 눌렀으면 -> 좋아요 취소
-            this.likes.removeIf(u -> u.getId().equals(user.getId()));
-            this.likeCount--;
-            return false;
-        } else {
-            // 좋아요 안눌렀다면 -> 좋아요 추가
-            this.likes.add(user);
-            this.likeCount++;
-            return true;
-        }
+    public long getLikeCount() {
+        return likes.size();
     }
 }

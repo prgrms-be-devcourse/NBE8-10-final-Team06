@@ -1,6 +1,7 @@
 package com.devstagram.domain.story.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
@@ -9,8 +10,10 @@ import com.devstagram.domain.story.dto.StoryCreateResponse;
 import com.devstagram.domain.story.dto.StoryDetailResponse;
 import com.devstagram.domain.story.dto.StoryLikeResponse;
 import com.devstagram.domain.story.entity.Story;
+import com.devstagram.domain.story.entity.StoryLike;
 import com.devstagram.domain.story.entity.StoryMedia;
 import com.devstagram.domain.story.entity.StoryTag;
+import com.devstagram.domain.story.repository.StoryLikeRepository;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
 import com.devstagram.domain.user.entity.User;
@@ -26,6 +29,7 @@ public class StoryService {
     private final StoryRepository storyRepository;
     private final StoryTagRepository storyTagRepository;
     private final UserRepository userRepository;
+    private final StoryLikeRepository storyLikeRepository;
 
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
@@ -90,9 +94,9 @@ public class StoryService {
                         .createdAt(story.getCreatedAt())
                         .expiredAt(story.getExpiredAt())
                         .content(story.getContent())
-                        .totalLikeCount((long) story.getLikeCount())
+                        .totalLikeCount(story.getLikeCount())
                         .isLiked(story.getLikes().stream()
-                                .anyMatch(u -> u.getId().equals(currentUserId)))
+                                .anyMatch(like -> like.getUser().getId().equals(currentUserId)))
                         .tagedUserIds(story.getTags().stream()
                                 .map(tag -> tag.getTarget().getId())
                                 .toList())
@@ -140,12 +144,22 @@ public class StoryService {
         }
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저"));
-        boolean currentLikeStatus = story.patchLike(user);
+        Optional<StoryLike> existingLike = storyLikeRepository.findByStoryAndUser(story, user);
+
+        boolean isLikedNow;
+        if (existingLike.isPresent()) {
+            storyLikeRepository.delete(existingLike.get());
+            isLikedNow = false;
+        } else {
+            StoryLike newLike = StoryLike.builder().story(story).user(user).build();
+            storyLikeRepository.save(newLike);
+            isLikedNow = true;
+        }
 
         return StoryLikeResponse.builder()
                 .storyId(story.getId())
-                .totalLikeCount((long) story.getLikeCount())
-                .isLiked(currentLikeStatus)
+                .totalLikeCount(story.getLikeCount())
+                .isLiked(isLikedNow)
                 .build();
     }
 }
