@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="test4" />
+    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="test4">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/controller/StoryController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/java/com/devstagram/domain/story/service/StoryService.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -42,7 +46,7 @@
     &quot;accountId&quot;: &quot;5caf69a0-da9f-4d44-92f2-c6891ab7a2bf&quot;
   }
 }</component>
-  <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$/backend/devstagram" gradleHome="C:\Users\mirmi\.gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1" javaHome="C:\Program Files\Java\jdk-21" gradleVersion="9.3.1" />
+  <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$/backend/devstagram" gradleHome="C:\Users\mirmi\.gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1" javaHome="C:\Users\mirmi\.jdks\temurin-21.0.10" gradleVersion="9.3.1" />
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -54,11 +58,13 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "Gradle.StoryServiceTest.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "com.google.cloudcode.ide_session_index": "20260318_0001",
+    "com.google.cloudcode.ide_session_index": "20260318_0003",
+    "git-widget-placeholder": "feat/story-crud-logic",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/programmers/TeamProject-4/NBE8-10-final-Team06",
@@ -120,7 +126,7 @@
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="디폴트 작업">
-      <changelist id="e8b0a54b-7f35-4779-9679-3c2a0d6971e9" name="변경" comment="" />
+      <changelist id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="test4" />
       <created>1773651246996</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />

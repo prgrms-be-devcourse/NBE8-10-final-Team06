@@ -29,7 +29,7 @@ public class StoryService {
 
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
-        // TODO : 토큰의 사용자 정보 받아오는 기능 추가
+
         User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저"));
 
         StoryMedia media = StoryMedia.builder()
@@ -76,8 +76,6 @@ public class StoryService {
     @Transactional
     public List<StoryDetailResponse> getUserAllStories(Long targetUserId, Long currentUserId) {
 
-        // TODO : 토큰의 사용자 정보 받아오는 기능 추가
-
         userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저."));
 
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
@@ -103,9 +101,13 @@ public class StoryService {
     }
 
     @Transactional
-    public void softDeleteStory(Long storyId) {
+    public void softDeleteStory(Long storyId, Long userId) {
 
         Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+
+        if (!story.getUser().getId().equals(userId)) {
+            throw new ServiceException("403", "본인 스토리만 삭제 가능");
+        }
 
         story.checkExpired();
         if (story.isDeleted()) {
@@ -116,9 +118,13 @@ public class StoryService {
     }
 
     @Transactional
-    public void hardDeleteStory(Long storyId) {
+    public void hardDeleteStory(Long storyId, Long userId) {
 
         Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+
+        if (!story.getUser().getId().equals(userId)) {
+            throw new ServiceException("403", "본인 스토리만 삭제 가능");
+        }
 
         storyRepository.delete(story);
     }
