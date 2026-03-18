@@ -1,9 +1,9 @@
 package com.devstagram.domain.post.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,19 +28,61 @@ import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.service.PostService;
+import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.service.UserSecurityService;
+import com.devstagram.global.rq.Rq;
+import com.devstagram.global.security.JwtProvider;
+import com.devstagram.global.security.SecurityUser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.jsonwebtoken.Claims;
 
 @WebMvcTest(PostController.class)
 class PostControllerTest {
 
+    @MockitoBean
+    private org.springframework.data.jpa.mapping.JpaMetamodelMappingContext jpaMappingContext;
+
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private JwtProvider jwtProvider;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @MockitoBean
     private PostService postService;
+
+    @MockitoBean
+    private UserSecurityService userSecurityService;
+
+    @MockitoBean
+    private Rq rq;
+
+    @BeforeEach
+    void setUp() {
+        given(rq.getHeader(eq("Authorization"), anyString())).willReturn("Bearer dummy");
+        given(rq.getHeader(eq("X-API-KEY"), anyString())).willReturn("");
+        given(rq.getCookieValue(anyString(), anyString())).willReturn("");
+
+        // jwt
+        given(jwtProvider.isValid(anyString())).willReturn(true);
+        Claims mockClaims = mock(Claims.class);
+        given(mockClaims.getSubject()).willReturn("1");
+        given(jwtProvider.payload(anyString())).willReturn(mockClaims);
+
+        // user
+        User mockUser = mock(User.class);
+        SecurityUser mockSecurityUser = mock(SecurityUser.class); // 가짜 SecurityUser 생성
+
+        given(userSecurityService.findById(1L)).willReturn(mockUser);
+        given(userSecurityService.toSecurityUser(mockUser)).willReturn(mockSecurityUser);
+
+        given(mockSecurityUser.getPassword()).willReturn("");
+        given(mockSecurityUser.getAuthorities()).willReturn(java.util.Collections.emptyList());
+    }
 
     @Test
     @WithMockUser
