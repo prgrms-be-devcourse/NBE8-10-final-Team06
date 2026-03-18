@@ -12,4 +12,4 @@ public record StoryCreateResponse(
         LocalDateTime createdAt,
         LocalDateTime expiredAt,
         String content,
-        List<Long> tagedUserIds) {}
+        List<Long> taggedUserIds) {}
