@@ -33,17 +33,17 @@ public class Comment extends BaseEntity {
 
     @Column(nullable = false)
     @Builder.Default
-    private boolean isDeleted = false;
+    private boolean is_deleted = false;
 
     public void modify(String content) {
         this.content = content;
     }
 
     public void softDelete() {
-        this.isDeleted = true;
+        this.is_deleted = true;
         this.content = "[삭제된 댓글입니다.]";
     }
 
-    @Formula("(SELECT count(*) FROM comment c WHERE c.parent_id = id AND c.deleted = false)")
+    @Formula("(SELECT count(*) FROM comment c WHERE c.parent_id = id AND c.is_deleted = false)")
     private long replyCount;
 }

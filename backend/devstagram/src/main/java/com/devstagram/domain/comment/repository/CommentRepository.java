@@ -11,17 +11,15 @@ import com.devstagram.domain.comment.entity.Comment;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    @Query("select c from Comment c " + "join fetch c.author m "
-            + "left join fetch m.profileImage i "
+    @Query("select c from Comment c " + "join fetch c.user m "
             + "where c.post.id = :postId and c.parent is null "
-            + "order by c.createDate desc")
-    Slice<Comment> findCommentsWithMemberAndImageByPostId(@Param("postId") Long postId, Pageable pageable);
+            + "order by c.createdAt desc")
+    Slice<Comment> findCommentsWithUserAndImageByPostId(@Param("postId") Long postId, Pageable pageable);
 
-    @Query("select r from Comment r " + "join fetch r.author m "
-            + "left join fetch m.profileImage i "
+    @Query("select r from Comment r " + "join fetch r.user m "
             + "where r.parent.id = :parentId "
-            + "order by r.createDate asc")
-    Slice<Comment> findRepliesWithMemberAndImageByParentId(@Param("parentId") Long parentId, Pageable pageable);
+            + "order by r.createdAt asc")
+    Slice<Comment> findRepliesWithUserAndImageByParentId(@Param("parentId") Long parentId, Pageable pageable);
 
     /**
      * 특정 게시글의 모든 대댓글(자식)을 먼저 삭제합니다.

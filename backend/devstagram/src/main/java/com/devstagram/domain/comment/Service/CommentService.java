@@ -71,7 +71,7 @@ public class CommentService {
                 CommentConstants.COMMENT_PAGE_SIZE,
                 Sort.by(Sort.Direction.ASC, CommentConstants.DEFAULT_SORT_FIELD));
 
-        Slice<Comment> comments = commentRepository.findCommentsWithMemberAndImageByPostId(postId, pageable);
+        Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
 
         return comments.map(CommentInfoRes::new);
     }
@@ -87,7 +87,7 @@ public class CommentService {
                 CommentConstants.REPLY_PAGE_SIZE,
                 Sort.by(Sort.Direction.ASC, CommentConstants.DEFAULT_SORT_FIELD));
 
-        Slice<Comment> replies = commentRepository.findRepliesWithMemberAndImageByParentId(commentId, pageable);
+        Slice<Comment> replies = commentRepository.findRepliesWithUserAndImageByParentId(commentId, pageable);
 
         return replies.map(ReplyInfoRes::new);
     }
@@ -113,7 +113,7 @@ public class CommentService {
             throw new ServiceException("403", "삭제 권한이 없습니다.");
         }
 
-        if (comment.isDeleted()) {
+        if (comment.is_deleted()) {
             return;
         }
 
