@@ -1,23 +1,18 @@
 package com.devstagram.domain.post.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
-
 import com.devstagram.domain.post.entity.Post;
-import com.devstagram.global.config.JpaAuditConfig;
+
 
 @DataJpaTest
-@Import(JpaAuditConfig.class) // Audit 기능을 위해 생성하신 설정을 임포트합니다.
 class PostRepositoryTest {
 
     @Autowired
@@ -36,7 +31,7 @@ class PostRepositoryTest {
         assertThat(savedPost.getId()).isNotNull();
         assertThat(savedPost.getTitle()).isEqualTo("테스트 제목");
         assertThat(savedPost.getLikeCount()).isEqualTo(0L);
-        assertThat(savedPost.getCreatedAt()).isBeforeOrEqualsTo(new Date());
+        assertThat(savedPost.getCreatedAt()).isBeforeOrEqualTo(LocalDateTime.now());
     }
 
     @Test

@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +43,7 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("[게시글 생성 성공] - 200") // TODO: 201반환으로 바꿀 예정
+    @DisplayName("[게시글 생성 성공] - 200")
     void createPost_Success() throws Exception {
         // given
         PostCreateReq req = new PostCreateReq("새 제목", "새 내용");
@@ -54,8 +54,8 @@ class PostControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isCreated()) // isOk() 대신 isCreated() 사용 (201 상태 코드 확인)
-                .andExpect(header().string("Location", "/api/posts/1")); // Location 헤더에 기대하는 URI가 포함되었는지 확인
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/posts/1"));
     }
 
     @Test
@@ -101,9 +101,8 @@ class PostControllerTest {
     void getPostDetail_Success() throws Exception {
         // given
         Long postId = 1L;
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
 
-        // 정원님의 PostDetailRes 구조에 맞춘 가짜 데이터 생성
         PostDetailRes response = PostDetailRes.builder()
                 .id(postId)
                 .title("테스트 제목")
@@ -132,8 +131,8 @@ class PostControllerTest {
     @DisplayName("[게시물 피드 조회 성공]")
     void getPostFeed_Success() throws Exception {
         // given
-        Date now = new Date();
-        // 1. 가짜 게시글 목록 생성
+        LocalDateTime now = LocalDateTime.now();
+
         List<PostFeedRes> content = List.of(
                 PostFeedRes.builder()
                         .id(1L)
@@ -152,7 +151,6 @@ class PostControllerTest {
                         .createdAt(now)
                         .build());
 
-        // 2. SliceImpl로 감싸기 (Pageable 정보와 다음 페이지 존재 여부 포함)
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
         Slice<PostFeedRes> sliceResponse = new SliceImpl<>(content, pageable, false);
 
@@ -163,12 +161,10 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("피드 조회 성공"))
-                // Slice 객체는 content라는 필드 안에 실제 리스트가 들어있습니다.
                 .andExpect(jsonPath("$.data.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.content[0].title").value("제목1"))
                 .andExpect(jsonPath("$.data.content[1].id").value(2L))
                 .andExpect(jsonPath("$.data.content[1].likeCount").value(5))
-                // Slice의 무한 스크롤 핵심 필드 검증
                 .andExpect(jsonPath("$.data.last").value(true))
                 .andExpect(jsonPath("$.data.first").value(true));
     }
