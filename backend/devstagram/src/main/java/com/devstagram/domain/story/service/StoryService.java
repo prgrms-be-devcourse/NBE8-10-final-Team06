@@ -33,7 +33,7 @@ public class StoryService {
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
 
-        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
 
         StoryMedia media = StoryMedia.builder()
                 .mediaType(request.mediaType())
@@ -54,7 +54,7 @@ public class StoryService {
                     .map(targetUserId -> {
                         User targetUser = userRepository
                                 .findById(targetUserId)
-                                .orElseThrow(() -> new ServiceException("404", "태그된 사용자를 찾을 수 없음"));
+                                .orElseThrow(() -> new ServiceException("404-F-2", "태그된 사용자를 찾을 수 없음"));
 
                         return StoryTag.builder()
                                 .story(savedStory)
@@ -79,7 +79,7 @@ public class StoryService {
     @Transactional
     public List<StoryDetailResponse> getUserAllStories(Long targetUserId, Long currentUserId) {
 
-        userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저."));
+        userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저."));
 
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
 
@@ -108,14 +108,15 @@ public class StoryService {
     @Transactional
     public void softDeleteStory(Long storyId, Long userId) {
 
-        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
         if (!story.getUser().getId().equals(userId)) {
-            throw new ServiceException("403", "본인 스토리만 삭제 가능");
+            throw new ServiceException("403-F-1", "본인 스토리만 삭제 가능");
         }
 
         if (story.isDeleted()) {
-            throw new ServiceException("404", "만료된 스토리.");
+            throw new ServiceException("404-F-2", "만료된 스토리.");
         } else {
             story.softDelete();
         }
@@ -124,10 +125,11 @@ public class StoryService {
     @Transactional
     public void hardDeleteStory(Long storyId, Long userId) {
 
-        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
         if (!story.getUser().getId().equals(userId)) {
-            throw new ServiceException("403", "본인 스토리만 삭제 가능");
+            throw new ServiceException("403-F-1", "본인 스토리만 삭제 가능");
         }
 
         storyRepository.delete(story);
@@ -136,17 +138,18 @@ public class StoryService {
     @Transactional
     public StoryViewResponse patchStoryLike(Long storyId, Long userId) {
 
-        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리."));
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리."));
 
         if (story.isDeleted()) {
-            throw new ServiceException("404", "만료/삭제된 스토리.");
+            throw new ServiceException("404-F-2", "만료/삭제된 스토리");
         }
 
         recordingStoryView(story, userId); // 조회 기록 없으면 생성
 
         StoryViewed storyViewed = storyViewedRepository
                 .findByStoryIdAndUserId(storyId, userId)
-                .orElseThrow(() -> new ServiceException("500", "조회 기록 갱신 실패"));
+                .orElseThrow(() -> new ServiceException("500-F-1", "조회 기록 갱신 실패"));
 
         storyViewed.updateLike(); // 스토리의 좋아요 갱신
 
@@ -181,10 +184,11 @@ public class StoryService {
     @Transactional(readOnly = true)
     public List<StoryViewerUserResponse> getStoryViewers(Long storyId, Long currentUserId) {
 
-        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
         if (!story.getUser().getId().equals(currentUserId)) {
-            throw new ServiceException("403", "본인만 확인 가능");
+            throw new ServiceException("403-F-1", "본인만 확인 가능");
         }
 
         List<StoryViewed> viewers = storyViewedRepository.findByStoryIdOrderByViewedAtDesc(storyId);
@@ -196,10 +200,11 @@ public class StoryService {
     @Transactional(readOnly = true)
     public List<StoryViewerUserResponse> getStoryLiker(Long storyId, Long currentUserId) {
 
-        Story story = storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 스토리"));
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
         if (!story.getUser().getId().equals(currentUserId)) {
-            throw new ServiceException("403", "본인만 확인 가능");
+            throw new ServiceException("403-F-1", "본인만 확인 가능");
         }
 
         List<StoryViewed> likers = storyViewedRepository.findByStoryIdAndIsLikedTrueOrderByLikedAtDesc(storyId);

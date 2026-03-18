@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,10 +24,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.devstagram.domain.story.dto.StoryCreateRequest;
-import com.devstagram.domain.story.dto.StoryCreateResponse;
-import com.devstagram.domain.story.dto.StoryDetailResponse;
-import com.devstagram.domain.story.dto.StoryLikeResponse;
+import com.devstagram.domain.story.dto.*;
 import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.enumtype.MediaType;
@@ -137,16 +135,44 @@ class StoryControllerTest {
 
     @Test
     @DisplayName("좋아요 업데이트 성공(좋아요)")
-    void patchStoryLike_Success() throws Exception {
+    void patchStoryLike_Success_Like() throws Exception {
         Long storyId = 10L;
-        StoryLikeResponse response = new StoryLikeResponse(storyId, 5L, true);
+        StoryViewResponse response = StoryViewResponse.builder()
+                .storyId(storyId)
+                .userId(1L)
+                .totalLikeCount(5L)
+                .isLiked(true)
+                .likedAt(LocalDateTime.now())
+                .build();
 
         given(storyService.patchStoryLike(eq(storyId), eq(1L))).willReturn(response);
 
         mockMvc.perform(post("/api/story/{storyId}/like", storyId).with(csrf()).with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("스토리에 좋아요"));
+                .andExpect(jsonPath("$.msg").value("스토리에 좋아요"))
+                .andExpect(jsonPath("$.data.isLiked").value(true));
+    }
+
+    @Test
+    @DisplayName("좋아요 업데이트 성공(좋아요 취소)")
+    void patchStoryLike_Success_Unlike() throws Exception {
+        Long storyId = 10L;
+        StoryViewResponse response = StoryViewResponse.builder()
+                .storyId(storyId)
+                .userId(1L)
+                .totalLikeCount(4L)
+                .isLiked(false)
+                .likedAt(null)
+                .build();
+
+        given(storyService.patchStoryLike(eq(storyId), eq(1L))).willReturn(response);
+
+        mockMvc.perform(post("/api/story/{storyId}/like", storyId).with(csrf()).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.msg").value("스토리 좋아요 취소"))
+                .andExpect(jsonPath("$.data.isLiked").value(false));
     }
 
     @Test
@@ -159,7 +185,7 @@ class StoryControllerTest {
                         .with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("스토리가 소프트 딜리트 성공"));
+                .andExpect(jsonPath("$.msg").value("스토리 수동 소프트 딜리트 성공"));
 
         verify(storyService).softDeleteStory(eq(storyId), eq(1L));
     }
@@ -177,5 +203,64 @@ class StoryControllerTest {
                 .andExpect(jsonPath("$.msg").value("스토리 하드 딜리트 성공"));
 
         verify(storyService).hardDeleteStory(eq(storyId), eq(1L));
+    }
+
+    @Test
+    @DisplayName("스토리 본 유저들 조회 성공")
+    void getStoryViewers_Success() throws Exception {
+        Long storyId = 10L;
+        StoryViewerUserResponse viewer = StoryViewerUserResponse.builder()
+                .userId(2L)
+                .nickname("viewer1")
+                .isLiked(false)
+                .viewedAt(LocalDateTime.now())
+                .build();
+
+        given(storyService.getStoryViewers(eq(storyId), eq(1L))).willReturn(List.of(viewer));
+
+        mockMvc.perform(get("/api/story/{storyId}/viewers", storyId).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data[0].nickname").value("viewer1"));
+    }
+
+    @Test
+    @DisplayName("스토리 좋아요 누른 유저 목록 조회 성공")
+    void getStoryLiker_Success() throws Exception {
+        Long storyId = 10L;
+        StoryViewerUserResponse liker = StoryViewerUserResponse.builder()
+                .userId(3L)
+                .nickname("liker1")
+                .isLiked(true)
+                .likedAt(LocalDateTime.now())
+                .build();
+
+        given(storyService.getStoryLiker(eq(storyId), eq(1L))).willReturn(List.of(liker));
+
+        mockMvc.perform(get("/api/story/{storyId}/liker", storyId).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data[0].nickname").value("liker1"));
+    }
+
+    @Test
+    @DisplayName("만료된 스토리 목록 조회 성공")
+    void getMyArchivedStories_Success() throws Exception {
+        StoryDetailResponse detailResponse = StoryDetailResponse.builder()
+                .storyId(11L)
+                .content("아카이브 테스트")
+                .totalLikeCount(2L)
+                .isLiked(true)
+                .build();
+
+        given(storyService.getMyArchivedStories(eq(1L))).willReturn(List.of(detailResponse));
+
+        mockMvc.perform(get("/api/story/archive").with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data[0].content").value("아카이브 테스트"));
     }
 }
