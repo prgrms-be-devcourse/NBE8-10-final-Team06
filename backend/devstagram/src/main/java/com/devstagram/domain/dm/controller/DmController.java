@@ -1,12 +1,16 @@
 package com.devstagram.domain.dm.controller;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
-import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.rsdata.RsData;
+import com.devstagram.global.security.SecurityUtil;
 
 @RestController
 @RequestMapping("/api/dm")
@@ -28,13 +32,12 @@ public class DmController {
             @PathVariable("roomId") Long roomId,
             @RequestParam(name = "cursor", required = false) Long cursor,
             @RequestParam(name = "size", defaultValue = "10") int size) {
-        // TODO: 인증 연동 시 실제 로그인 유저 주입
-        User currentUser = new User();
+        Long currentUserId = SecurityUtil.getCurrentUserId();
 
         // 첫 진입 시 기본 15개
         int effectiveSize = (cursor == null) ? 15 : size;
 
-        DmMessageSliceResponse response = dmService.getMessages(currentUser, roomId, cursor, effectiveSize);
+        DmMessageSliceResponse response = dmService.getMessages(currentUserId, roomId, cursor, effectiveSize);
 
         return RsData.success(response);
     }
@@ -46,11 +49,9 @@ public class DmController {
      */
     @GetMapping("/rooms")
     public RsData<java.util.List<DmRoomSummaryResponse>> getRooms() {
-        // TODO : 인증 연동 시 실제 로그인 유저 주입
-        User currentUser = new User();
-        currentUser.setId("mock-user"); // TODO: SecurityContext 와 연동
+        Long currentUserId = SecurityUtil.getCurrentUserId();
 
-        java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUser);
+        java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
 
         return RsData.success(rooms);
     }

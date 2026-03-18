@@ -15,7 +15,6 @@ import com.devstagram.domain.dm.entity.Dm;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
-import com.devstagram.domain.user.entity.User;
 
 @Service
 public class DmService {
@@ -36,14 +35,14 @@ public class DmService {
      * cursor 가 null 이면 최신 메시지부터 size 개,
      * cursor 가 있으면 해당 ID 이전의 메시지들을 size 개 조회한다.
      */
-    public DmMessageSliceResponse getMessages(User user, Long roomId, Long cursor, int size) {
+    public DmMessageSliceResponse getMessages(Long userId, Long roomId, Long cursor, int size) {
         if (!dmRoomRepository.existsById(roomId)) {
             throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
         }
 
         // 방 접근 권한 체크 (간단한 participant 존재 여부 기반)
-        if (user != null && user.getId() != null) {
-            boolean canAccess = dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, user.getId());
+        if (userId != null) {
+            boolean canAccess = dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, userId);
             if (!canAccess) {
                 throw new IllegalStateException("채팅방에 참여하고 있지 않습니다.");
             }
@@ -78,12 +77,12 @@ public class DmService {
     /**
      * 로그인한 유저가 속한 DM 방 목록 + 각 방의 마지막 메시지 1개 조회.
      */
-    public List<DmRoomSummaryResponse> getRoomsWithLastMessage(User user) {
-        if (user == null || user.getId() == null) {
+    public List<DmRoomSummaryResponse> getRoomsWithLastMessage(Long userId) {
+        if (userId == null) {
             throw new IllegalArgumentException("유저 정보가 필요합니다.");
         }
 
-        return dmRoomUserRepository.findByUser_Id(user.getId()).stream()
+        return dmRoomUserRepository.findByUser_Id(userId).stream()
                 .map(roomUser -> {
                     var room = roomUser.getDmRoom();
                     Dm last = dmRepository.findTopByDmRoom_IdOrderByIdDesc(room.getId());
@@ -103,7 +102,7 @@ public class DmService {
                     var participantDtos = dmRoomUserRepository.findByDmRoom_Id(room.getId()).stream()
                             .filter(ru -> ru.getUser() != null
                                     && ru.getUser().getId() != null
-                                    && !ru.getUser().getId().equals(user.getId()))
+                                    && !ru.getUser().getId().equals(userId))
                             .map(ru -> new DmRoomParticipantSummary(
                                     ru.getUser().getId(), ru.getUser().getEmail()))
                             .collect(Collectors.toList());

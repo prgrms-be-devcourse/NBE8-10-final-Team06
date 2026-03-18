@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import java.util.Date;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,6 @@ import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
-import com.devstagram.domain.user.entity.User;
 
 @ExtendWith(MockitoExtension.class)
 class DmServiceTest {
@@ -57,41 +55,35 @@ class DmServiceTest {
     void getMessages_userNotParticipant_throws() {
         when(dmRoomRepository.existsById(1L)).thenReturn(true);
 
-        User user = new User();
-        user.setId("u1");
-        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, "u1")).thenReturn(false);
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(false);
 
-        assertThatThrownBy(() -> dmService.getMessages(user, 1L, null, 15)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> dmService.getMessages(1L, 1L, null, 15)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void getMessages_cursorNull_fetchLatestAndComputesNextCursor() {
         when(dmRoomRepository.existsById(1L)).thenReturn(true);
 
-        User user = new User();
-        user.setId("u1");
-        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, "u1")).thenReturn(true);
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(true);
 
-        Dm dm3 = new Dm();
-        dm3.setId(3L);
-        dm3.setType(MessageType.TEXT);
-        dm3.setContent("c3");
-        dm3.setValid(true);
-        dm3.setCreatedAt(new Date());
+        Dm dm3 = mock(Dm.class);
+        when(dm3.getId()).thenReturn(3L);
+        when(dm3.getType()).thenReturn(MessageType.TEXT);
+        when(dm3.getContent()).thenReturn("c3");
+        when(dm3.isValid()).thenReturn(true);
 
-        Dm dm2 = new Dm();
-        dm2.setId(2L);
-        dm2.setType(MessageType.TEXT);
-        dm2.setContent("c2");
-        dm2.setValid(true);
-        dm2.setCreatedAt(new Date());
+        Dm dm2 = mock(Dm.class);
+        when(dm2.getId()).thenReturn(2L);
+        when(dm2.getType()).thenReturn(MessageType.TEXT);
+        when(dm2.getContent()).thenReturn("c2");
+        when(dm2.isValid()).thenReturn(true);
 
         Slice<Dm> slice = new SliceImpl<>(List.of(dm3, dm2), PageRequest.of(0, 2), true);
 
         when(dmRepository.findByDmRoom_IdOrderByIdDesc(eq(1L), any(PageRequest.class)))
                 .thenReturn(slice);
 
-        DmMessageSliceResponse res = dmService.getMessages(user, 1L, null, 2);
+        DmMessageSliceResponse res = dmService.getMessages(1L, 1L, null, 2);
 
         verify(dmRepository).findByDmRoom_IdOrderByIdDesc(eq(1L), pageRequestCaptor.capture());
         assertThat(pageRequestCaptor.getValue().getPageSize()).isEqualTo(2);
@@ -105,22 +97,19 @@ class DmServiceTest {
     void getMessages_cursorProvided_fetchBeforeCursor() {
         when(dmRoomRepository.existsById(1L)).thenReturn(true);
 
-        User user = new User();
-        user.setId("u1");
-        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, "u1")).thenReturn(true);
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(true);
 
-        Dm dm9 = new Dm();
-        dm9.setId(9L);
-        dm9.setType(MessageType.TEXT);
-        dm9.setContent("c9");
-        dm9.setValid(true);
-        dm9.setCreatedAt(new Date());
+        Dm dm9 = mock(Dm.class);
+        when(dm9.getId()).thenReturn(9L);
+        when(dm9.getType()).thenReturn(MessageType.TEXT);
+        when(dm9.getContent()).thenReturn("c9");
+        when(dm9.isValid()).thenReturn(true);
 
         Slice<Dm> slice = new SliceImpl<>(List.of(dm9), PageRequest.of(0, 1), false);
         when(dmRepository.findByDmRoom_IdAndIdLessThanOrderByIdDesc(eq(1L), eq(10L), any(PageRequest.class)))
                 .thenReturn(slice);
 
-        DmMessageSliceResponse res = dmService.getMessages(user, 1L, 10L, 1);
+        DmMessageSliceResponse res = dmService.getMessages(1L, 1L, 10L, 1);
 
         verify(dmRepository).findByDmRoom_IdAndIdLessThanOrderByIdDesc(eq(1L), eq(10L), any(PageRequest.class));
         assertThat(res.messages()).hasSize(1);
