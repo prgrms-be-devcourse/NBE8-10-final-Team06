@@ -38,6 +38,7 @@ public class Story {
     private String thumbnailUrl;
     private LocalDateTime expiredAt;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "story_likes",
@@ -45,6 +46,7 @@ public class Story {
             inverseJoinColumns = @JoinColumn(name = "user_id"))
     private List<User> likes = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StoryTag> tags = new ArrayList<>();
 

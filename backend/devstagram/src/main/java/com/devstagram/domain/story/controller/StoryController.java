@@ -49,7 +49,7 @@ public class StoryController {
         Long userId = securityUser.getId();
         StoryLikeResponse response = storyService.patchStoryLike(storyId, userId);
 
-        String msg = response.getIsLiked() ? "스토리에 좋아요" : "스토리 좋아요 취소";
+        String msg = response.isLiked() ? "스토리에 좋아요" : "스토리 좋아요 취소";
 
         return RsData.success(msg, response);
     }

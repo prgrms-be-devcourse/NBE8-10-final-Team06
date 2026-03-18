@@ -3,18 +3,13 @@ package com.devstagram.domain.story.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
 
-@Getter
 @Builder
-@AllArgsConstructor
-public class StoryCreateResponse {
-    private Long storyId;
-    private Long userId;
-    private LocalDateTime createdAt;
-    private LocalDateTime expiredAt;
-    private String content;
-    private List<Long> tagedUserIds;
-}
+public record StoryCreateResponse(
+        Long storyId,
+        Long userId,
+        LocalDateTime createdAt,
+        LocalDateTime expiredAt,
+        String content,
+        List<Long> tagedUserIds) {}

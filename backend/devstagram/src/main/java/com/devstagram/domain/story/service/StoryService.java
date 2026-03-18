@@ -33,21 +33,21 @@ public class StoryService {
         User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저"));
 
         StoryMedia media = StoryMedia.builder()
-                .mediaType(request.getMediaType())
-                .sourceUrl(request.getStorageSource())
+                .mediaType(request.mediaType())
+                .sourceUrl(request.storageSource())
                 .build();
 
         Story story = Story.builder()
                 .user(user)
-                .content(request.getContent())
-                .thumbnailUrl(request.getThumbnailUrl())
+                .content(request.content())
+                .thumbnailUrl(request.thumbnailUrl())
                 .storyMedia(media)
                 .build();
 
         Story savedStory = storyRepository.save(story);
 
-        if (request.getTagUserIds() != null) { // 태그된 유저 존재하는지 검증 & storyTag 생성
-            List<StoryTag> tags = request.getTagUserIds().stream()
+        if (request.tagUserIds() != null) { // 태그된 유저 존재하는지 검증 & storyTag 생성
+            List<StoryTag> tags = request.tagUserIds().stream()
                     .map(targetUserId -> {
                         User targetUser = userRepository
                                 .findById(targetUserId)
@@ -69,7 +69,7 @@ public class StoryService {
                 .createdAt(story.getCreatedAt())
                 .expiredAt(story.getExpiredAt())
                 .content(story.getContent())
-                .tagedUserIds(request.getTagUserIds())
+                .tagedUserIds(request.tagUserIds())
                 .build();
     }
 

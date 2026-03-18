@@ -4,17 +4,8 @@ import java.util.List;
 
 import com.devstagram.global.enumtype.MediaType;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
 
-@Getter
 @Builder
-@AllArgsConstructor
-public class StoryCreateRequest {
-    private String content;
-    private List<Long> tagUserIds;
-    private MediaType mediaType;
-    private String storageSource;
-    private String thumbnailUrl;
-}
+public record StoryCreateRequest(
+        String content, List<Long> tagUserIds, MediaType mediaType, String storageSource, String thumbnailUrl) {}
