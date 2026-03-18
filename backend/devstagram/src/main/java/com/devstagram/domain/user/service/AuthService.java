@@ -34,7 +34,6 @@ public class AuthService {
         return SignupResponse.from(userRepository.save(user));
     }
 
-    @Transactional
     public LoginDto login(LoginRequest request) {
         User user = userRepository
                 .findByEmail(request.email())
