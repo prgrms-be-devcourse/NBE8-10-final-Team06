@@ -24,6 +24,7 @@ import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
+import com.devstagram.domain.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class DmServiceTest {
@@ -36,6 +37,9 @@ class DmServiceTest {
 
     @Mock
     private DmRoomUserRepository dmRoomUserRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private DmService dmService;
