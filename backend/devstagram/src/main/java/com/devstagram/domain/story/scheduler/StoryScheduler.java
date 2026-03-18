@@ -4,10 +4,10 @@ import java.time.LocalDateTime;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.story.repository.StoryRepository;
 
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Component
@@ -20,6 +20,6 @@ public class StoryScheduler {
     public void checkExpiredStories() {
         LocalDateTime now = LocalDateTime.now();
 
-        storyRepository.SoftDeleteAllExpiredStories(now);
+        storyRepository.softDeleteAllExpiredStories(now);
     }
 }

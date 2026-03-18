@@ -72,7 +72,7 @@ public class StoryService {
                 .createdAt(story.getCreatedAt())
                 .expiredAt(story.getExpiredAt())
                 .content(story.getContent())
-                .tagedUserIds(request.tagUserIds())
+                .taggedUserIds(request.tagUserIds())
                 .build();
     }
 

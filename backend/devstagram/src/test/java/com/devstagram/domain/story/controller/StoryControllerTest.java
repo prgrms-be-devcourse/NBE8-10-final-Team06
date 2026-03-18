@@ -98,7 +98,7 @@ class StoryControllerTest {
                 .storyId(10L)
                 .userId(1L)
                 .content("테스트 스토리")
-                .tagedUserIds(List.of(2L))
+                .taggedUserIds(List.of(2L))
                 .build();
 
         given(storyService.createStory(eq(1L), any(StoryCreateRequest.class))).willReturn(response);
@@ -238,7 +238,7 @@ class StoryControllerTest {
 
         given(storyService.getStoryLiker(eq(storyId), eq(1L))).willReturn(List.of(liker));
 
-        mockMvc.perform(get("/api/story/{storyId}/liker", storyId).with(user(mockSecurityUser)))
+        mockMvc.perform(get("/api/story/{storyId}/likers", storyId).with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
