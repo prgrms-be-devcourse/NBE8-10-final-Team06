@@ -26,11 +26,13 @@ public class PostController {
     private final PostService postService;
 
     @PostMapping
-    public ResponseEntity<Void> createPost(@Valid @RequestBody PostCreateReq req) {
+    public ResponseEntity<RsData<Long>> createPost(@Valid @RequestBody PostCreateReq req) {
 
         Long postId = postService.createPost(req);
 
-        return ResponseEntity.created(URI.create("/api/posts/" + postId)).build();
+        RsData<Long> rsData = new RsData<>("201-S-1", "게시글 생성 성공", postId);
+
+        return ResponseEntity.created(URI.create("/api/posts/" + postId)).body(rsData);
     }
 
     @PutMapping("/{postId}")

@@ -16,7 +16,6 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class PostService {
     private final PostRepository postRepository;

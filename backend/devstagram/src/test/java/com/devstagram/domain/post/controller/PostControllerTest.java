@@ -86,7 +86,7 @@ class PostControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("[게시글 생성 성공] - 200")
+    @DisplayName("[게시글 생성 성공] - 201")
     void createPost_Success() throws Exception {
         // given
         PostCreateReq req = new PostCreateReq("새 제목", "새 내용");
