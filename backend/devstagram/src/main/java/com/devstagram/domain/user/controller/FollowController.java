@@ -21,7 +21,6 @@ public class FollowController {
     // 팔로우 실행
     @PostMapping("/{toUserId}")
     public RsData<Void> follow(@PathVariable Long toUserId) {
-        // SecurityUtil을 사용하여 현재 로그인한 유저 ID 추출
         Long loginUserId = SecurityUtil.getCurrentUserId();
 
         followService.follow(loginUserId, toUserId);
