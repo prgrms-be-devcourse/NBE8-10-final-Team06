@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/modules/devstagram.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/devstagram.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules/devstagram.main.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/devstagram.main.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules/devstagram.test.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/devstagram.test.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="06f140e8-7a63-4d23-9d80-b23c70565fe6" name="변경" comment="refactor : rsData에 맞게 에러코드 변경" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
