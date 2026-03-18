@@ -2,8 +2,13 @@ package com.devstagram.domain.user.entity;
 
 import java.util.Date;
 
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
 public class User {
-    String id;
+    Long id;
     String email;
     String password;
     Date birthDate;

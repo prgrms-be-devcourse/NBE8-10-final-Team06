@@ -4,18 +4,18 @@ import java.time.LocalDateTime;
 
 import org.springframework.data.annotation.CreatedDate;
 
-import com.devstagram.global.enumtype.MediaType;
+import com.devstagram.domain.user.entity.User;
 
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "story_media")
+@Table(name = "story_tag")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Builder
 @AllArgsConstructor
-public class StoryMedia {
+@Builder
+public class StoryTag {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,10 +24,11 @@ public class StoryMedia {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    MediaType mediaType; // 이미지, 동영상
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_id", nullable = false)
+    private User target;
 
-    @Column(nullable = false)
-    String sourceUrl;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "story_id", nullable = false)
+    private Story story;
 }
