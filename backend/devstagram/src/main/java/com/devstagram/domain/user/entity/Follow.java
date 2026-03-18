@@ -18,10 +18,10 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 @Table(
-        name = "follow",
+        name = "follows",
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_follow_from_to",
@@ -38,11 +38,4 @@ public class Follow extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_user_id", nullable = false)
     private User toUser;   // 팔로우 대상 (상대방)
-
-    @PrePersist
-    public void validate() {
-        if (fromUser.getId().equals(toUser.getId())) {
-            throw new ServiceException("400-F-1", "자기 자신을 팔로우할 수 없습니다.");
-        }
-    }
 }
