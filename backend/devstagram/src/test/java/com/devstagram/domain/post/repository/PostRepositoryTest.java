@@ -6,9 +6,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.devstagram.domain.user.entity.Gender;
-import com.devstagram.domain.user.entity.User;
-import com.devstagram.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +14,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.user.entity.Gender;
+import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.UserRepository;
 
 @DataJpaTest
 class PostRepositoryTest {

@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.devstagram.domain.post.repository.PostLikeRepository;
-import com.devstagram.domain.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +20,9 @@ import com.devstagram.domain.post.dto.PostCreateReq;
 import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
