@@ -30,4 +30,11 @@ public class DmRoom extends BaseEntity {
         room.isGroup = false;
         return room;
     }
+
+    public static DmRoom createGroupRoom(String name) {
+        DmRoom room = new DmRoom();
+        room.name = name;
+        room.isGroup = true;
+        return room;
+    }
 }

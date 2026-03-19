@@ -5,11 +5,14 @@ import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmCreateGroupWithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmGroupRoomCreateRequest;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
@@ -67,5 +70,14 @@ public class DmController {
     public RsData<DmCreate1v1WithRoomListResponse> create1v1Room(@PathVariable("otherUserId") Long otherUserId) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         return RsData.success(dmService.create1v1RoomAndReturnRooms(currentUserId, otherUserId));
+    }
+
+    /**
+     * 그룹 채팅방 생성 + 내 room list 반환
+     */
+    @PostMapping("/rooms/group")
+    public RsData<DmCreateGroupWithRoomListResponse> createGroupRoom(@RequestBody DmGroupRoomCreateRequest request) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        return RsData.success(dmService.createGroupRoomAndReturnRooms(currentUserId, request));
     }
 }

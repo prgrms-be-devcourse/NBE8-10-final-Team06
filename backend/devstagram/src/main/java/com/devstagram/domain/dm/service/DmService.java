@@ -12,6 +12,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 
 import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmCreateGroupWithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmGroupRoomCreateRequest;
 import com.devstagram.domain.dm.dto.DmMessageResponse;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomParticipantSummary;
@@ -127,18 +129,8 @@ public class DmService {
 
         List<DmRoomUser> myRoomUsers = dmRoomUserRepository.findByUser_Id(currentUserId);
 
-        // 1:1 후보 방 탐색은 "이미 조회한 내 room list"에서 수행
-        var roomById = myRoomUsers.stream()
-                .filter(ru -> ru.getDmRoom() != null && ru.getDmRoom().getId() != null)
-                .collect(Collectors.toMap(ru -> ru.getDmRoom().getId(), ru -> ru.getDmRoom(), (a, b) -> a));
-
-        Long existingRoomId = roomById.values().stream()
-                .filter(room -> room.getIsGroup() != null && !room.getIsGroup())
-                .filter(room -> dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(room.getId(), otherUserId))
-                .filter(room -> dmRoomUserRepository.countByDmRoom_Id(room.getId()) == 2)
-                .map(DmRoom::getId)
-                .findFirst()
-                .orElse(null);
+        Long existingRoomId =
+                dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId).orElse(null);
 
         if (existingRoomId != null) {
             List<DmRoomSummaryResponse> rooms = buildRoomsSummary(currentUserId, myRoomUsers);
@@ -149,6 +141,52 @@ public class DmService {
         Long createdRoomId = create1v1Room(currentUserId, otherUserId);
         List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
         return new DmCreate1v1WithRoomListResponse(createdRoomId, rooms);
+    }
+
+    /**
+     * 그룹 채팅방 생성 + 내 room list 반환
+     */
+    public DmCreateGroupWithRoomListResponse createGroupRoomAndReturnRooms(
+            Long currentUserId, DmGroupRoomCreateRequest request) {
+        if (currentUserId == null) {
+            throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
+        }
+        if (request == null) {
+            throw new ServiceException("400-F-1", "요청 값이 필요합니다.");
+        }
+        if (request.name() == null || request.name().isBlank()) {
+            throw new ServiceException("400-F-2", "방 이름이 필요합니다.");
+        }
+        if (request.userIds() == null || request.userIds().isEmpty()) {
+            throw new ServiceException("400-F-3", "참여 유저 목록이 필요합니다.");
+        }
+
+        // currentUser 포함 + 중복 제거
+        Set<Long> memberIds =
+                request.userIds().stream().filter(id -> id != null).collect(Collectors.toSet());
+        memberIds.add(currentUserId);
+
+        // 최소 2명 (currentUser 포함)
+        if (memberIds.size() < 2) {
+            throw new ServiceException("400-F-4", "그룹 채팅은 최소 2명 이상이어야 합니다.");
+        }
+
+        DmRoom room = DmRoom.createGroupRoom(request.name());
+        DmRoom savedRoom = dmRoomRepository.save(room);
+
+        List<DmRoomUser> roomUsers = memberIds.stream()
+                .map(memberId -> {
+                    User member = userRepository
+                            .findById(memberId)
+                            .orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
+                    return DmRoomUser.create(savedRoom, member, new Date());
+                })
+                .collect(Collectors.toList());
+
+        dmRoomUserRepository.saveAll(roomUsers);
+
+        List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
+        return new DmCreateGroupWithRoomListResponse(savedRoom.getId(), rooms);
     }
 
     private List<DmRoomSummaryResponse> buildRoomsSummary(Long userId, List<DmRoomUser> myRoomUsers) {
@@ -375,15 +413,8 @@ public class DmService {
             throw new ServiceException("400-F-1", "자기 자신과의 1:1 DM 은 생성할 수 없습니다.");
         }
 
-        // 현재 유저가 포함된 방들 중에서 1:1 후보 탐색
-        return dmRoomUserRepository.findByUser_Id(currentUserId).stream()
-                .map(DmRoomUser::getDmRoom)
-                .distinct()
-                .filter(room -> room.getIsGroup() != null && !room.getIsGroup())
-                .filter(room -> dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(room.getId(), otherUserId))
-                .filter(room -> dmRoomUserRepository.countByDmRoom_Id(room.getId()) == 2)
-                .findFirst()
-                .map(DmRoom::getId)
+        return dmRoomUserRepository
+                .find1v1RoomId(currentUserId, otherUserId)
                 .orElseGet(() -> create1v1Room(currentUserId, otherUserId));
     }
 
