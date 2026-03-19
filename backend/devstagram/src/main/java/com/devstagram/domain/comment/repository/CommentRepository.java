@@ -26,23 +26,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
             + "order by r.createdAt asc")
     Slice<Comment> findRepliesWithUserAndImageByParentId(@Param("parentId") Long parentId, Pageable pageable);
 
-    /**
-     * 특정 게시글의 모든 대댓글(자식)을 먼저 삭제합니다.
-     */
     @Modifying
     @Query("delete from Comment c where c.post.id = :postId and c.parent is not null")
     void deleteRepliesByPostId(@Param("postId") Long postId);
 
-    /**
-     * 특정 게시글의 모든 일반 댓글(부모)을 삭제합니다.
-     */
     @Modifying
     @Query("delete from Comment c where c.post.id = :postId and c.parent is null")
     void deleteParentsByPostId(@Param("postId") Long postId);
 
     boolean existsByParent(Comment parent);
 
-    // 비관적 락을 사용하여 다른 트랜잭션의 접근을 제어
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Comment c WHERE c.id = :id")
     Optional<Comment> findByIdWithLock(@Param("id") Long id);

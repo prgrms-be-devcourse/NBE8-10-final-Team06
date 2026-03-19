@@ -35,6 +35,10 @@ public class Comment extends BaseEntity {
     @Builder.Default
     private boolean is_deleted = false;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private long likeCount = 0;
+
     public void modify(String content) {
         this.content = content;
     }
