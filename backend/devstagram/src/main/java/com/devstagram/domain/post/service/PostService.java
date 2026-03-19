@@ -99,7 +99,7 @@ public class PostService {
                 .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
-        Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndMemberId(postId, memberId);
+        Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
 
         if (existingLike.isPresent()) {
 

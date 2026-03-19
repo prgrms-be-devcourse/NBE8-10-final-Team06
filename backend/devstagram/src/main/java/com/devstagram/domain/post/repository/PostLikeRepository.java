@@ -15,9 +15,9 @@ import com.devstagram.domain.post.entity.PostLike;
 @Repository
 public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
 
-    Optional<PostLike> findByPostIdAndMemberId(Long postId, Long memberId);
+    Optional<PostLike> findByPostIdAndUserId(Long postId, Long userId);
 
-    void deleteByPostIdAndMemberId(Long postId, Long memberId);
+    void deleteByPostIdAndUserId(Long postId, Long userId);
 
     @Query("SELECT new com.devstagram.domain.post.dto.PostLikerRes(u.nickname) " + "FROM PostLike pl "
             + "JOIN pl.user u "

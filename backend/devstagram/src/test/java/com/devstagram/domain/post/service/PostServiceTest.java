@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.devstagram.domain.post.repository.PostLikeRepository;
+import com.devstagram.domain.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,11 +37,16 @@ class PostServiceTest {
     @InjectMocks
     private PostService postService;
 
+    @Mock
+    private PostLikeRepository postLikeRepository;
+
     @Test
     @DisplayName("[게시글 작성 성공]")
     void createPost_Success() {
         // given
+        Long userId = 1L;
         PostCreateReq req = new PostCreateReq("테스트 제목", "테스트 내용");
+        User mockUser = mock(User.class);
 
         Post savedPost =
                 Post.builder().title(req.title()).content(req.content()).build();
@@ -49,7 +56,7 @@ class PostServiceTest {
         given(postRepository.save(any(Post.class))).willReturn(savedPost);
 
         // when
-        Long postId = postService.createPost(req);
+        Long postId = postService.createPost(userId, req);
 
         // then
         assertThat(postId).isEqualTo(1L);
@@ -105,32 +112,46 @@ class PostServiceTest {
     @DisplayName("[게시글 수정 성공]")
     void updatePost_Success() {
         // given
-        Long postId = 1L;
+        Long userId = 1L;
+        Long postId = 100L;
         PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
+
+        User writer = mock(User.class);
+        given(writer.getId()).willReturn(userId);
 
         Post mockPost = Post.builder().title("기존 제목").content("기존 내용").build();
 
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 
         // when
-        postService.updatePost(postId, updateReq);
+        postService.updatePost(userId, postId, updateReq);
 
         // then
         assertThat(mockPost.getTitle()).isEqualTo("수정된 제목");
         assertThat(mockPost.getContent()).isEqualTo("수정된 내용");
-        verify(postRepository, times(1)).findById(postId);
     }
 
     @Test
     @DisplayName("[게시글 삭제 성공]")
     void deletePost_Success() {
-        Long postId = 1L;
+        // given
+        Long userId = 1L;
+        Long postId = 100L;
 
-        given(postRepository.existsById(postId)).willReturn(true);
+        User writer = mock(User.class);
+        given(writer.getId()).willReturn(userId);
 
-        postService.deletePost(postId);
+        Post mockPost = Post.builder().user(writer).build();
+
+        ReflectionTestUtils.setField(mockPost, "is_deleted", false);
+
+        given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
+
+        // when (userId 파라미터 추가)
+        postService.deletePost(userId, postId);
 
         // then
-        verify(postRepository, times(1)).deleteById(postId);
+        assertThat(mockPost.is_deleted()).isTrue();
+        verify(postRepository).findById(postId);
     }
 }

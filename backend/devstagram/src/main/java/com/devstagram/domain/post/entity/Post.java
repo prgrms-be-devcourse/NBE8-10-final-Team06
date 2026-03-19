@@ -28,10 +28,12 @@ public class Post extends BaseEntity {
 
     private String thumbnailUrl;
 
+    @Builder.Default
     @Column(nullable = false)
     private Long likeCount = 0L;
 
-    @Column
+    @Builder.Default
+    @Column(nullable = false)
     private Long commentCount = 0L;
 
     @Column(nullable = false)

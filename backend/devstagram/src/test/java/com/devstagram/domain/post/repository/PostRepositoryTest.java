@@ -2,9 +2,13 @@ package com.devstagram.domain.post.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.devstagram.domain.user.entity.Gender;
+import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,19 +24,35 @@ class PostRepositoryTest {
     @Autowired
     private PostRepository postRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Test
     @DisplayName("[게시글 생성]")
     void savePostTest() {
-        // given
-        Post post = Post.builder().title("테스트 제목").content("테스트 내용").build();
 
-        // when
+        User author = User.builder()
+                .email("test@devstagram.com")
+                .nickname("테스터")
+                .password("password123!")
+                .gender(Gender.MALE)
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .build();
+        userRepository.save(author);
+
+        Post post = Post.builder()
+                .title("테스트 제목")
+                .content("테스트 내용")
+                .user(author) // <--- 작성자 정보 필수!
+                .build();
+
+        // 3. when
         Post savedPost = postRepository.save(post);
 
-        // then
+        // 4. then
         assertThat(savedPost.getId()).isNotNull();
         assertThat(savedPost.getTitle()).isEqualTo("테스트 제목");
-        assertThat(savedPost.getLikeCount()).isEqualTo(0L);
+        assertThat(savedPost.getLikeCount()).isEqualTo(0L); // @Builder.Default 적용 확인
         assertThat(savedPost.getCreatedAt()).isBeforeOrEqualTo(LocalDateTime.now());
     }
 

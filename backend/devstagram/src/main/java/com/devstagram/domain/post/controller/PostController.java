@@ -78,7 +78,7 @@ public class PostController {
         return RsData.success(message, null);
     }
 
-    @GetMapping("/{postId}")
+    @GetMapping("/{postId}/likers")
     public RsData<Slice<PostLikerRes>> getLikers(
             @PathVariable Long postId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
