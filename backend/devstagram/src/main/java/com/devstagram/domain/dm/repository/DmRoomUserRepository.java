@@ -1,6 +1,7 @@
 package com.devstagram.domain.dm.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -15,4 +16,8 @@ public interface DmRoomUserRepository extends JpaRepository<DmRoomUser, Long> {
     List<DmRoomUser> findByUser_Id(Long userId);
 
     List<DmRoomUser> findByDmRoom_Id(Long roomId);
+
+    Optional<DmRoomUser> findByDmRoom_IdAndUser_Id(Long roomId, Long userId);
+
+    long countByDmRoom_Id(Long roomId);
 }

@@ -4,4 +4,8 @@ import java.util.List;
 
 import com.devstagram.domain.user.entity.User;
 
-public record DmRoomResponse(long roomId, List<User> dmRoomUsers, String name, String message) {}
+public class DmRoomCreateRequest {
+    List<User> users;
+
+    String name;
+}

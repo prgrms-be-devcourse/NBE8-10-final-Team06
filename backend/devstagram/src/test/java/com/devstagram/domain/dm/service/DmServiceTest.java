@@ -24,7 +24,9 @@ import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
+import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.exception.ServiceException;
 
 @ExtendWith(MockitoExtension.class)
 class DmServiceTest {
@@ -41,6 +43,9 @@ class DmServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private PostRepository postRepository;
+
     @InjectMocks
     private DmService dmService;
 
@@ -51,8 +56,7 @@ class DmServiceTest {
     void getMessages_roomNotFound_throws() {
         when(dmRoomRepository.existsById(1L)).thenReturn(false);
 
-        assertThatThrownBy(() -> dmService.getMessages(null, 1L, null, 15))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> dmService.getMessages(null, 1L, null, 15)).isInstanceOf(ServiceException.class);
     }
 
     @Test
@@ -61,7 +65,7 @@ class DmServiceTest {
 
         when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(false);
 
-        assertThatThrownBy(() -> dmService.getMessages(1L, 1L, null, 15)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> dmService.getMessages(1L, 1L, null, 15)).isInstanceOf(ServiceException.class);
     }
 
     @Test

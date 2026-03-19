@@ -62,16 +62,26 @@ class DmWebSocketControllerTest {
 
         controller.typing(1L, dto);
 
-        verify(messagingTemplate).convertAndSend("/topic/dm.1", new WebSocketEventPayload<>("typing", dto));
+        verify(messagingTemplate)
+                .convertAndSend("/topic/dm.1", new DmWebSocketController.TypingWsPayload("typing", 1L, 2L, "start"));
     }
 
     @Test
     void read_broadcastsToRoomTopic() {
         DmWebSocketController.ReadEventDto dto = new DmWebSocketController.ReadEventDto(1L, 2L, 123L);
 
+        SecurityUser securityUser = new SecurityUser(
+                2L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(
+                        securityUser, securityUser.getPassword(), securityUser.getAuthorities()));
+
+        when(dmService.markRead(2L, 1L, 123L)).thenReturn(123L);
+
         controller.read(1L, dto);
 
-        verify(messagingTemplate).convertAndSend("/topic/dm.1", new WebSocketEventPayload<>("read", dto));
+        verify(messagingTemplate).convertAndSend("/topic/dm.1", new DmWebSocketController.ReadWsPayload("read", 123L));
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -80,7 +90,8 @@ class DmWebSocketControllerTest {
 
         controller.join(1L, dto);
 
-        verify(messagingTemplate).convertAndSend("/topic/dm.1", new WebSocketEventPayload<>("join", dto));
+        verify(messagingTemplate)
+                .convertAndSend("/topic/dm.1", new DmWebSocketController.JoinLeaveWsPayload("join", 1L, 2L));
     }
 
     @Test
@@ -89,6 +100,9 @@ class DmWebSocketControllerTest {
 
         controller.leave(1L, dto);
 
-        verify(messagingTemplate).convertAndSend("/topic/dm.1", new WebSocketEventPayload<>("leave", dto));
+        verify(messagingTemplate)
+                .convertAndSend("/topic/dm.1", new DmWebSocketController.TypingWsPayload("typing", 1L, 2L, "stop"));
+        verify(messagingTemplate)
+                .convertAndSend("/topic/dm.1", new DmWebSocketController.JoinLeaveWsPayload("leave", 1L, 2L));
     }
 }

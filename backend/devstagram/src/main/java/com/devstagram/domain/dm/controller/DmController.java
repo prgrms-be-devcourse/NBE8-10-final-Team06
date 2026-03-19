@@ -2,10 +2,12 @@ package com.devstagram.domain.dm.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
@@ -54,5 +56,18 @@ public class DmController {
         java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
 
         return RsData.success(rooms);
+    }
+
+    /**
+     * 1:1 DM 방 생성/재사용 + 내 room list 반환
+     */
+    @PostMapping("/rooms/1v1/{otherUserId}")
+    public RsData<DmCreate1v1WithRoomListResponse> create1v1Room(@PathVariable("otherUserId") Long otherUserId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        Long roomId = dmService.getOrCreate1v1RoomId(currentUserId, otherUserId);
+        java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
+
+        return RsData.success(new DmCreate1v1WithRoomListResponse(roomId, rooms));
     }
 }
