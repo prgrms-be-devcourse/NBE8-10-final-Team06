@@ -1,9 +1,5 @@
 package com.devstagram.domain.post.service;
 
-import com.devstagram.domain.user.entity.User;
-import com.devstagram.domain.user.repository.UserRepository;
-import com.devstagram.global.exception.ServiceException;
-import jakarta.servlet.ServletException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -15,8 +11,10 @@ import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.exception.ServiceException;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -28,7 +26,7 @@ public class PostService {
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
 
-        //TODO: 피드 정책 수립 후 반영.
+        // TODO: 피드 정책 수립 후 반영.
 
         return postRepository.findAllByOrderByCreatedAtDesc(pageable).map(PostFeedRes::from);
     }
@@ -64,7 +62,7 @@ public class PostService {
                 .findById(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
-        if(!post.getUser().getId().equals(userId)) {
+        if (!post.getUser().getId().equals(userId)) {
             throw new ServiceException("403-U-1", "수정 권한이 없습니다.");
         }
 
@@ -74,18 +72,19 @@ public class PostService {
     @Transactional
     public void deletePost(Long userId, Long postId) {
 
-        Post post = postRepository.findById(postId)
-                        .orElseThrow(()-> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
+        Post post = postRepository
+                .findById(postId)
+                .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
         if (post.is_deleted()) {
             throw new ServiceException("404-P-2", "이미 삭제된 게시글입니다.");
         }
 
-        if(!post.getUser().getId().equals(userId)) {
+        if (!post.getUser().getId().equals(userId)) {
             throw new ServiceException("403-U-2", "삭제 권한이 없습니다.");
         }
 
-        //TODO: 댓글 적용 후 제약 조건 위반 방지를 위해 댓글 순차 삭제 로직 추가 예정.
+        // TODO: 댓글 적용 후 제약 조건 위반 방지를 위해 댓글 순차 삭제 로직 추가 예정.
         post.softDelete();
     }
 }

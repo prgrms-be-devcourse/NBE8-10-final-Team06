@@ -2,7 +2,6 @@ package com.devstagram.domain.post.controller;
 
 import java.net.URI;
 
-import com.devstagram.global.security.SecurityUser;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
@@ -17,6 +16,7 @@ import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.global.rsdata.RsData;
+import com.devstagram.global.security.SecurityUser;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,9 +29,7 @@ public class PostController {
 
     @PostMapping
     public ResponseEntity<RsData<Long>> createPost(
-            @AuthenticationPrincipal SecurityUser user,
-            @Valid @RequestBody PostCreateReq req
-    ) {
+            @AuthenticationPrincipal SecurityUser user, @Valid @RequestBody PostCreateReq req) {
 
         Long postId = postService.createPost(user.getId(), req);
 
@@ -41,7 +39,10 @@ public class PostController {
     }
 
     @PutMapping("/{postId}")
-    public RsData<Void> updatePost(@AuthenticationPrincipal SecurityUser user, @PathVariable Long postId, @Valid @RequestBody PostUpdateReq req) {
+    public RsData<Void> updatePost(
+            @AuthenticationPrincipal SecurityUser user,
+            @PathVariable Long postId,
+            @Valid @RequestBody PostUpdateReq req) {
 
         postService.updatePost(user.getId(), postId, req);
 
