@@ -11,5 +11,5 @@ public class CommentConstants {
     public static final int REPLY_PAGE_SIZE = 5;
 
     // 기본 정렬 기준 필드
-    public static final String DEFAULT_SORT_FIELD = "createDate";
+    public static final String DEFAULT_SORT_FIELD = "createAt";
 }

@@ -72,7 +72,7 @@ public class CommentService {
         Pageable pageable = PageRequest.of(
                 pageNumber,
                 CommentConstants.COMMENT_PAGE_SIZE,
-                Sort.by(Sort.Direction.ASC, CommentConstants.DEFAULT_SORT_FIELD));
+                Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
 
         Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
 
@@ -89,7 +89,7 @@ public class CommentService {
         Pageable pageable = PageRequest.of(
                 pageNumber,
                 CommentConstants.REPLY_PAGE_SIZE,
-                Sort.by(Sort.Direction.ASC, CommentConstants.DEFAULT_SORT_FIELD));
+                Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
 
         Slice<Comment> replies = commentRepository.findRepliesWithUserAndImageByParentId(commentId, pageable);
 
