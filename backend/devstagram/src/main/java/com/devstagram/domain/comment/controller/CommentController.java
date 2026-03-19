@@ -77,4 +77,13 @@ public class CommentController {
 
         return RsData.success();
     }
+
+    @PostMapping("/comments/{commentId}")
+    public RsData<Void> toggleLike(@PathVariable Long commentId, @AuthenticationPrincipal SecurityUser securityUser) {
+        boolean isLiked = commentService.toggleCommentLike(commentId, securityUser.getId());
+
+        String message = isLiked ? "댓글 좋아요 성공" : "댓글 좋아요 취소 성공";
+
+        return RsData.success(message, null);
+    }
 }

@@ -28,6 +28,8 @@ import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.dto.ReplyInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.entity.CommentLike;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostRepository;
@@ -49,6 +51,9 @@ class CommentServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private CommentLikeRepository commentLikeRepository;
 
     private Post createPost(Long id, String title) {
         Post post = Post.builder().title(title).build();
@@ -248,5 +253,71 @@ class CommentServiceTest {
 
         // when & then
         assertThatThrownBy(() -> commentService.deleteComment(1L, requesterId)).isInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    @DisplayName("[댓글 좋아요 성공]")
+    void toggleCommentLike_CreateSuccess() {
+        // [given]
+        Long commentId = 1L;
+        Long memberId = 1L;
+        User user = createMember(memberId, "테스트유저");
+        Comment comment = createComment(commentId, "댓글 내용", null, user, null);
+
+        given(userRepository.getReferenceById(memberId)).willReturn(user);
+        given(commentRepository.findByIdWithLock(commentId)).willReturn(Optional.of(comment));
+        given(commentLikeRepository.findByCommentIdAndUserId(commentId, memberId))
+                .willReturn(Optional.empty());
+
+        // [when]
+        boolean result = commentService.toggleCommentLike(commentId, memberId);
+
+        // [then]
+        assertThat(result).isTrue(); // 좋아요 성공 시 true 반환
+        verify(commentLikeRepository, times(1)).save(any(CommentLike.class));
+        verify(commentRepository, times(1)).incrementLikeCount(commentId);
+    }
+
+    @Test
+    @DisplayName("[댓글 좋아요 취소 성공]")
+    void toggleCommentLike_DeleteSuccess() {
+        // [given]
+        Long commentId = 1L;
+        Long memberId = 1L;
+        User user = createMember(memberId, "테스트유저");
+        Comment comment = createComment(commentId, "댓글 내용", null, user, null);
+
+        CommentLike existingLike =
+                CommentLike.builder().user(user).comment(comment).build();
+
+        given(userRepository.getReferenceById(memberId)).willReturn(user);
+        given(commentRepository.findByIdWithLock(commentId)).willReturn(Optional.of(comment));
+        given(commentLikeRepository.findByCommentIdAndUserId(commentId, memberId))
+                .willReturn(Optional.of(existingLike));
+
+        // [when]
+        boolean result = commentService.toggleCommentLike(commentId, memberId);
+
+        // [then]
+        assertThat(result).isFalse(); // 좋아요 취소 시 false 반환
+        verify(commentLikeRepository, times(1)).delete(existingLike);
+        verify(commentRepository, times(1)).decrementLikeCount(commentId);
+    }
+
+    @Test
+    @DisplayName("[댓글 좋아요 실패 - 존재하지 않는 댓글]")
+    void toggleCommentLike_Fail_NotFound() {
+        // [given]
+        Long invalidCommentId = 999L;
+        Long memberId = 1L;
+
+        given(commentRepository.findByIdWithLock(invalidCommentId)).willReturn(Optional.empty());
+
+        // [when & then]
+        assertThatThrownBy(() -> commentService.toggleCommentLike(invalidCommentId, memberId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("존재하지 않는 댓글입니다.");
+        verify(commentLikeRepository, never()).save(any());
+        verify(commentRepository, never()).incrementLikeCount(anyLong());
     }
 }

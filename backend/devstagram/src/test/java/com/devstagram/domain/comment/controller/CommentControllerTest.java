@@ -178,4 +178,36 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"));
     }
+
+    @Test
+    @WithMockUser
+    @DisplayName("[댓글 좋아요 토글 성공] - 좋아요 생성")
+    void toggleCommentLike_Created() throws Exception {
+        // given
+        Long commentId = 1L;
+        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(true);
+
+        // when & then
+        mockMvc.perform(post("/api/comments/{commentId}", commentId).with(csrf())) // POST 요청이므로 CSRF 토큰 필요
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.msg").value("댓글 좋아요 성공"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("[댓글 좋아요 토글 성공] - 좋아요 취소")
+    void toggleCommentLike_Removed() throws Exception {
+        // given
+        Long commentId = 1L;
+        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(false);
+
+        // when & then
+        mockMvc.perform(post("/api/comments/{commentId}", commentId).with(csrf()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.msg").value("댓글 좋아요 취소 성공"));
+    }
 }

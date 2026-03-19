@@ -1,5 +1,7 @@
 package com.devstagram.domain.comment.Service;
 
+import java.util.Optional;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -12,6 +14,8 @@ import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.dto.ReplyInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.entity.CommentLike;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostRepository;
@@ -28,6 +32,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
     @Transactional
     public Long createComment(Long postId, Long memberId, CommentCreateReq req) {
@@ -129,6 +134,30 @@ public class CommentService {
             comment.softDelete();
         } else {
             commentRepository.delete(comment);
+        }
+    }
+
+    @Transactional
+    public boolean toggleCommentLike(Long commentId, Long userId) {
+
+        User user = userRepository.getReferenceById(userId);
+
+        Comment comment = commentRepository
+                .findByIdWithLock(commentId)
+                .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 댓글입니다."));
+
+        Optional<CommentLike> existingLike = commentLikeRepository.findByCommentIdAndUserId(commentId, userId);
+
+        if (existingLike.isPresent()) {
+            commentLikeRepository.delete(existingLike.get());
+            commentRepository.decrementLikeCount(commentId);
+            return false;
+        } else {
+            CommentLike newLike =
+                    CommentLike.builder().user(user).comment(comment).build();
+            commentLikeRepository.save(newLike);
+            commentRepository.incrementLikeCount(commentId);
+            return true;
         }
     }
 }

@@ -1,13 +1,18 @@
 package com.devstagram.domain.comment.repository;
 
+import java.util.Optional;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.devstagram.domain.comment.entity.Comment;
+
+import jakarta.persistence.LockModeType;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
@@ -36,4 +41,17 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     void deleteParentsByPostId(@Param("postId") Long postId);
 
     boolean existsByParent(Comment parent);
+
+    // 비관적 락을 사용하여 다른 트랜잭션의 접근을 제어
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Comment c WHERE c.id = :id")
+    Optional<Comment> findByIdWithLock(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Comment c SET c.likeCount = c.likeCount + 1 WHERE c.id = :id")
+    void incrementLikeCount(@Param("id") Long id);
+
+    @Modifying
+    @Query("UPDATE Comment c SET c.likeCount = c.likeCount - 1 WHERE c.id = :id")
+    void decrementLikeCount(@Param("id") Long id);
 }
