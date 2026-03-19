@@ -28,6 +28,12 @@ out/
 .env
 **/.env
 
+################
+**/.idea/
+**/*.iws
+**/*.iml
+**/*.ipr
+
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
