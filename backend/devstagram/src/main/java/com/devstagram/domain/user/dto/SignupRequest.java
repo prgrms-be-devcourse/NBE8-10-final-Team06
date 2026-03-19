@@ -32,10 +32,7 @@ public record SignupRequest(
                 .build();
 
         UserInfo userInfo =
-                UserInfo.builder()
-                        .githubUrl(this.githubUrl)
-                        .resume(this.resume)
-                        .build();
+                UserInfo.builder().githubUrl(this.githubUrl).resume(this.resume).build();
 
         user.setUserInfo(userInfo);
         return user;

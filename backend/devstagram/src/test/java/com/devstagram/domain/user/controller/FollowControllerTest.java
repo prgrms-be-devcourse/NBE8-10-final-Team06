@@ -54,9 +54,13 @@ class FollowControllerTest {
 
         // 1. 내 계정 생성 및 '원본 API Key'와 '쿠키' 획득
         SignupRequest mySignup = new SignupRequest(
-                "myNickname", "me@test.com", "password123!",
-                LocalDate.of(1000, 1, 1), Gender.MALE,
-                "https://github.com/myNickname", Resume.UNDERGRADUATE);
+                "myNickname",
+                "me@test.com",
+                "password123!",
+                LocalDate.of(1000, 1, 1),
+                Gender.MALE,
+                "https://github.com/myNickname",
+                Resume.UNDERGRADUATE);
 
         MvcResult signupResult = mvc.perform(post("/api/auth/signup")
                         .content(objectMapper.writeValueAsString(mySignup))
@@ -88,8 +92,7 @@ class FollowControllerTest {
     @DisplayName("API Key 헤더를 이용한 팔로우 성공 테스트 - 해싱 로직 검증")
     void followWithApiKeySuccess() throws Exception {
         // 쿠키 없이 헤더의 X-API-KEY(ID.UUID)만 사용하여 팔로우 시도
-        mvc.perform(post("/api/follows/" + otherUser.getId())
-                        .header("X-API-KEY", myApiKey))
+        mvc.perform(post("/api/follows/" + otherUser.getId()).header("X-API-KEY", myApiKey))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andDo(print());
@@ -183,9 +186,13 @@ class FollowControllerTest {
 
     private User saveUser(String email, String nickname) throws Exception {
         SignupRequest request = new SignupRequest(
-                nickname, email, "password123!",
-                LocalDate.of(1000, 1, 1), Gender.MALE,
-                "https://github.com/" + nickname, Resume.UNDERGRADUATE);
+                nickname,
+                email,
+                "password123!",
+                LocalDate.of(1000, 1, 1),
+                Gender.MALE,
+                "https://github.com/" + nickname,
+                Resume.UNDERGRADUATE);
 
         mvc.perform(post("/api/auth/signup")
                 .content(objectMapper.writeValueAsString(request))
@@ -196,9 +203,8 @@ class FollowControllerTest {
 
     private Cookie loginAndGetCookie(String email, String password) throws Exception {
         String loginJson = String.format("{\"email\":\"%s\",\"password\":\"%s\"}", email, password);
-        MvcResult result = mvc.perform(post("/api/auth/login")
-                        .content(loginJson)
-                        .contentType(MediaType.APPLICATION_JSON))
+        MvcResult result = mvc.perform(
+                        post("/api/auth/login").content(loginJson).contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
         return result.getResponse().getCookie("accessToken");
     }

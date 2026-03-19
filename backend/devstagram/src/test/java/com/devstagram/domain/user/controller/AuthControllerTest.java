@@ -27,8 +27,6 @@ import com.devstagram.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 
-import jakarta.servlet.http.Cookie;
-
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -54,9 +52,13 @@ class AuthControllerTest {
     void signupTest() throws Exception {
         // Given
         SignupRequest signupRequest = new SignupRequest(
-                "dohwan", "test@test.com", "password123!",
-                LocalDate.of(2000, 1, 1), Gender.MALE,
-                "https://github.com/dohwa", Resume.UNDERGRADUATE);
+                "dohwan",
+                "test@test.com",
+                "password123!",
+                LocalDate.of(2000, 1, 1),
+                Gender.MALE,
+                "https://github.com/dohwa",
+                Resume.UNDERGRADUATE);
 
         // When
         ResultActions resultActions = mvc.perform(post("/api/auth/signup")
@@ -81,9 +83,8 @@ class AuthControllerTest {
         String loginRequest = "{\"email\":\"test@test.com\",\"password\":\"password123!\"}";
 
         // When
-        ResultActions resultActions = mvc.perform(post("/api/auth/login")
-                .content(loginRequest)
-                .contentType(MediaType.APPLICATION_JSON));
+        ResultActions resultActions =
+                mvc.perform(post("/api/auth/login").content(loginRequest).contentType(MediaType.APPLICATION_JSON));
 
         // Then
         resultActions
@@ -98,9 +99,13 @@ class AuthControllerTest {
     void meTest() throws Exception {
         // 1. 회원가입 시점에 발급되는 '원본 API Key'를 추출합니다.
         SignupRequest signupRequest = new SignupRequest(
-                "dohwan", "test@test.com", "password123!",
-                LocalDate.of(2000, 1, 1), Gender.MALE,
-                "https://github.com/dohwa", Resume.UNDERGRADUATE);
+                "dohwan",
+                "test@test.com",
+                "password123!",
+                LocalDate.of(2000, 1, 1),
+                Gender.MALE,
+                "https://github.com/dohwa",
+                Resume.UNDERGRADUATE);
 
         MvcResult signupResult = mvc.perform(post("/api/auth/signup")
                         .content(objectMapper.writeValueAsString(signupRequest))
@@ -113,8 +118,7 @@ class AuthControllerTest {
 
         // 2. [핵심] 쿠키 없이 헤더에 X-API-KEY만 담아서 요청 보냅니다.
         // 필터가 ID로 유저를 찾고 뒤의 UUID를 matches()로 검증하는지 확인하는 테스트입니다.
-        ResultActions resultActions = mvc.perform(get("/api/auth/me")
-                .header("X-API-KEY", publicApiKey));
+        ResultActions resultActions = mvc.perform(get("/api/auth/me").header("X-API-KEY", publicApiKey));
 
         // Then
         resultActions
@@ -140,9 +144,13 @@ class AuthControllerTest {
 
     private void saveTestUser(String email, String nickname) throws Exception {
         SignupRequest signupRequest = new SignupRequest(
-                nickname, email, "password123!",
-                LocalDate.of(2000, 1, 1), Gender.MALE,
-                "https://github.com/dohwa", Resume.UNDERGRADUATE);
+                nickname,
+                email,
+                "password123!",
+                LocalDate.of(2000, 1, 1),
+                Gender.MALE,
+                "https://github.com/dohwa",
+                Resume.UNDERGRADUATE);
 
         mvc.perform(post("/api/auth/signup")
                 .content(objectMapper.writeValueAsString(signupRequest))
