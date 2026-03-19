@@ -39,6 +39,11 @@ jobs:
 
       - name: Build and Test with Gradle
         run: ./gradlew build
+        env:
+          # GitHub Secrets에 저장된 값을 시스템 환경 변수로 할당합니다.
+          # 이렇게 하면 application.yml의 ${JWT_SECRET_KEY}가 이 값을 읽어갑니다.
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ACCESS_TOKEN_EXPIRE_SECONDS: ${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}
 
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v4

@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -30,6 +31,7 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
     private final UserSecurityService userSecurityService;
     private final Rq rq;
     private final ObjectMapper objectMapper;
+    private final PasswordEncoder passwordEncoder; // BCrypt 비교를 위해 추가
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -95,13 +97,37 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. accessToken 실패 또는 없음 -> apiKey 인증
         if (!apiKey.isBlank()) {
-            User user = userSecurityService.findByApiKey(apiKey);
-            setAuthentication(user);
+            try {
+                // "유저ID.UUID" 형식 분리
+                String[] bits = apiKey.split("\\.", 2);
+                if (bits.length != 2) {
+                    throw new ServiceException("401-F-1", "유효하지 않은 API Key 형식입니다.");
+                }
 
-            String newAccessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
+                Long userId = Long.parseLong(bits[0]); // 앞부분: ID
+                String rawUuid = bits[1]; // 뒷부분: 원본 UUID
 
-            rq.setCookie("accessToken", newAccessToken);
-            return;
+                // ID로 유저 먼저 찾기 (광속 조회)
+                User user = userSecurityService.findById(userId);
+
+                // DB에 저장된 해싱된 API Key와 사용자가 보낸 원본 UUID 비교
+                if (!passwordEncoder.matches(rawUuid, user.getApiKey())) {
+                    throw new ServiceException("401-F-1", "API Key가 일치하지 않습니다.");
+                }
+
+                // 인증 성공 시 세팅
+                setAuthentication(user);
+
+                // 새 accessToken 발급 및 쿠키 세팅
+                String newAccessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
+                rq.setCookie("accessToken", newAccessToken);
+
+                return;
+            } catch (ServiceException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ServiceException("401-F-2", "로그인 후 이용해주세요.");
+            }
         }
 
         // 3. 둘 다 실패
