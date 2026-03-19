@@ -10,5 +10,5 @@ import com.devstagram.domain.post.entity.Post;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    Slice<Post> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Slice<Post> findAllByOrderByCreatedAtDescIdDesc(Pageable pageable);
 }

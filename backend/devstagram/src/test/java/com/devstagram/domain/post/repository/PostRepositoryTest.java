@@ -47,7 +47,7 @@ class PostRepositoryTest {
         PageRequest pageRequest = PageRequest.of(0, 2);
 
         // when
-        Slice<Post> result = postRepository.findAllByOrderByCreatedAtDesc(pageRequest);
+        Slice<Post> result = postRepository.findAllByOrderByCreatedAtDescIdDesc(pageRequest);
 
         // then
         List<Post> content = result.getContent();

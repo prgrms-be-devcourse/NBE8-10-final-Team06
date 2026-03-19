@@ -22,7 +22,7 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
-        return postRepository.findAllByOrderByCreatedAtDesc(pageable).map(PostFeedRes::from);
+        return postRepository.findAllByOrderByCreatedAtDescIdDesc(pageable).map(PostFeedRes::from);
     }
 
     @Transactional(readOnly = true)

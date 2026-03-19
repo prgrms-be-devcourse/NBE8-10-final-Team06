@@ -65,14 +65,14 @@ class PostServiceTest {
                 Post.builder().title("제목1").build(), Post.builder().title("제목2").build());
         Slice<Post> slice = new SliceImpl<>(posts, pageable, false);
 
-        given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
+        given(postRepository.findAllByOrderByCreatedAtDescIdDesc(pageable)).willReturn(slice);
 
         // when
         Slice<PostFeedRes> result = postService.getPostFeed(pageable);
 
         // then
         assertThat(result.getContent()).hasSize(2);
-        verify(postRepository).findAllByOrderByCreatedAtDesc(pageable);
+        verify(postRepository).findAllByOrderByCreatedAtDescIdDesc(pageable);
     }
 
     @Test
@@ -88,7 +88,7 @@ class PostServiceTest {
 
         List<Post> firstPageContent = posts.subList(0, 10);
         Slice<Post> slice = new SliceImpl<>(firstPageContent, pageable, true);
-        given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
+        given(postRepository.findAllByOrderByCreatedAtDescIdDesc(pageable)).willReturn(slice);
 
         // when
         Slice<PostFeedRes> result = postService.getPostFeed(pageable);
@@ -98,7 +98,7 @@ class PostServiceTest {
         assertThat(result.hasNext()).isTrue();
         assertThat(result.getContent().get(0).title()).isEqualTo("제목1");
 
-        verify(postRepository, times(1)).findAllByOrderByCreatedAtDesc(pageable);
+        verify(postRepository, times(1)).findAllByOrderByCreatedAtDescIdDesc(pageable);
     }
 
     @Test
