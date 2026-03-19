@@ -6,6 +6,9 @@ import com.devstagram.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @Builder
@@ -41,8 +44,9 @@ public class Post extends BaseEntity {
     //    @Column
     //    private List<Comment> comment;
 
-    //    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
-    //    private List<PostLike> postLikeList;
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sequence ASC")
+    private List<PostMedia> mediaList = new ArrayList<>();
 
     @Builder
     public Post(String content, String title, User user) {

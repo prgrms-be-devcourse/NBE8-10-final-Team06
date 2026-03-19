@@ -1,5 +1,6 @@
 package com.devstagram.domain.post.entity;
 
+import lombok.Builder;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -13,25 +14,26 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
         uniqueConstraints = {
             @UniqueConstraint(
                     name = "uk_post_like_member_post",
-                    columnNames = {"member_id", "post_id"})
+                    columnNames = {"user_id", "post_id"})
         })
 public class PostLike extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false)
-    private User member;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Post post;
 
-    public PostLike(User member, Post post) {
-        this.member = member;
+    public PostLike(User user, Post post) {
+        this.user = user;
         this.post = post;
     }
 }
