@@ -2,8 +2,7 @@ package com.devstagram.domain.story.controller;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -206,6 +205,24 @@ class StoryControllerTest {
     }
 
     @Test
+    @DisplayName("스토리 하드 딜리트 실패 - 권한 없음")
+    void hardDeleteStory_Fail_Forbidden() throws Exception {
+        Long storyId = 10L;
+
+        doThrow(new com.devstagram.global.exception.ServiceException("403-F-1", "본인 스토리만 삭제 가능"))
+                .when(storyService)
+                .hardDeleteStory(eq(storyId), eq(1L));
+
+        mockMvc.perform(delete("/api/story/{storyId}/hard-delete", storyId)
+                        .with(csrf())
+                        .with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.resultCode").value("403-F-1"))
+                .andExpect(jsonPath("$.msg").value("본인 스토리만 삭제 가능"));
+    }
+
+    @Test
     @DisplayName("스토리 본 유저들 조회 성공")
     void getStoryViewers_Success() throws Exception {
         Long storyId = 10L;
@@ -226,6 +243,21 @@ class StoryControllerTest {
     }
 
     @Test
+    @DisplayName("스토리 본 유저들 조회 실패 - 권한 없음")
+    void getStoryViewers_Fail_Forbidden() throws Exception {
+        Long storyId = 10L;
+
+        given(storyService.getStoryViewers(eq(storyId), eq(1L)))
+                .willThrow(new com.devstagram.global.exception.ServiceException("403-F-1", "본인만 확인 가능"));
+
+        mockMvc.perform(get("/api/story/{storyId}/viewers", storyId).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.resultCode").value("403-F-1"))
+                .andExpect(jsonPath("$.msg").value("본인만 확인 가능"));
+    }
+
+    @Test
     @DisplayName("스토리 좋아요 누른 유저 목록 조회 성공")
     void getStoryLiker_Success() throws Exception {
         Long storyId = 10L;
@@ -243,6 +275,59 @@ class StoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.data[0].nickname").value("liker1"));
+    }
+
+    @Test
+    @DisplayName("스토리 좋아요 누른 유저 목록 조회 실패 - 권한 없음")
+    void getStoryLiker_Fail_Forbidden() throws Exception {
+        Long storyId = 10L;
+
+        given(storyService.getStoryLiker(eq(storyId), eq(1L)))
+                .willThrow(new com.devstagram.global.exception.ServiceException("403-F-1", "본인만 확인 가능"));
+
+        mockMvc.perform(get("/api/story/{storyId}/likers", storyId).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.resultCode").value("403-F-1"))
+                .andExpect(jsonPath("$.msg").value("본인만 확인 가능"));
+    }
+
+    @Test
+    @DisplayName("스토리 시청 기록 성공")
+    void recordStoryView_Success() throws Exception {
+        Long storyId = 10L;
+        StoryDetailResponse detailResponse = StoryDetailResponse.builder()
+                .storyId(storyId)
+                .content("시청 기록 테스트")
+                .totalLikeCount(5L)
+                .isLiked(false)
+                .build();
+
+        given(storyService.recordSingleStoryView(eq(storyId), eq(1L))).willReturn(detailResponse);
+
+        mockMvc.perform(post("/api/story/{storyId}/view", storyId).with(csrf()).with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.msg").value("스토리 시청 기록 성공"));
+    }
+
+    @Test
+    @DisplayName("스토리 소프트 딜리트 실패 - 권한 없음")
+    void softDeleteStory_Fail_Forbidden() throws Exception {
+        Long storyId = 10L;
+
+        doThrow(new com.devstagram.global.exception.ServiceException("403-F-1", "본인 스토리만 삭제 가능"))
+                .when(storyService)
+                .softDeleteStory(eq(storyId), eq(1L));
+
+        mockMvc.perform(patch("/api/story/{storyId}/soft-delete", storyId)
+                        .with(csrf())
+                        .with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.resultCode").value("403-F-1"))
+                .andExpect(jsonPath("$.msg").value("본인 스토리만 삭제 가능"));
     }
 
     @Test

@@ -76,33 +76,66 @@ public class StoryService {
                 .build();
     }
 
-    @Transactional
+    // 특정 유저가 올린 스토리 목록 가져옴
+    @Transactional(readOnly = true)
     public List<StoryDetailResponse> getUserAllStories(Long targetUserId, Long currentUserId) {
 
         userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저."));
 
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
 
-        Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
+        if (stories.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> storyIds = stories.stream().map(Story::getId).toList();
+        List<StoryViewed> existingViews = storyViewedRepository.findByUserIdAndStoryIdIn(currentUserId, storyIds);
+
+        Set<Long> likedStoryIds = existingViews.stream()
+                .filter(StoryViewed::isLiked)
+                .map(v -> v.getStory().getId())
+                .collect(Collectors.toSet());
 
         return stories.stream()
-                .map(story -> {
-                    recordingStoryView(story, currentUserId); // storyView 생성
-
-                    return StoryDetailResponse.builder()
-                            .storyId(story.getId())
-                            .userId(story.getUser().getId())
-                            .createdAt(story.getCreatedAt())
-                            .expiredAt(story.getExpiredAt())
-                            .content(story.getContent())
-                            .totalLikeCount(story.getLikeCount())
-                            .isLiked(likedStoryIds.contains(story.getId()))
-                            .tagedUserIds(story.getTags().stream()
-                                    .map(tag -> tag.getTarget().getId())
-                                    .toList())
-                            .build();
-                })
+                .map(story -> StoryDetailResponse.builder()
+                        .storyId(story.getId())
+                        .userId(story.getUser().getId())
+                        .createdAt(story.getCreatedAt())
+                        .expiredAt(story.getExpiredAt())
+                        .content(story.getContent())
+                        .totalLikeCount(story.getLikeCount())
+                        .isLiked(likedStoryIds.contains(story.getId()))
+                        .tagedUserIds(story.getTags().stream()
+                                .map(tag -> tag.getTarget().getId())
+                                .toList())
+                        .build())
                 .toList();
+    }
+
+    // 스토리 단건 조회(StoryViewed 생성)
+    @Transactional
+    public StoryDetailResponse recordSingleStoryView(Long storyId, Long currentUserId) {
+
+        Story story =
+                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
+
+        User currentUser =
+                userRepository.findById(currentUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
+
+        StoryViewed storyViewed = createStoryViewed(story, currentUser);
+
+        return StoryDetailResponse.builder()
+                .storyId(story.getId())
+                .userId(story.getUser().getId())
+                .createdAt(story.getCreatedAt())
+                .expiredAt(story.getExpiredAt())
+                .content(story.getContent())
+                .totalLikeCount(story.getLikeCount())
+                .isLiked(storyViewed.isLiked())
+                .tagedUserIds(story.getTags().stream()
+                        .map(tag -> tag.getTarget().getId())
+                        .toList())
+                .build();
     }
 
     @Transactional
@@ -145,7 +178,9 @@ public class StoryService {
             throw new ServiceException("404-F-2", "만료/삭제된 스토리");
         }
 
-        recordingStoryView(story, userId); // 조회 기록 없으면 생성
+        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
+
+        createStoryViewed(story, user); // 조회 기록 없으면 생성
 
         StoryViewed storyViewed = storyViewedRepository
                 .findByStoryIdAndUserId(storyId, userId)
@@ -156,14 +191,12 @@ public class StoryService {
         return StoryViewResponse.from(storyViewed);
     }
 
-    // 조회 기록 StoryView 생성/갱신
-    private void recordingStoryView(Story story, Long userId) {
-        userRepository.findById(userId).ifPresent(user -> {
-            if (!storyViewedRepository.existsByStoryAndUser(story, user)) {
-                storyViewedRepository.save(
-                        StoryViewed.builder().story(story).user(user).build());
-            }
-        });
+    // 조회 기록 있으면 가져오고, 아니면 새로 StoryView 생성
+    private StoryViewed createStoryViewed(Story story, User user) {
+        return storyViewedRepository
+                .findByStoryIdAndUserId(story.getId(), user.getId())
+                .orElseGet(() -> storyViewedRepository.save(
+                        StoryViewed.builder().story(story).user(user).build()));
     }
 
     // 스토리 목록 중에서 유저가 좋아요 누른 스토리 ID set 반환
