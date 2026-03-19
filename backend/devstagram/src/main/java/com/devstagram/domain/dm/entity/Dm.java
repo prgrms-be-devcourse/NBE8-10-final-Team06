@@ -4,12 +4,13 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.entity.BaseEntity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Dm extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -36,4 +37,20 @@ public class Dm extends BaseEntity {
      */
     @Column(nullable = false)
     private boolean valid = true;
+
+    /**
+     * 메시지 생성용 팩토리.
+     * 외부에서 임의로 setter를 호출해 엔티티 상태가 깨지는 것을 방지한다.
+     */
+    public static Dm create(
+            DmRoom dmRoom, User sender, MessageType type, String content, String thumbnailUrl, boolean valid) {
+        Dm dm = new Dm();
+        dm.dmRoom = dmRoom;
+        dm.sender = sender;
+        dm.content = content;
+        dm.type = type;
+        dm.thumbnailUrl = thumbnailUrl;
+        dm.valid = valid;
+        return dm;
+    }
 }

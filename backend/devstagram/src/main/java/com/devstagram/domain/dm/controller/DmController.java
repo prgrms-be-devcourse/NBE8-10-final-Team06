@@ -64,10 +64,6 @@ public class DmController {
     @PostMapping("/rooms/1v1/{otherUserId}")
     public RsData<DmCreate1v1WithRoomListResponse> create1v1Room(@PathVariable("otherUserId") Long otherUserId) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
-
-        Long roomId = dmService.getOrCreate1v1RoomId(currentUserId, otherUserId);
-        java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
-
-        return RsData.success(new DmCreate1v1WithRoomListResponse(roomId, rooms));
+        return RsData.success(dmService.create1v1RoomAndReturnRooms(currentUserId, otherUserId));
     }
 }
