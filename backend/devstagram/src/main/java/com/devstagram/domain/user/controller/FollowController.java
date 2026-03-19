@@ -1,17 +1,20 @@
 package com.devstagram.domain.user.controller;
 
-import com.devstagram.domain.user.dto.FollowUserResponse;
-import com.devstagram.domain.user.service.FollowService;
-import com.devstagram.global.rsdata.RsData;
-import com.devstagram.global.security.SecurityUtil;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.devstagram.domain.user.dto.FollowUserResponse;
+import com.devstagram.domain.user.service.FollowService;
+import com.devstagram.global.rsdata.RsData;
+import com.devstagram.global.security.SecurityUtil;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequiredArgsConstructor

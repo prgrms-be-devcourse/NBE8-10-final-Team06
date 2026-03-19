@@ -1,15 +1,18 @@
 package com.devstagram.domain.user.service;
 
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.devstagram.domain.user.dto.FollowUserResponse;
 import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
-import java.util.List;
-import org.springframework.transaction.annotation.Transactional;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -32,17 +35,15 @@ public class FollowService {
         User fromUser = getUserById(fromUserId);
         User toUser = getUserById(toUserId);
 
-        Follow follow = Follow.builder()
-                .fromUser(fromUser)
-                .toUser(toUser)
-                .build();
+        Follow follow = Follow.builder().fromUser(fromUser).toUser(toUser).build();
 
         followRepository.save(follow);
     }
 
     @Transactional
     public void unfollow(Long fromUserId, Long toUserId) {
-        Follow follow = followRepository.findByFromUserIdAndToUserId(fromUserId, toUserId)
+        Follow follow = followRepository
+                .findByFromUserIdAndToUserId(fromUserId, toUserId)
                 .orElseThrow(() -> new ServiceException("400-F-3", "팔로우 관계가 아닙니다."));
 
         followRepository.delete(follow);
@@ -50,7 +51,8 @@ public class FollowService {
 
     // [공통 로직 추출]
     private User getUserById(Long id) {
-        return userRepository.findById(id)
+        return userRepository
+                .findById(id)
                 .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다. ID: " + id));
     }
 
@@ -72,8 +74,8 @@ public class FollowService {
 
     // 특정 유저가 팔로잉하는 사람들 목록
     public List<FollowUserResponse> getFollowings(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         // 내가(fromUser) 팔로우한 사람들(toUser)을 가져와서 DTO로 변환
         return followRepository.findAllByFromUser(user).stream()
@@ -83,8 +85,8 @@ public class FollowService {
 
     // 특정 유저를 팔로우하는 사람들(팬) 목록
     public List<FollowUserResponse> getFollowers(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         // 나를(toUser) 팔로우한 사람들(fromUser)을 가져와서 DTO로 변환
         return followRepository.findAllByToUser(user).stream()

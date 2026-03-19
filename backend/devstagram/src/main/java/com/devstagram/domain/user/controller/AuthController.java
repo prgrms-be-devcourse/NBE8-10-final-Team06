@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.LoginRequest;
+import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
 import com.devstagram.domain.user.service.AuthService;

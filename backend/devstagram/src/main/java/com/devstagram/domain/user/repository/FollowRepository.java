@@ -2,12 +2,15 @@ package com.devstagram.domain.user.repository;
 
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
 
 public interface FollowRepository extends JpaRepository<Follow, Long> {
     List<Follow> findAllByFromUser(User fromUser);
+
     List<Follow> findAllByToUser(User toUser);
 
     // 내가 팔로우하는 사람 수 (팔로잉 카운트)
