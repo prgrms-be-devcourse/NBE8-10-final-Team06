@@ -32,9 +32,11 @@ public class CommentService {
     @Transactional
     public Long createComment(Long postId, Long memberId, CommentCreateReq req) {
 
-        User user = userRepository.findById(memberId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 유저입니다."));
+        User user =
+                userRepository.findById(memberId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 유저입니다."));
 
-        Post post = postRepository.findById(postId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 게시글입니다."));
+        Post post =
+                postRepository.findById(postId).orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
         Comment parentComment = null;
 
@@ -44,10 +46,10 @@ public class CommentService {
         if (parentCommentId != null) {
             parentComment = commentRepository
                     .findById(parentCommentId)
-                    .orElseThrow(() -> new ServiceException("404", "존재하지 않는 댓글입니다."));
+                    .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 댓글입니다."));
 
             if (!parentComment.getPost().getId().equals(postId)) {
-                throw new ServiceException("400", "해당 게시글의 댓글이 아닙니다.");
+                throw new ServiceException("400-C-2", "해당 게시글의 댓글이 아닙니다.");
             }
         }
 
@@ -64,7 +66,8 @@ public class CommentService {
     @Transactional(readOnly = true)
     public Slice<CommentInfoRes> getCommentsByPostId(Long postId, int pageNumber) {
 
-        Post post = postRepository.findById(postId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 게시글입니다."));
+        Post post =
+                postRepository.findById(postId).orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
         Pageable pageable = PageRequest.of(
                 pageNumber,
@@ -79,8 +82,9 @@ public class CommentService {
     @Transactional(readOnly = true)
     public Slice<ReplyInfoRes> getRepliesByCommentId(Long commentId, int pageNumber) {
 
-        Comment parent =
-                commentRepository.findById(commentId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 댓글입니다."));
+        Comment parent = commentRepository
+                .findById(commentId)
+                .orElseThrow(() -> new ServiceException("404-C-2", "존재하지 않는 댓글입니다."));
 
         Pageable pageable = PageRequest.of(
                 pageNumber,
@@ -94,11 +98,12 @@ public class CommentService {
 
     @Transactional
     public void updateComment(Long commentId, Long memberId, String content) {
-        Comment comment =
-                commentRepository.findById(commentId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 게시글입니다."));
+        Comment comment = commentRepository
+                .findById(commentId)
+                .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 댓글입니다."));
 
         if (!comment.getUser().getId().equals(memberId)) {
-            throw new ServiceException("403", "수정 권한이 없습니다.");
+            throw new ServiceException("403-C-1", "수정 권한이 없습니다.");
         }
 
         comment.modify(content);
@@ -106,11 +111,12 @@ public class CommentService {
 
     @Transactional
     public void deleteComment(Long commentId, Long memberId) {
-        Comment comment =
-                commentRepository.findById(commentId).orElseThrow(() -> new ServiceException("404", "존재하지 않는 댓글입니다."));
+        Comment comment = commentRepository
+                .findById(commentId)
+                .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 댓글입니다."));
 
         if (!comment.getUser().getId().equals(memberId)) {
-            throw new ServiceException("403", "삭제 권한이 없습니다.");
+            throw new ServiceException("403-C-2", "삭제 권한이 없습니다.");
         }
 
         if (comment.is_deleted()) {
