@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.*;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder; // 추가
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -81,19 +81,19 @@ class PostControllerTest {
         given(jwtProvider.payload(anyString())).willReturn(mockClaims);
 
         // User 객체 생성 및 ID 주입
-        User mockUser = User.builder()
-                .email("test@test.com")
-                .nickname("tester")
-                .build();
+        User mockUser = User.builder().email("test@test.com").nickname("tester").build();
         ReflectionTestUtils.setField(mockUser, "id", 1L);
 
         // 서비스 응답 정의
         given(userSecurityService.findById(1L)).willReturn(mockUser);
 
         SecurityUser mockSecurityUser = new SecurityUser(
-                1L, "test@test.com", "tester", "hashedKey", "password",
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))
-        );
+                1L,
+                "test@test.com",
+                "tester",
+                "hashedKey",
+                "password",
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER")));
         given(userSecurityService.toSecurityUser(any(User.class))).willReturn(mockSecurityUser);
 
         // PasswordEncoder matches 모킹 (필요 시)
