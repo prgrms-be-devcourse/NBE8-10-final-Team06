@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.user.dto.SignupRequest;
@@ -125,6 +126,65 @@ class FollowControllerTest {
         mvc.perform(get("/api/follows/" + me.getId() + "/following-count").cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(1));
+    }
+
+    @Test
+    @DisplayName("팔로잉 목록 조회 테스트 - 내가 팔로우한 사람들의 목록이 나와야 함")
+    void getFollowingsTest() throws Exception {
+        // Given: '나'가 '상대방'을 팔로우
+        mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie));
+
+        // When: 나의 팔로잉 목록 조회
+        ResultActions resultActions = mvc.perform(get("/api/follows/" + me.getId() + "/followings")
+                .cookie(authCookie)); // 인증 쿠키 필수!
+
+        // Then
+        resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].nickname").value("otherNickname"))
+                .andExpect(jsonPath("$.data[0].id").value(otherUser.getId().intValue()))
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("팔로워 목록 조회 테스트 - 나를 팔로우한 사람들의 목록이 나와야 함")
+    void getFollowersTest() throws Exception {
+        // Given: '상대방'이 '나'를 팔로우하게 함
+        // (상대방으로 로그인하기 번거로우니, Repository를 사용하거나 다른 테스트 유저를 생성)
+        User thirdUser = saveUser("third@test.com", "thirdUser");
+        Cookie thirdCookie = loginAndGetCookie("third@test.com", "password123!");
+
+        mvc.perform(post("/api/follows/" + me.getId()).cookie(thirdCookie));
+
+        // When: 나의 팔로워 목록 조회
+        ResultActions resultActions = mvc.perform(get("/api/follows/" + me.getId() + "/followers")
+                .cookie(authCookie));
+
+        // Then
+        resultActions
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].nickname").value("thirdUser"))
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("팔로우 여부 확인 테스트")
+    void isFollowingTest() throws Exception {
+        // Given: 팔로우 전 상태
+        mvc.perform(get("/api/follows/" + otherUser.getId() + "/status")
+                        .cookie(authCookie))
+                .andExpect(jsonPath("$.data").value(false));
+
+        // When: 팔로우 실행
+        mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie));
+
+        // Then: 팔로우 후 상태 확인
+        mvc.perform(get("/api/follows/" + otherUser.getId() + "/status")
+                        .cookie(authCookie))
+                .andExpect(jsonPath("$.data").value(true));
     }
 
     // --- Helper Methods ---
