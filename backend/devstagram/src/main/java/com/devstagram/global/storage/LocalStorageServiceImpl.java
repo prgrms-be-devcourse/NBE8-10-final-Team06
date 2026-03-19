@@ -23,7 +23,7 @@ public class LocalStorageServiceImpl implements StorageService {
     @Value("${storage.location}")
     private String uploadPath;
 
-    // 폴더 경로 객체
+    // 폴더 경로
     private Path rootLocation;
 
     @PostConstruct // 파일 저장될 폴더 세팅
