@@ -29,10 +29,19 @@ public class AuthService {
         checkEmail(request.email());
         checkNickname(request.nickname());
 
-        String encodedPassword = passwordEncoder.encode(request.password());
-        User user = request.toEntity(encodedPassword);
+        // 1. 원본 랜덤 UUID 생성 (DB 저장용 소스)
+        String uuid = java.util.UUID.randomUUID().toString();
 
-        return SignupResponse.from(userRepository.save(user));
+        String encodedPassword = passwordEncoder.encode(request.password());
+        String encodedApiKey = passwordEncoder.encode(uuid);
+
+        User user = request.toEntity(encodedPassword, encodedApiKey);
+        userRepository.save(user);
+
+        // 이렇게 해야 나중에 필터에서 ID로 유저를 광속으로 찾고 UUID를 검증할 수 있습니다.
+        String publicApiKey = user.getId() + "." + uuid;
+
+        return new SignupResponse(user.getId(), user.getNickname(), user.getEmail(), publicApiKey);
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -46,7 +55,8 @@ public class AuthService {
 
         String accessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
 
-        return new LoginResponse(accessToken, user.getApiKey(), user.getEmail(), user.getNickname());
+        // 로그인 응답에서는 보안을 위해 apiKey를 제외
+        return new LoginResponse(accessToken, null, user.getEmail(), user.getNickname());
     }
 
     public void checkEmail(String email) {

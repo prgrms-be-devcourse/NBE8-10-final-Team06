@@ -20,18 +20,22 @@ public record SignupRequest(
         @NotNull Gender gender,
         @Size(max = 200) String githubUrl,
         @NotNull Resume resume) {
-    public User toEntity(String encodedPassword) {
+
+    public User toEntity(String encodedPassword, String encodedApiKey) {
         User user = User.builder()
                 .nickname(this.nickname)
                 .email(this.email)
                 .password(encodedPassword)
                 .birthDate(this.birthDate)
                 .gender(this.gender)
-                .apiKey(java.util.UUID.randomUUID().toString())
+                .apiKey(encodedApiKey)
                 .build();
 
         UserInfo userInfo =
-                UserInfo.builder().githubUrl(this.githubUrl).resume(this.resume).build();
+                UserInfo.builder()
+                        .githubUrl(this.githubUrl)
+                        .resume(this.resume)
+                        .build();
 
         user.setUserInfo(userInfo);
         return user;

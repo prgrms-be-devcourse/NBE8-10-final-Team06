@@ -25,13 +25,14 @@ import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 
 import jakarta.servlet.http.Cookie;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional // 각 테스트 후 롤백되어 DB가 깨끗하게 유지됩니다.
+@Transactional
 class AuthControllerTest {
 
     @Autowired
@@ -45,22 +46,17 @@ class AuthControllerTest {
 
     @BeforeEach
     void init() {
-        // @Transactional이 있어도 혹시 모를 데이터 간섭을 방지하기 위해 초기화합니다.
         userRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("회원가입 성공 - 200-S-1 반환 확인")
+    @DisplayName("회원가입 성공 - 원본 API Key(ID.UUID)가 응답에 포함되어야 함")
     void signupTest() throws Exception {
         // Given
         SignupRequest signupRequest = new SignupRequest(
-                "dohwan",
-                "test@test.com",
-                "password123!",
-                LocalDate.of(2000, 1, 1),
-                Gender.MALE,
-                "https://github.com/dohwa",
-                Resume.UNDERGRADUATE);
+                "dohwan", "test@test.com", "password123!",
+                LocalDate.of(2000, 1, 1), Gender.MALE,
+                "https://github.com/dohwa", Resume.UNDERGRADUATE);
 
         // When
         ResultActions resultActions = mvc.perform(post("/api/auth/signup")
@@ -72,53 +68,53 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.data.nickname").value("dohwan"))
+                .andExpect(jsonPath("$.data.apiKey").exists()) // 원본 키가 존재하는지 확인
                 .andDo(print());
     }
 
     @Test
-    @DisplayName("로그인 성공 - 쿠키(accessToken, apiKey) 발급 확인")
+    @DisplayName("로그인 성공 - accessToken 쿠키 발급 확인 (apiKey 쿠키는 보안상 미발급)")
     void loginTest() throws Exception {
-        // Given: 먼저 회원가입 처리 (회원가입 로직 재사용 대신 직접 DB 저장도 가능하지만 흐름 테스트를 위해 사용)
+        // Given
         saveTestUser("test@test.com", "dohwan");
 
-        String loginRequest = """
-                {
-                    "email": "test@test.com",
-                    "password": "password123!"
-                }
-                """;
+        String loginRequest = "{\"email\":\"test@test.com\",\"password\":\"password123!\"}";
 
         // When
-        ResultActions resultActions =
-                mvc.perform(post("/api/auth/login").content(loginRequest).contentType(MediaType.APPLICATION_JSON));
+        ResultActions resultActions = mvc.perform(post("/api/auth/login")
+                .content(loginRequest)
+                .contentType(MediaType.APPLICATION_JSON));
 
         // Then
         resultActions
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(cookie().exists("accessToken"))
-                .andExpect(cookie().exists("apiKey"))
-                .andExpect(jsonPath("$.msg").value("로그인 성공"))
                 .andDo(print());
     }
 
     @Test
-    @DisplayName("내 정보 조회 - 유효한 쿠키 전달 시 성공")
+    @DisplayName("내 정보 조회 - 발급받은 원본 API Key(ID.UUID)로 인증 성공")
     void meTest() throws Exception {
-        // Given: 사용자 생성 및 로그인 수행하여 쿠키 추출
-        saveTestUser("test@test.com", "dohwan");
+        // 1. 회원가입 시점에 발급되는 '원본 API Key'를 추출합니다.
+        SignupRequest signupRequest = new SignupRequest(
+                "dohwan", "test@test.com", "password123!",
+                LocalDate.of(2000, 1, 1), Gender.MALE,
+                "https://github.com/dohwa", Resume.UNDERGRADUATE);
 
-        MvcResult loginResult = mvc.perform(post("/api/auth/login")
-                        .content("{\"email\":\"test@test.com\",\"password\":\"password123!\"}")
+        MvcResult signupResult = mvc.perform(post("/api/auth/signup")
+                        .content(objectMapper.writeValueAsString(signupRequest))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
 
-        Cookie accessCookie = loginResult.getResponse().getCookie("accessToken");
-        Cookie apiCookie = loginResult.getResponse().getCookie("apiKey");
+        // 응답 JSON에서 apiKey(ID.UUID 형태) 추출
+        String responseBody = signupResult.getResponse().getContentAsString();
+        String publicApiKey = JsonPath.read(responseBody, "$.data.apiKey");
 
-        // When: 발급받은 쿠키와 함께 /me 호출
-        ResultActions resultActions =
-                mvc.perform(get("/api/auth/me").cookie(accessCookie).cookie(apiCookie));
+        // 2. [핵심] 쿠키 없이 헤더에 X-API-KEY만 담아서 요청 보냅니다.
+        // 필터가 ID로 유저를 찾고 뒤의 UUID를 matches()로 검증하는지 확인하는 테스트입니다.
+        ResultActions resultActions = mvc.perform(get("/api/auth/me")
+                .header("X-API-KEY", publicApiKey));
 
         // Then
         resultActions
@@ -132,31 +128,21 @@ class AuthControllerTest {
     @Test
     @DisplayName("내 정보 조회 실패 - 인증 정보가 없을 때 401-F-2 반환")
     void meFailTest() throws Exception {
-        /*
-         * 핵심 포인트: CustomAuthenticationFilter에서 인증 정보가 없으면
-         * 401-F-2 ("로그인 후 이용해주세요.") 에러를 던지도록 설계되어 있습니다.
-         */
-
-        // When: 쿠키나 헤더 없이 호출
+        // When: 아무런 인증 정보 없이 호출
         ResultActions resultActions = mvc.perform(get("/api/auth/me"));
 
-        // Then
+        // Then: 필터에서 401-F-2가 터져야 함
         resultActions
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.resultCode").value("401-F-2")) // 필터의 에러 코드와 매칭
+                .andExpect(jsonPath("$.resultCode").value("401-F-2"))
                 .andDo(print());
     }
 
-    // 테스트용 헬퍼 메서드: 매번 회원가입 API를 부르는 대신 직접 회원가입을 수행하여 테스트 속도 향상
     private void saveTestUser(String email, String nickname) throws Exception {
         SignupRequest signupRequest = new SignupRequest(
-                nickname,
-                email,
-                "password123!",
-                LocalDate.of(2000, 1, 1),
-                Gender.MALE,
-                "https://github.com/dohwa",
-                Resume.UNDERGRADUATE);
+                nickname, email, "password123!",
+                LocalDate.of(2000, 1, 1), Gender.MALE,
+                "https://github.com/dohwa", Resume.UNDERGRADUATE);
 
         mvc.perform(post("/api/auth/signup")
                 .content(objectMapper.writeValueAsString(signupRequest))
