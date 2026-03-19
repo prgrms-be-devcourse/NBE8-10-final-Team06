@@ -4,10 +4,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.devstagram.domain.user.dto.LoginDto;
 import com.devstagram.domain.user.dto.LoginRequest;
+import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
 import com.devstagram.domain.user.service.AuthService;
@@ -36,12 +37,11 @@ public class AuthController {
 
     @PostMapping("/login")
     public RsData<String> login(@Valid @RequestBody LoginRequest request) {
-        LoginDto loginDto = authService.login(request);
+        LoginResponse loginResponse = authService.login(request);
 
-        rq.setCookie("accessToken", loginDto.accessToken());
-        rq.setCookie("apiKey", loginDto.apiKey());
+        rq.setCookie("accessToken", loginResponse.accessToken());
 
-        return RsData.success("로그인 성공", loginDto.accessToken());
+        return RsData.success("로그인 성공", loginResponse.accessToken());
     }
 
     @GetMapping("/me")
@@ -58,5 +58,17 @@ public class AuthController {
         rq.deleteCookie("accessToken");
         rq.deleteCookie("apiKey");
         return RsData.success("로그아웃 되었습니다.", null);
+    }
+
+    @GetMapping("/check-email")
+    public RsData<Void> checkEmail(@RequestParam String email) {
+        authService.checkEmail(email);
+        return RsData.success("사용 가능한 이메일입니다.", null);
+    }
+
+    @GetMapping("/check-nickname")
+    public RsData<Void> checkNickname(@RequestParam String nickname) {
+        authService.checkNickname(nickname);
+        return RsData.success("사용 가능한 닉네임입니다.", null);
     }
 }
