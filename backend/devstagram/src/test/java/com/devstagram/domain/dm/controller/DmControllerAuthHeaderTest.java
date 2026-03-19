@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Constructor;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
@@ -55,8 +56,7 @@ class DmControllerAuthHeaderTest {
         Rq rq = new Rq(request, response);
         ObjectMapper objectMapper = new ObjectMapper();
 
-        CustomAuthenticationFilter filter =
-                new CustomAuthenticationFilter(jwtProvider, userSecurityService, rq, objectMapper);
+        CustomAuthenticationFilter filter = newFilter(jwtProvider, userSecurityService, rq, objectMapper);
 
         when(jwtProvider.isValid("test-token")).thenReturn(true);
         Claims claims = mock(Claims.class);
@@ -111,5 +111,25 @@ class DmControllerAuthHeaderTest {
         assertThat(rs).isNotNull();
         assertThat(rs.isSuccess()).isTrue();
         assertThat(rs.data()).isEqualTo(List.<DmRoomSummaryResponse>of());
+    }
+
+    private CustomAuthenticationFilter newFilter(
+            JwtProvider jwtProvider, UserSecurityService userSecurityService, Rq rq, ObjectMapper objectMapper) {
+        try {
+            for (Constructor<?> ctor : CustomAuthenticationFilter.class.getConstructors()) {
+                if (ctor.getParameterCount() == 4) {
+                    return (CustomAuthenticationFilter)
+                            ctor.newInstance(jwtProvider, userSecurityService, rq, objectMapper);
+                }
+                if (ctor.getParameterCount() == 5) {
+                    Object passwordEncoder = mock(ctor.getParameterTypes()[4]);
+                    return (CustomAuthenticationFilter)
+                            ctor.newInstance(jwtProvider, userSecurityService, rq, objectMapper, passwordEncoder);
+                }
+            }
+            throw new IllegalStateException("지원 가능한 CustomAuthenticationFilter 생성자를 찾지 못했습니다.");
+        } catch (Exception e) {
+            throw new RuntimeException("CustomAuthenticationFilter 생성 실패", e);
+        }
     }
 }
