@@ -79,7 +79,7 @@ class CommentServiceTest {
         // [given]
         Long postId = 1L;
         Long memberId = 1L;
-        CommentCreateReq req = new CommentCreateReq("댓글 내용", 1L, null);
+        CommentCreateReq req = new CommentCreateReq("댓글 내용", null);
         User user = createMember(memberId, "테스트유저");
 
         given(userRepository.findById(anyLong())).willReturn(Optional.of(user));
@@ -101,7 +101,7 @@ class CommentServiceTest {
         Long postId = 1L;
         Long memberId = 1L;
         Long invalidParentId = 999L;
-        CommentCreateReq req = new CommentCreateReq("내용", 1L, invalidParentId);
+        CommentCreateReq req = new CommentCreateReq("내용", invalidParentId);
 
         User user = createMember(memberId, "테스트유저");
 

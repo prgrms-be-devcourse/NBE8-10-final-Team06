@@ -132,7 +132,7 @@ class CommentControllerTest {
     void createComment_Success() throws Exception {
         // given
         Long postId = 1L;
-        CommentCreateReq req = new CommentCreateReq("댓글 작성 테스트", 1L, null);
+        CommentCreateReq req = new CommentCreateReq("댓글 작성 테스트", null);
         given(commentService.createComment(eq(postId), anyLong(), any(CommentCreateReq.class)))
                 .willReturn(100L);
 
