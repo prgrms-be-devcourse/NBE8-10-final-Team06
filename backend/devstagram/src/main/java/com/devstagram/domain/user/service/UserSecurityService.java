@@ -22,13 +22,13 @@ public class UserSecurityService {
     private final UserRepository userRepository;
 
     public User findById(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
+        return userRepository.findById(id).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
     }
 
     public User findByApiKey(String apiKey) {
         return userRepository
                 .findByApiKey(apiKey)
-                .orElseThrow(() -> new ServiceException("401-F-1", "유효하지 않은 API Key입니다."));
+                .orElseThrow(() -> new ServiceException("401-U-1", "유효하지 않은 API Key입니다."));
     }
 
     public SecurityUser toSecurityUser(User user) {

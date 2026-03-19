@@ -4,7 +4,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.user.dto.LoginDto;
+import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
@@ -35,18 +35,18 @@ public class AuthService {
         return SignupResponse.from(userRepository.save(user));
     }
 
-    public LoginDto login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request) {
         User user = userRepository
                 .findByEmail(request.email())
-                .orElseThrow(() -> new ServiceException("401-F-1", "이메일 또는 비밀번호가 일치하지 않습니다."));
+                .orElseThrow(() -> new ServiceException("401-U-1", "이메일 또는 비밀번호가 일치하지 않습니다."));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new ServiceException("401-F-1", "이메일 또는 비밀번호가 일치하지 않습니다.");
+            throw new ServiceException("401-U-1", "이메일 또는 비밀번호가 일치하지 않습니다.");
         }
 
         String accessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
 
-        return new LoginDto(accessToken, user.getApiKey(), user.getEmail(), user.getNickname());
+        return new LoginResponse(accessToken, user.getApiKey(), user.getEmail(), user.getNickname());
     }
 
     public void checkEmail(String email) {

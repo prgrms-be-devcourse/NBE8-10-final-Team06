@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.devstagram.domain.user.dto.LoginDto;
+import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
@@ -37,12 +37,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public RsData<String> login(@Valid @RequestBody LoginRequest request) {
-        LoginDto loginDto = authService.login(request);
+        LoginResponse loginResponse = authService.login(request);
 
-        rq.setCookie("accessToken", loginDto.accessToken());
-        rq.setCookie("apiKey", loginDto.apiKey());
+        rq.setCookie("accessToken", loginResponse.accessToken());
+        rq.setCookie("apiKey", loginResponse.apiKey());
 
-        return RsData.success("로그인 성공", loginDto.accessToken());
+        return RsData.success("로그인 성공", loginResponse.accessToken());
     }
 
     @GetMapping("/me")
