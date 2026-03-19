@@ -19,8 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.*;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder; // 추가
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.devstagram.domain.post.dto.PostCreateReq;
@@ -61,38 +63,50 @@ class PostControllerTest {
     @MockitoBean
     private Rq rq;
 
+    // [핵심 추가] 필터(CustomAuthenticationFilter)가 생성될 때 필요한 빈입니다.
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
+
     @BeforeEach
     void setUp() {
+        // Rq 모킹
         given(rq.getHeader(eq("Authorization"), anyString())).willReturn("Bearer dummy");
         given(rq.getHeader(eq("X-API-KEY"), anyString())).willReturn("");
         given(rq.getCookieValue(anyString(), anyString())).willReturn("");
 
-        // jwt
+        // JWT 모킹
         given(jwtProvider.isValid(anyString())).willReturn(true);
         Claims mockClaims = mock(Claims.class);
         given(mockClaims.getSubject()).willReturn("1");
         given(jwtProvider.payload(anyString())).willReturn(mockClaims);
 
-        // user
-        User mockUser = mock(User.class);
-        SecurityUser mockSecurityUser = mock(SecurityUser.class); // 가짜 SecurityUser 생성
+        // User 객체 생성 및 ID 주입
+        User mockUser = User.builder()
+                .email("test@test.com")
+                .nickname("tester")
+                .build();
+        ReflectionTestUtils.setField(mockUser, "id", 1L);
 
+        // 서비스 응답 정의
         given(userSecurityService.findById(1L)).willReturn(mockUser);
-        given(userSecurityService.toSecurityUser(mockUser)).willReturn(mockSecurityUser);
 
-        given(mockSecurityUser.getPassword()).willReturn("");
-        given(mockSecurityUser.getAuthorities()).willReturn(java.util.Collections.emptyList());
+        SecurityUser mockSecurityUser = new SecurityUser(
+                1L, "test@test.com", "tester", "hashedKey", "password",
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))
+        );
+        given(userSecurityService.toSecurityUser(any(User.class))).willReturn(mockSecurityUser);
+
+        // PasswordEncoder matches 모킹 (필요 시)
+        given(passwordEncoder.matches(anyString(), anyString())).willReturn(true);
     }
 
     @Test
     @WithMockUser
     @DisplayName("[게시글 생성 성공] - 201")
     void createPost_Success() throws Exception {
-        // given
         PostCreateReq req = new PostCreateReq("새 제목", "새 내용");
         given(postService.createPost(any(PostCreateReq.class))).willReturn(1L);
 
-        // when & then
         mockMvc.perform(post("/api/posts")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,15 +119,11 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("[게시글 수정 성공] - 200")
     void updatePost_Success() throws Exception {
-        // given
         Long postId = 1L;
         PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
-
-        // 특정 동작을 검증
         doNothing().when(postService).updatePost(eq(postId), any(PostUpdateReq.class));
 
-        // when & then
-        mockMvc.perform(put("/api/posts/{postId}", postId) // @PutMapping이므로 put 사용
+        mockMvc.perform(put("/api/posts/{postId}", postId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateReq)))
@@ -127,11 +137,9 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("[게시물 삭제 성공] - 200")
     void deletePost_Success() throws Exception {
-        // given
         Long postId = 1L;
         doNothing().when(postService).deletePost(postId);
 
-        // when & then
         mockMvc.perform(delete("/api/posts/{postId}", postId).with(csrf()))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -142,7 +150,6 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("[게시물 상세 조회 성공]")
     void getPostDetail_Success() throws Exception {
-        // given
         Long postId = 1L;
         LocalDateTime now = LocalDateTime.now();
 
@@ -157,7 +164,6 @@ class PostControllerTest {
 
         given(postService.getPostDetail(postId)).willReturn(response);
 
-        // when & then
         mockMvc.perform(get("/api/posts/{postId}", postId))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -173,7 +179,6 @@ class PostControllerTest {
     @WithMockUser
     @DisplayName("[게시물 피드 조회 성공]")
     void getPostFeed_Success() throws Exception {
-        // given
         LocalDateTime now = LocalDateTime.now();
 
         List<PostFeedRes> content = List.of(
@@ -199,7 +204,6 @@ class PostControllerTest {
 
         given(postService.getPostFeed(any(Pageable.class))).willReturn(sliceResponse);
 
-        // when & then
         mockMvc.perform(get("/api/posts").param("page", "0").param("size", "10").param("sort", "createdAt,desc"))
                 .andDo(print())
                 .andExpect(status().isOk())
