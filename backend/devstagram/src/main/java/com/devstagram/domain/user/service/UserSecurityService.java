@@ -25,18 +25,6 @@ public class UserSecurityService {
         return userRepository.findById(id).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
     }
 
-    /**
-     * [주의] API Key가 해싱되어 저장되므로,
-     * 단순 findByApiKey(apiKey) 쿼리로는 유저를 찾을 수 없습니다.
-     * 이 메서드는 나중에 '식별자'를 통해 유저를 찾고 passwordEncoder.matches()로 검증하는 로직으로 변경되어야 합니다.
-     * 지금은 컴파일 에러 방지를 위해 기존 구조를 유지하되, 로직상 동작하지 않음을 인지해야 합니다.
-     */
-    public User findByApiKey(String apiKey) {
-        return userRepository
-                .findByApiKey(apiKey) // DB에 해싱된 값이 들어있어서 원본 apiKey로는 검색 실패함
-                .orElseThrow(() -> new ServiceException("401-U-1", "유효하지 않은 API Key입니다."));
-    }
-
     public SecurityUser toSecurityUser(User user) {
         return new SecurityUser(
                 user.getId(),

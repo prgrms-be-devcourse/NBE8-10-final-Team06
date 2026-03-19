@@ -74,8 +74,7 @@ public class FollowService {
 
     // 특정 유저가 팔로잉하는 사람들 목록
     public List<FollowUserResponse> getFollowings(Long userId) {
-        User user =
-                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user = getUserById(userId);
 
         // 내가(fromUser) 팔로우한 사람들(toUser)을 가져와서 DTO로 변환
         return followRepository.findAllByFromUser(user).stream()
@@ -85,8 +84,7 @@ public class FollowService {
 
     // 특정 유저를 팔로우하는 사람들(팬) 목록
     public List<FollowUserResponse> getFollowers(Long userId) {
-        User user =
-                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user = getUserById(userId);
 
         // 나를(toUser) 팔로우한 사람들(fromUser)을 가져와서 DTO로 변환
         return followRepository.findAllByToUser(user).stream()

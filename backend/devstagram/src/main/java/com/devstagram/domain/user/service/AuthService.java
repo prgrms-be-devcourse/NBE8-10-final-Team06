@@ -41,7 +41,7 @@ public class AuthService {
         // 이렇게 해야 나중에 필터에서 ID로 유저를 광속으로 찾고 UUID를 검증할 수 있습니다.
         String publicApiKey = user.getId() + "." + uuid;
 
-        return new SignupResponse(user.getId(), user.getNickname(), user.getEmail(), publicApiKey);
+        return SignupResponse.of(user, publicApiKey);
     }
 
     public LoginResponse login(LoginRequest request) {

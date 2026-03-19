@@ -40,7 +40,6 @@ public class AuthController {
         LoginResponse loginResponse = authService.login(request);
 
         rq.setCookie("accessToken", loginResponse.accessToken());
-        rq.setCookie("apiKey", loginResponse.apiKey());
 
         return RsData.success("로그인 성공", loginResponse.accessToken());
     }
