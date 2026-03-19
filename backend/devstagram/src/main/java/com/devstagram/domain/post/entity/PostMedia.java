@@ -2,11 +2,23 @@ package com.devstagram.domain.post.entity;
 
 import com.devstagram.global.entity.BaseEntity;
 import com.devstagram.global.enumtype.MediaType;
+import jakarta.persistence.*;
 
 public class PostMedia extends BaseEntity {
-    short sequence; //
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    MediaType mediaType;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
 
-    String sourceUrl;
+    @Column(nullable = false)
+    private String sourceUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MediaType mediaType;
+
+    @Column(nullable = false)
+    private short sequence;
 }

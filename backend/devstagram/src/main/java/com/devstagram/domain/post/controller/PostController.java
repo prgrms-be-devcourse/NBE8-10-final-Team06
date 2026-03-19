@@ -2,11 +2,13 @@ package com.devstagram.domain.post.controller;
 
 import java.net.URI;
 
+import com.devstagram.global.security.SecurityUser;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.post.dto.PostCreateReq;
@@ -26,9 +28,12 @@ public class PostController {
     private final PostService postService;
 
     @PostMapping
-    public ResponseEntity<RsData<Long>> createPost(@Valid @RequestBody PostCreateReq req) {
+    public ResponseEntity<RsData<Long>> createPost(
+            @AuthenticationPrincipal SecurityUser user,
+            @Valid @RequestBody PostCreateReq req
+    ) {
 
-        Long postId = postService.createPost(req);
+        Long postId = postService.createPost(user.getId(), req);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "게시글 생성 성공", postId);
 
@@ -36,16 +41,16 @@ public class PostController {
     }
 
     @PutMapping("/{postId}")
-    public RsData<Void> updatePost(@PathVariable Long postId, @Valid @RequestBody PostUpdateReq req) {
+    public RsData<Void> updatePost(@AuthenticationPrincipal SecurityUser user, @PathVariable Long postId, @Valid @RequestBody PostUpdateReq req) {
 
-        postService.updatePost(postId, req);
+        postService.updatePost(user.getId(), postId, req);
 
         return RsData.success();
     }
 
     @DeleteMapping("/{postId}")
-    public RsData<Void> deletePost(@PathVariable Long postId) {
-        postService.deletePost(postId);
+    public RsData<Void> deletePost(@AuthenticationPrincipal SecurityUser user, @PathVariable Long postId) {
+        postService.deletePost(user.getId(), postId);
 
         return RsData.success();
     }
