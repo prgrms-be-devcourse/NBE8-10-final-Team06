@@ -1,13 +1,13 @@
 package com.devstagram.domain.post.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.entity.BaseEntity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Getter

@@ -2,7 +2,6 @@ package com.devstagram.domain.post.controller;
 
 import java.net.URI;
 
-import com.devstagram.domain.post.dto.*;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
@@ -11,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
@@ -69,10 +69,7 @@ public class PostController {
     }
 
     @PostMapping("/{postId}")
-    public RsData<Void> toggleLike(
-            @PathVariable Long postId,
-            @AuthenticationPrincipal SecurityUser securityUser
-    ) {
+    public RsData<Void> toggleLike(@PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) {
         // 서비스에서 좋아요 상태(true: 추가됨, false: 취소됨)를 반환받음
         boolean isLiked = postService.togglePostLike(postId, securityUser.getId());
 
@@ -84,11 +81,9 @@ public class PostController {
     @GetMapping("/{postId}")
     public RsData<Slice<PostLikerRes>> getLikers(
             @PathVariable Long postId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ){
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Slice<PostLikerRes> likers = postService.getPostLikers(postId, pageable);
 
-        return RsData.success("좋아요 목록 조회 성공",  likers);
+        return RsData.success("좋아요 목록 조회 성공", likers);
     }
-
 }

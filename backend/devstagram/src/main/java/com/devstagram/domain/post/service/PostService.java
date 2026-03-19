@@ -1,23 +1,22 @@
 package com.devstagram.domain.post.service;
 
-import com.devstagram.domain.post.dto.*;
-import com.devstagram.domain.post.entity.PostLike;
-import com.devstagram.domain.post.repository.PostLikeRepository;
-import org.springframework.data.domain.Page;
+import java.util.Optional;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.entity.PostLike;
+import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -96,7 +95,8 @@ public class PostService {
 
         User user = userRepository.getReferenceById(memberId);
 
-        Post post = postRepository.findByIdWithLock(postId)
+        Post post = postRepository
+                .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndMemberId(postId, memberId);
@@ -108,10 +108,7 @@ public class PostService {
             return false;
         } else {
 
-            PostLike newLike = PostLike.builder()
-                    .user(user)
-                    .post(post)
-                    .build();
+            PostLike newLike = PostLike.builder().user(user).post(post).build();
 
             postLikeRepository.save(newLike);
             postRepository.incrementLikeCount(postId);
