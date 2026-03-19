@@ -1,5 +1,7 @@
 package com.devstagram.domain.dm.controller;
 
+import java.util.List;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,10 +52,10 @@ public class DmController {
      * - Room 에서 가장 최신의 대화 포함
      */
     @GetMapping("/rooms")
-    public RsData<java.util.List<DmRoomSummaryResponse>> getRooms() {
+    public RsData<List<DmRoomSummaryResponse>> getRooms() {
         Long currentUserId = SecurityUtil.getCurrentUserId();
 
-        java.util.List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
+        List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
 
         return RsData.success(rooms);
     }

@@ -1,7 +1,10 @@
 package com.devstagram.domain.dm.service;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
@@ -100,50 +103,8 @@ public class DmService {
             throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
         }
 
-        return dmRoomUserRepository.findByUser_Id(userId).stream()
-                .map(roomUser -> {
-                    var room = roomUser.getDmRoom();
-                    Dm last = dmRepository.findTopByDmRoom_IdOrderByIdDesc(room.getId());
-
-                    DmMessageResponse lastMessage = null;
-                    if (last != null) {
-                        lastMessage = new DmMessageResponse(
-                                last.getId(),
-                                last.getType(),
-                                last.getContent(),
-                                last.getThumbnailUrl(),
-                                last.isValid(),
-                                last.getCreatedAt());
-                    }
-
-                    // 현재 유저를 제외한 참여자 정보
-                    var participantDtos = dmRoomUserRepository.findByDmRoom_Id(room.getId()).stream()
-                            .filter(ru -> ru.getUser() != null
-                                    && ru.getUser().getId() != null
-                                    && !ru.getUser().getId().equals(userId))
-                            .map(ru -> new DmRoomParticipantSummary(
-                                    ru.getUser().getId(), ru.getUser().getEmail()))
-                            .collect(Collectors.toList());
-
-                    // 안 읽은 메시지 수
-                    Long lastReadId = roomUser.getLastReadMessageCursor();
-                    long unreadCount;
-                    if (lastReadId == null) {
-                        unreadCount = dmRepository.countByDmRoom_Id(room.getId());
-                    } else {
-                        unreadCount = dmRepository.countByDmRoom_IdAndIdGreaterThan(room.getId(), lastReadId);
-                    }
-
-                    return new DmRoomSummaryResponse(
-                            room.getId(),
-                            room.getName(),
-                            room.getIsGroup(),
-                            lastMessage,
-                            roomUser.getJoinedAt(),
-                            participantDtos,
-                            unreadCount);
-                })
-                .collect(Collectors.toList());
+        List<DmRoomUser> myRoomUsers = dmRoomUserRepository.findByUser_Id(userId);
+        return buildRoomsSummary(userId, myRoomUsers);
     }
 
     /**
@@ -180,7 +141,7 @@ public class DmService {
                 .orElse(null);
 
         if (existingRoomId != null) {
-            List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessageFromRoomUsers(currentUserId, myRoomUsers);
+            List<DmRoomSummaryResponse> rooms = buildRoomsSummary(currentUserId, myRoomUsers);
             return new DmCreate1v1WithRoomListResponse(existingRoomId, rooms);
         }
 
@@ -190,13 +151,52 @@ public class DmService {
         return new DmCreate1v1WithRoomListResponse(createdRoomId, rooms);
     }
 
-    private List<DmRoomSummaryResponse> getRoomsWithLastMessageFromRoomUsers(
-            Long userId, List<DmRoomUser> myRoomUsers) {
+    private List<DmRoomSummaryResponse> buildRoomsSummary(Long userId, List<DmRoomUser> myRoomUsers) {
+        if (myRoomUsers == null || myRoomUsers.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> roomIds = myRoomUsers.stream()
+                .map(ru -> ru.getDmRoom() == null ? null : ru.getDmRoom().getId())
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+
+        if (roomIds.isEmpty()) {
+            return List.of();
+        }
+
+        // 1) 각 room 별 최신 메시지 1개를 배치로 조회합니다.
+        Map<Long, Dm> latestByRoomId = dmRepository.findLatestByDmRoom_IdIn(roomIds).stream()
+                .collect(Collectors.toMap(d -> d.getDmRoom().getId(), d -> d));
+
+        // 2) 각 room 별 참여자도 배치로 조회합니다. (join fetch user)
+        List<DmRoomUser> participants = dmRoomUserRepository.findParticipantsByDmRoom_IdIn(roomIds);
+        Map<Long, List<DmRoomUser>> participantsByRoomId = participants.stream()
+                .collect(Collectors.groupingBy(ru -> ru.getDmRoom().getId()));
+
+        // 3) lastReadMessageCursor 가 null 인 room 은 total count를 1번에 조회합니다.
+        Set<Long> unreadRoomIds = myRoomUsers.stream()
+                .filter(ru -> ru.getLastReadMessageCursor() == null)
+                .map(ru -> ru.getDmRoom().getId())
+                .collect(Collectors.toSet());
+
+        Map<Long, Long> totalCountWhenUnread = new HashMap<>();
+        if (!unreadRoomIds.isEmpty()) {
+            List<Object[]> totals = dmRepository.countTotalByDmRoom_IdIn(unreadRoomIds);
+            for (Object[] row : totals) {
+                Long roomId = (Long) row[0];
+                Long cnt = (Long) row[1];
+                totalCountWhenUnread.put(roomId, cnt);
+            }
+        }
+
+        // 4) in-memory 조립 (lastRead != null 인 room 은 기존 countBy* 1회/room 로직 유지)
         return myRoomUsers.stream()
                 .map(roomUser -> {
                     var room = roomUser.getDmRoom();
-                    Dm last = dmRepository.findTopByDmRoom_IdOrderByIdDesc(room.getId());
+                    Long roomId = room.getId();
 
+                    Dm last = latestByRoomId.get(roomId);
                     DmMessageResponse lastMessage = null;
                     if (last != null) {
                         lastMessage = new DmMessageResponse(
@@ -208,8 +208,7 @@ public class DmService {
                                 last.getCreatedAt());
                     }
 
-                    // 현재 유저를 제외한 참여자 정보
-                    var participantDtos = dmRoomUserRepository.findByDmRoom_Id(room.getId()).stream()
+                    var participantDtos = participantsByRoomId.getOrDefault(roomId, List.of()).stream()
                             .filter(ru -> ru.getUser() != null
                                     && ru.getUser().getId() != null
                                     && !ru.getUser().getId().equals(userId))
@@ -217,17 +216,16 @@ public class DmService {
                                     ru.getUser().getId(), ru.getUser().getEmail()))
                             .collect(Collectors.toList());
 
-                    // 안 읽은 메시지 수
                     Long lastReadId = roomUser.getLastReadMessageCursor();
                     long unreadCount;
                     if (lastReadId == null) {
-                        unreadCount = dmRepository.countByDmRoom_Id(room.getId());
+                        unreadCount = totalCountWhenUnread.getOrDefault(roomId, 0L);
                     } else {
-                        unreadCount = dmRepository.countByDmRoom_IdAndIdGreaterThan(room.getId(), lastReadId);
+                        unreadCount = dmRepository.countByDmRoom_IdAndIdGreaterThan(roomId, lastReadId);
                     }
 
                     return new DmRoomSummaryResponse(
-                            room.getId(),
+                            roomId,
                             room.getName(),
                             room.getIsGroup(),
                             lastMessage,
