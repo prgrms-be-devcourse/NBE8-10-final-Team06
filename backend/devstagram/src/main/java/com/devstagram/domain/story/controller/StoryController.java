@@ -2,6 +2,7 @@ package com.devstagram.domain.story.controller;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.story.dto.*;
@@ -19,8 +20,8 @@ public class StoryController {
     private final StoryService storyService;
 
     // 스토리 생성
-    @PostMapping
-    public RsData<StoryCreateResponse> createStory(@RequestBody StoryCreateRequest request) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public RsData<StoryCreateResponse> createStory(@ModelAttribute StoryCreateRequest request) {
 
         Long userId = SecurityUtil.getCurrentUserId();
         StoryCreateResponse response = storyService.createStory(userId, request);
