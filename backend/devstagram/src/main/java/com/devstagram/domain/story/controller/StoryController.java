@@ -22,6 +22,7 @@ public class StoryController {
     // 스토리 생성
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public RsData<StoryCreateResponse> createStory(@ModelAttribute StoryCreateRequest request) {
+        // 파일이 포함된 데이터라 @ModelAttribute 사용
 
         Long userId = SecurityUtil.getCurrentUserId();
         StoryCreateResponse response = storyService.createStory(userId, request);

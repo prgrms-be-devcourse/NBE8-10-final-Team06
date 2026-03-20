@@ -37,8 +37,10 @@ public class StoryService {
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
 
+        // 미디어 파일 로컬 저장
         String savedFileName = storageService.store(request.file());
 
+        // StoryMedia 엔티티 생성 & 그 안에 파일몀 넣어놓기
         StoryMedia media = StoryMedia.builder()
                 .mediaType(request.mediaType())
                 .sourceUrl(savedFileName)
