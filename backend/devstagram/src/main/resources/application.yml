@@ -15,8 +15,8 @@ server:
   port: 8080
 
 storage:
-  location: C:/programmers/TeamProject-4/NBE8-10-final-Team06/backend/devstagram/uploads
-  # 본인의 로컬 프로젝트 파일에 저장 공간 설정
+  location: ${STORAGE_PATH:./uploads}
+  # .env에 본인의 로컬 프로젝트 파일 경로 STORAGE_PATH 설정
 
 custom:
   jwt:

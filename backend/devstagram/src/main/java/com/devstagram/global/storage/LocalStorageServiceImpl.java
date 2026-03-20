@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -26,7 +27,10 @@ public class LocalStorageServiceImpl implements StorageService {
     // 폴더 경로
     private Path rootLocation;
 
-    @PostConstruct // 파일 저장될 폴더 세팅
+    // 허용할 확장자 리스트
+    private final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", "webp", ".webm");
+
+    @PostConstruct // 파일 저장될 폴더 경로 세팅
     public void init() {
         try {
             // "C:/uploads" 같은 문자열을 자바가 이해할 수 있는 Path 객체로 변환
@@ -53,9 +57,19 @@ public class LocalStorageServiceImpl implements StorageService {
             // 파일의 원래 이름/확장자 파악
             String originalFilename = file.getOriginalFilename();
 
+            if (originalFilename == null || !originalFilename.contains(".")) {
+                throw new ServiceException("400-S-3", "확장자가 없는 파일");
+            } // 확장자 추출 & 검증
+
             // . 기준으로 확장자만 분리 -> 파일명 : 난수 + 확장자로 설정해서 동일 파일 덮어쓰기 방지
             String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            String savedFilename = UUID.randomUUID().toString() + extension;
+
+            if (!ALLOWED_EXTENSIONS.contains(extension)) {
+                log.warn("허용되지 않은 파일 업로드 시도: {}", originalFilename);
+                throw new ServiceException("400-S-4", "허용되지 않는 파일 형식");
+            }
+
+            String savedFilename = UUID.randomUUID() + extension;
 
             if (savedFilename.contains("..")) {
                 throw new ServiceException("400-S-2", "파일명에 부적절한 문자가 포함");
@@ -66,7 +80,7 @@ public class LocalStorageServiceImpl implements StorageService {
             return savedFilename; // 저장 성공 -> 저장한 파일명 반환
 
         } catch (IOException e) {
-            throw new ServiceException("500-S-2", "파일을 하드디스크에 기록하는 중 오류가 발생.");
+            throw new ServiceException("500-S-2", "파일 저장 중 오류 발생");
         }
     }
 
@@ -79,7 +93,7 @@ public class LocalStorageServiceImpl implements StorageService {
             Files.deleteIfExists(file); // 있으면 지우고, 없으면 그냥 넘어감
 
         } catch (IOException e) {
-            log.error("파일 물리 삭제 실패 : {}", fileName, e);
+            log.error("파일 삭제 실패 : {}", fileName, e);
         }
     }
 }
