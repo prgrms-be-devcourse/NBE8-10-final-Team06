@@ -39,6 +39,7 @@ public class StoryService {
                 .mediaType(request.mediaType())
                 .sourceUrl(request.storageSource())
                 .build();
+        // StoryMedia 생성
 
         Story story = Story.builder()
                 .user(user)
@@ -46,6 +47,7 @@ public class StoryService {
                 .thumbnailUrl(request.thumbnailUrl())
                 .storyMedia(media)
                 .build();
+        // 스토리 생성
 
         Story savedStory = storyRepository.save(story);
 
@@ -81,9 +83,6 @@ public class StoryService {
     public List<StoryDetailResponse> getUserAllStories(Long targetUserId, Long currentUserId) {
 
         userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저."));
-
-        boolean isAuthor = targetUserId.equals(currentUserId);
-        // 조회자가 스토리 보유자와 동일인인지 : 좋아요 개수 노출 여부 결정하기 위함
 
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
         // 특정 유저의 스토리 & 활성화된 스토리 찾아서 생성 시간순으로 정렬
@@ -183,6 +182,19 @@ public class StoryService {
         return StoryViewResponse.from(storyViewed);
     }
 
+    // 내 만료된 스토리 목록 조회
+    @Transactional(readOnly = true)
+    public List<StoryDetailResponse> getMyArchivedStories(Long currentUserId) {
+
+        // isDeleted = true인 스토리 목록 조회 -> id들만 뽑아옴
+        List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(currentUserId);
+        Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
+
+        return stories.stream()
+                .map(story -> toDetailResponse(story, currentUserId, likedStoryIds.contains(story.getId())))
+                .toList();
+    }
+
     // 조회 기록 있으면 가져오고, 아니면 새로 StoryView 생성
     private StoryViewed createStoryViewed(Story story, User user) {
         return storyViewedRepository
@@ -205,51 +217,7 @@ public class StoryService {
                 .collect(Collectors.toSet());
     }
 
-    // 스토리 본 유저들 조회
-    @Transactional(readOnly = true)
-    public List<StoryViewerUserResponse> getStoryViewers(Long storyId, Long currentUserId) {
-
-        Story story =
-                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
-
-        if (!story.getUser().getId().equals(currentUserId)) {
-            throw new ServiceException("403-F-1", "본인만 확인 가능");
-        }
-
-        List<StoryViewed> viewers = storyViewedRepository.findByStoryIdOrderByViewedAtDesc(storyId);
-
-        return viewers.stream().map(StoryViewerUserResponse::from).toList();
-    }
-
-    // 스토리 좋아요 누른 유저들 조회
-    @Transactional(readOnly = true)
-    public List<StoryViewerUserResponse> getStoryLiker(Long storyId, Long currentUserId) {
-
-        Story story =
-                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
-
-        if (!story.getUser().getId().equals(currentUserId)) {
-            throw new ServiceException("403-F-1", "본인만 확인 가능");
-        }
-
-        List<StoryViewed> likers = storyViewedRepository.findByStoryIdAndIsLikedTrueOrderByLikedAtDesc(storyId);
-
-        return likers.stream().map(StoryViewerUserResponse::from).toList();
-    }
-
-    // 내 만료된 스토리 목록 조회
-    @Transactional(readOnly = true)
-    public List<StoryDetailResponse> getMyArchivedStories(Long currentUserId) {
-
-        // isDeleted = true인 스토리 목록 조회 -> id들만 뽑아옴
-        List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(currentUserId);
-        Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
-
-        return stories.stream()
-                .map(story -> toDetailResponse(story, currentUserId, likedStoryIds.contains(story.getId())))
-                .toList();
-    }
-
+    // 해당 유저가 스토리 보유자와 동일인인지 판별해서 -> rs DTO 생성
     private StoryDetailResponse toDetailResponse(Story story, Long currentUserId, boolean isLiked) {
 
         boolean isAuthor = story.getUser().getId().equals(currentUserId);
