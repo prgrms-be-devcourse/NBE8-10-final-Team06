@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.controller;
 
+import com.devstagram.domain.user.dto.FollowResponse;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,20 +26,20 @@ public class FollowController {
 
     // 팔로우 실행
     @PostMapping("/{toUserId}")
-    public RsData<Void> follow(@PathVariable Long toUserId) {
+    public RsData<FollowResponse> follow(@PathVariable Long toUserId) {
         Long loginUserId = SecurityUtil.getCurrentUserId();
+        FollowResponse response = followService.follow(loginUserId, toUserId);
 
-        followService.follow(loginUserId, toUserId);
-        return RsData.success("팔로우가 완료되었습니다.", null);
+        return RsData.success("팔로우가 완료되었습니다.", response);
     }
 
     // 팔로우 취소 (언팔로우)
     @DeleteMapping("/{toUserId}")
-    public RsData<Void> unfollow(@PathVariable Long toUserId) {
+    public RsData<FollowResponse> unfollow(@PathVariable Long toUserId) {
         Long loginUserId = SecurityUtil.getCurrentUserId();
+        FollowResponse response = followService.unfollow(loginUserId, toUserId);
 
-        followService.unfollow(loginUserId, toUserId);
-        return RsData.success("언팔로우가 완료되었습니다.", null);
+        return RsData.success("언팔로우가 완료되었습니다.", response);
     }
 
     // 특정 유저의 팔로워 수 조회
