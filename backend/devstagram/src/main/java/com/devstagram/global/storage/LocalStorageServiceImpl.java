@@ -28,7 +28,7 @@ public class LocalStorageServiceImpl implements StorageService {
     private Path rootLocation;
 
     // 허용할 확장자 리스트
-    private final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", "webp", ".webm");
+    private final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
 
     @PostConstruct // 파일 저장될 폴더 경로 세팅
     public void init() {
