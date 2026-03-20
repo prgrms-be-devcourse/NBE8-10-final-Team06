@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,7 +27,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.devstagram.domain.story.dto.*;
 import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.domain.user.service.UserSecurityService;
-import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
@@ -90,9 +90,14 @@ class StoryControllerTest {
     }
 
     @Test
-    @DisplayName("스토리 생성 성공")
-    void createStory_Success() throws Exception {
-        StoryCreateRequest request = new StoryCreateRequest("테스트 스토리", List.of(2L), MediaType.jpg, "url", "thumb");
+    @DisplayName("스토리 생성 성공 - 이미지")
+    void createStory_Success_Image() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.jpg",
+                org.springframework.http.MediaType.IMAGE_JPEG_VALUE,
+                "test image content".getBytes());
+
         StoryCreateResponse response = StoryCreateResponse.builder()
                 .storyId(10L)
                 .userId(1L)
@@ -102,15 +107,61 @@ class StoryControllerTest {
 
         given(storyService.createStory(eq(1L), any(StoryCreateRequest.class))).willReturn(response);
 
-        mockMvc.perform(post("/api/story")
+        mockMvc.perform(multipart("/api/story")
+                        .file(file)
+                        .param("content", "테스트 스토리")
+                        .param("tagUserIds", "2")
+                        .param("mediaType", "jpg")
+                        .param("thumbnailUrl", "thumb")
                         .with(csrf())
-                        .with(user(mockSecurityUser)) // SecurityUtil.getCurrentUserId()가 1L을 반환하게 함
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.data.storyId").value(10L));
+    }
+
+    @Test
+    @DisplayName("스토리 생성 성공 - 비디오")
+    void createStory_Success_Video() throws Exception {
+        MockMultipartFile file =
+                new MockMultipartFile("file", "test.webm", "video/webm", "test video content".getBytes());
+
+        StoryCreateResponse response = StoryCreateResponse.builder()
+                .storyId(11L)
+                .userId(1L)
+                .content("비디오 스토리")
+                .build();
+
+        given(storyService.createStory(eq(1L), any(StoryCreateRequest.class))).willReturn(response);
+
+        mockMvc.perform(multipart("/api/story")
+                        .file(file)
+                        .param("content", "비디오 스토리")
+                        .param("mediaType", "webm")
+                        .with(csrf())
+                        .with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data.storyId").value(11L));
+    }
+
+    @Test
+    @DisplayName("스토리 생성 실패 - 파일 누락")
+    void createStory_Fail_MissingFile() throws Exception {
+        given(storyService.createStory(eq(1L), any(StoryCreateRequest.class)))
+                .willThrow(new com.devstagram.global.exception.ServiceException("400-F-1", "파일은 필수입니다."));
+
+        mockMvc.perform(multipart("/api/story")
+                        .param("content", "파일 없는 스토리")
+                        .param("mediaType", "jpg")
+                        .with(csrf())
+                        .with(user(mockSecurityUser)))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.resultCode").value("400-F-1"))
+                .andExpect(jsonPath("$.msg").value("파일은 필수입니다."));
     }
 
     @Test

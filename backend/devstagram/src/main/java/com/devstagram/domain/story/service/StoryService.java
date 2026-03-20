@@ -19,6 +19,7 @@ import com.devstagram.domain.story.repository.StoryViewedRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.storage.StorageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,15 +30,20 @@ public class StoryService {
     private final StoryTagRepository storyTagRepository;
     private final UserRepository userRepository;
     private final StoryViewedRepository storyViewedRepository;
+    private final StorageService storageService;
 
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
 
+        // 미디어 파일 로컬 저장
+        String savedFileName = storageService.store(request.file());
+
+        // StoryMedia 엔티티 생성 & 그 안에 파일몀 넣어놓기
         StoryMedia media = StoryMedia.builder()
                 .mediaType(request.mediaType())
-                .sourceUrl(request.storageSource())
+                .sourceUrl(savedFileName)
                 .build();
 
         Story story = Story.builder()
@@ -163,6 +169,11 @@ public class StoryService {
 
         if (!story.getUser().getId().equals(userId)) {
             throw new ServiceException("403-F-1", "본인 스토리만 삭제 가능");
+        }
+
+        // 하드 딜리트 시 미디어 파일도 같이 삭제
+        if (story.getStoryMedia() != null && story.getStoryMedia().getSourceUrl() != null) {
+            storageService.delete(story.getStoryMedia().getSourceUrl());
         }
 
         storyRepository.delete(story);
