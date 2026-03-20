@@ -37,18 +37,18 @@ public class Story {
 
     private long likeCount;
 
-    @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true) // 스토리 삭제시 자동 삭제
     @Builder.Default
     private List<StoryViewed> viewers = new ArrayList<>();
 
     @Builder.Default
-    @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true) // 스토리 삭제시 자동 삭제
     private List<StoryTag> tags = new ArrayList<>();
 
     @Builder.Default
     private boolean isDeleted = false; // 소프트 딜리트 담당 필드
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL) // 스토리 삭제시 자동 삭제
     @JoinColumn(name = "story_media_id")
     StoryMedia storyMedia;
 
