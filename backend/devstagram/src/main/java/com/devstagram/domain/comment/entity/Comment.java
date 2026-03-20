@@ -31,9 +31,9 @@ public class Comment extends BaseEntity {
     @JoinColumn(name = "parent_id")
     private Comment parent;
 
-    @Column(nullable = false)
+    @Column(name = "is_deleted", nullable = false)
     @Builder.Default
-    private boolean is_deleted = false;
+    private boolean isDeleted = false;
 
     @Column(nullable = false)
     @Builder.Default
@@ -44,7 +44,7 @@ public class Comment extends BaseEntity {
     }
 
     public void softDelete() {
-        this.is_deleted = true;
+        this.isDeleted = true;
         this.content = "[삭제된 댓글입니다.]";
     }
 
