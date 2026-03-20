@@ -19,7 +19,8 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
 
     void deleteByPostIdAndUserId(Long postId, Long userId);
 
-    @Query("SELECT new com.devstagram.domain.post.dto.PostLikerRes(u.nickname) " + "FROM PostLike pl "
+    @Query("SELECT new com.devstagram.domain.post.dto.PostLikerRes(u.id, u.nickname) "
+            + "FROM PostLike pl "
             + "JOIN pl.user u "
             + "WHERE pl.post.id = :postId")
     Slice<PostLikerRes> findLikersByPostId(@Param("postId") Long postId, Pageable pageable);

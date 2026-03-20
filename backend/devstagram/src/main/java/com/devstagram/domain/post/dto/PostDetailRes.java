@@ -11,18 +11,19 @@ import lombok.Builder;
 
 @Builder
 public record PostDetailRes(
+        Long id,
+        Long authorId,
         String nickname,
         String title,
         String content,
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt,
-        Slice<CommentInfoRes> comments
-
-        // TODO: 댓글 슬라이스 추가
-        ) {
+        Slice<CommentInfoRes> comments) {
     public static PostDetailRes from(Post post, Slice<CommentInfoRes> comments) {
         return PostDetailRes.builder()
+                .id(post.getId())
+                .authorId(post.getUser().getId())
                 .nickname(post.getUser().getNickname())
                 .title(post.getTitle())
                 .content(post.getContent())

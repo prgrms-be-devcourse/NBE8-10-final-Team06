@@ -158,6 +158,8 @@ class PostControllerTest {
         Slice<CommentInfoRes> commentSlice = new SliceImpl<>(commentList, PageRequest.of(pageNumber, 10), true);
 
         PostDetailRes response = PostDetailRes.builder()
+                .id(postId)
+                .authorId(10L)
                 .nickname("게시글 유저")
                 .title("테스트 제목")
                 .content("테스트 내용")
@@ -181,11 +183,13 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.commentCount").value(5))
                 .andExpect(jsonPath("$.data.comments.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.comments.content[0].content").value("첫 번째 댓글입니다."))
-                .andExpect(jsonPath("$.data.comments.content[0].nickname").value("테스트유저")) // 수정됨
+                .andExpect(jsonPath("$.data.comments.content[0].nickname").value("테스트유저"))
                 .andExpect(jsonPath("$.data.comments.content[0].replyCount").value(2))
                 .andExpect(jsonPath("$.data.comments.first").value(true))
                 .andExpect(jsonPath("$.data.comments.last").value(false))
-                .andExpect(jsonPath("$.data.comments.numberOfElements").value(1));
+                .andExpect(jsonPath("$.data.comments.numberOfElements").value(1))
+                .andExpect(jsonPath("$.data.id").value(postId))
+                .andExpect(jsonPath("$.data.authorId").value(10L));
     }
 
     @Test
@@ -197,6 +201,8 @@ class PostControllerTest {
 
         List<PostFeedRes> content = List.of(
                 PostFeedRes.builder()
+                        .id(1L)
+                        .authorId(10L)
                         .nickname("게시글 작성자1")
                         .title("제목1")
                         .content("내용1")
@@ -205,6 +211,8 @@ class PostControllerTest {
                         .createdAt(now)
                         .build(),
                 PostFeedRes.builder()
+                        .id(2L)
+                        .authorId(10L)
                         .nickname("게시글 작성자2")
                         .title("제목2")
                         .content("내용2")
@@ -224,8 +232,10 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("피드 조회 성공"))
                 .andExpect(jsonPath("$.data.content[0].nickname").value("게시글 작성자1"))
+                .andExpect(jsonPath("$.data.content[0].id").value(1L))
                 .andExpect(jsonPath("$.data.content[0].title").value("제목1"))
                 .andExpect(jsonPath("$.data.content[1].nickname").value("게시글 작성자2"))
+                .andExpect(jsonPath("$.data.content[1].id").value(2L))
                 .andExpect(jsonPath("$.data.content[1].likeCount").value(5))
                 .andExpect(jsonPath("$.data.last").value(true))
                 .andExpect(jsonPath("$.data.first").value(true))

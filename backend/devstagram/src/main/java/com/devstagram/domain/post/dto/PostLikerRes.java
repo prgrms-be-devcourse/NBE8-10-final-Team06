@@ -1,3 +1,3 @@
 package com.devstagram.domain.post.dto;
 
-public record PostLikerRes(String nickname) {}
+public record PostLikerRes(Long userId, String nickname) {}
