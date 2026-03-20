@@ -57,12 +57,17 @@ public class LocalStorageServiceImpl implements StorageService {
             // 파일의 원래 이름/확장자 파악
             String originalFilename = file.getOriginalFilename();
 
-            if (originalFilename == null || !originalFilename.contains(".")) {
+            // Path Traversal 취약점 방지
+            if (originalFilename == null || originalFilename.contains("..")) {
+                throw new ServiceException("400-S-2", "파일명에 부적절한 문자가 포함");
+            }
+
+            if (!originalFilename.contains(".")) {
                 throw new ServiceException("400-S-3", "확장자가 없는 파일");
             } // 확장자 추출 & 검증
 
-            // . 기준으로 확장자만 분리 -> 파일명 : 난수 + 확장자로 설정해서 동일 파일 덮어쓰기 방지
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            // . 기준으로 확장자만 분리하고 소문자로 변환 -> 파일명 : 난수 + 확장자로 설정해서 동일 파일 덮어쓰기 방지
+            String extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
 
             if (!ALLOWED_EXTENSIONS.contains(extension)) {
                 log.warn("허용되지 않은 파일 업로드 시도: {}", originalFilename);
@@ -70,10 +75,6 @@ public class LocalStorageServiceImpl implements StorageService {
             }
 
             String savedFilename = UUID.randomUUID() + extension;
-
-            if (savedFilename.contains("..")) {
-                throw new ServiceException("400-S-2", "파일명에 부적절한 문자가 포함");
-            }
 
             Files.copy(file.getInputStream(), this.rootLocation.resolve(savedFilename));
 
