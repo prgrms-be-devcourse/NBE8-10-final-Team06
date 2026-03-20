@@ -82,33 +82,30 @@ public class StoryService {
 
         userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저."));
 
+        boolean isAuthor = targetUserId.equals(currentUserId);
+        // 조회자가 스토리 보유자와 동일인인지 : 좋아요 개수 노출 여부 결정하기 위함
+
         List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
+        // 특정 유저의 스토리 & 활성화된 스토리 찾아서 생성 시간순으로 정렬
 
         if (stories.isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<Long> storyIds = stories.stream().map(Story::getId).toList();
+        List<Long> storyIds = stories.stream().map(Story::getId).toList(); // 위에서 받아온 스토리들의 아이디만 리스트로 받아옴
         List<StoryViewed> existingViews = storyViewedRepository.findByUserIdAndStoryIdIn(currentUserId, storyIds);
+        // 받아온 스토리들의 스토리 뷰들을 찾아 리스트로 만듦
 
         Set<Long> likedStoryIds = existingViews.stream()
                 .filter(StoryViewed::isLiked)
+                // StoryViewed 들 중에서 isLiked = true <=> 현재 사용자가 좋아요 누른 것들만 필터링
                 .map(v -> v.getStory().getId())
+                // 좋아요 누른 스토리 아이디만 추출해서 Set으로 담음
                 .collect(Collectors.toSet());
 
+        // 이 유저의 활성화된 스토리를 전부 순회
         return stories.stream()
-                .map(story -> StoryDetailResponse.builder()
-                        .storyId(story.getId())
-                        .userId(story.getUser().getId())
-                        .createdAt(story.getCreatedAt())
-                        .expiredAt(story.getExpiredAt())
-                        .content(story.getContent())
-                        .totalLikeCount(story.getLikeCount())
-                        .isLiked(likedStoryIds.contains(story.getId()))
-                        .tagedUserIds(story.getTags().stream()
-                                .map(tag -> tag.getTarget().getId())
-                                .toList())
-                        .build())
+                .map(story -> toDetailResponse(story, currentUserId, likedStoryIds.contains(story.getId())))
                 .toList();
     }
 
@@ -119,23 +116,17 @@ public class StoryService {
         Story story =
                 storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
+        if (story.isDeleted()) {
+            throw new ServiceException("404-F-2", "만료된 스토리");
+        }
+
         User currentUser =
                 userRepository.findById(currentUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
 
         StoryViewed storyViewed = createStoryViewed(story, currentUser);
+        // 조회 기록 처리
 
-        return StoryDetailResponse.builder()
-                .storyId(story.getId())
-                .userId(story.getUser().getId())
-                .createdAt(story.getCreatedAt())
-                .expiredAt(story.getExpiredAt())
-                .content(story.getContent())
-                .totalLikeCount(story.getLikeCount())
-                .isLiked(storyViewed.isLiked())
-                .tagedUserIds(story.getTags().stream()
-                        .map(tag -> tag.getTarget().getId())
-                        .toList())
-                .build();
+        return toDetailResponse(story, currentUserId, storyViewed.isLiked());
     }
 
     @Transactional
@@ -168,6 +159,7 @@ public class StoryService {
         storyRepository.delete(story);
     }
 
+    // 스토리 좋아요 갱신
     @Transactional
     public StoryViewResponse patchStoryLike(Long storyId, Long userId) {
 
@@ -254,18 +246,47 @@ public class StoryService {
         Set<Long> likedStoryIds = getLikedStoryIds(currentUserId, stories);
 
         return stories.stream()
-                .map(story -> StoryDetailResponse.builder()
-                        .storyId(story.getId())
-                        .userId(story.getUser().getId())
-                        .createdAt(story.getCreatedAt())
-                        .expiredAt(story.getExpiredAt())
-                        .content(story.getContent())
-                        .totalLikeCount(story.getLikeCount())
-                        .isLiked(likedStoryIds.contains(story.getId()))
-                        .tagedUserIds(story.getTags().stream()
-                                .map(tag -> tag.getTarget().getId())
-                                .toList())
-                        .build())
+                .map(story -> toDetailResponse(story, currentUserId, likedStoryIds.contains(story.getId())))
                 .toList();
+    }
+
+    private StoryDetailResponse toDetailResponse(Story story, Long currentUserId, boolean isLiked) {
+
+        boolean isAuthor = story.getUser().getId().equals(currentUserId);
+        // 조회자가 스토리 보유자와 동일인인지 : 좋아요 개수 노출 여부 결정하기 위함
+
+        List<StoryViewerUserResponse> viewers = null;
+        List<StoryViewerUserResponse> likers = null;
+
+        if (isAuthor) {
+            // 스토리 시청자들
+            viewers = story.getViewers().stream()
+                    .map(StoryViewerUserResponse::from)
+                    .toList();
+
+            // 조회 기록 중 좋아요를 누른 사람만 필터링
+            likers = story.getViewers().stream()
+                    .filter(StoryViewed::isLiked)
+                    .map(StoryViewerUserResponse::from)
+                    .toList();
+        }
+
+        return StoryDetailResponse.builder()
+                .storyId(story.getId())
+                .userId(story.getUser().getId())
+                .content(story.getContent())
+                .createdAt(story.getCreatedAt())
+                .expiredAt(story.getExpiredAt())
+                .totalLikeCount(isAuthor ? story.getLikeCount() : -1)
+                // ㄴ 현재 조회자가 작성자면 정상 갯수 반환, 작성자가 아니면 무조건 좋아요 갯수 -1 반환
+
+                .isLiked(isLiked) // 좋아요 눌렀는지 여부
+                .tagedUserIds(story.getTags().stream()
+                        .map(tag -> tag.getTarget().getId())
+                        .toList())
+                .viewers(viewers)
+                .likers(likers)
+                // 작성자일 때만 채워진 리스트가 나가고, 작성자 본인 아니면 null로
+                .build();
     }
 }

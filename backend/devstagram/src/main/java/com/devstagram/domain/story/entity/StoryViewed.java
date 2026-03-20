@@ -41,10 +41,10 @@ public class StoryViewed {
         this.isLiked = !isLiked;
         if (isLiked) {
             this.likedAt = LocalDateTime.now(); // 좋아요 시 현재 시간 갱신
-            story.increaseLikeCount();
+            this.story.increaseLikeCount();
         } else {
             this.likedAt = null; // 취소 시 시간 초기화
-            story.decreaseLikeCount();
+            this.story.decreaseLikeCount();
         }
     }
 }
