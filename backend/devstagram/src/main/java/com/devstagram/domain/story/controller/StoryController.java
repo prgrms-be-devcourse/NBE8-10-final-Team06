@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.story.dto.*;
+import com.devstagram.domain.story.entity.StoryFeedResponse;
 import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
@@ -29,7 +30,14 @@ public class StoryController {
         return RsData.success("스토리 생성 성공", response);
     }
 
-    // 유저가 올린 활성화된 스토리 목록 가져오기
+    // 내가 팔로우하는 사람들의 스토리 홈 피드 조회
+    @GetMapping("/feed")
+    public RsData<List<StoryFeedResponse>> getStoryFeed(@AuthenticationPrincipal SecurityUser securityUser) {
+        List<StoryFeedResponse> responses = storyService.getFollowingStoriesFeed(securityUser.getId());
+        return RsData.success("스토리 피드 조회 성공", responses);
+    }
+
+    // 특정 유저가 올린 활성화된 스토리 목록 가져오기
     @GetMapping("/user/{targetUserId}")
     public RsData<List<StoryDetailResponse>> getAllUserStories(
             @AuthenticationPrincipal SecurityUser securityUser, @PathVariable Long targetUserId) {

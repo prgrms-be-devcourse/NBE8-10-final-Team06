@@ -1,6 +1,8 @@
 package com.devstagram.domain.story.service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -9,10 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.story.dto.*;
-import com.devstagram.domain.story.entity.Story;
-import com.devstagram.domain.story.entity.StoryMedia;
-import com.devstagram.domain.story.entity.StoryTag;
-import com.devstagram.domain.story.entity.StoryViewed;
+import com.devstagram.domain.story.entity.*;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
 import com.devstagram.domain.story.repository.StoryViewedRepository;
@@ -210,6 +209,34 @@ public class StoryService {
 
         return stories.stream()
                 .map(story -> toDetailResponse(story, currentUserId, likedStoryIds.contains(story.getId())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoryFeedResponse> getFollowingStoriesFeed(Long currentUserId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 팔로잉 중이고 & 활성화된 스토리 가진 유저들 조회
+        List<User> followedUsers = storyRepository.findFolloweesWithActiveStories(currentUserId, now);
+
+        return followedUsers.stream()
+                // 유저 리스트 순회 돌면서 처리
+                .map(user -> {
+                    // 이 유저의 스토리 중 내가 안 본 게 있는지
+                    boolean unread = storyRepository.existsUnreadStory(user.getId(), currentUserId, now);
+
+                    return StoryFeedResponse.builder()
+                            .userId(user.getId())
+                            .nickname(user.getNickname())
+                            .isUnread(unread)
+                            .build();
+                })
+                .sorted(Comparator
+                        // 안 읽은 스토리들 isUnread=true 우선 앞으로
+                        .comparing(StoryFeedResponse::isUnread)
+                        .reversed()
+                        // 그 안에선 최신순으로 정렬
+                        .thenComparing(StoryFeedResponse::lastUpdatedAt, Comparator.reverseOrder()))
                 .toList();
     }
 
