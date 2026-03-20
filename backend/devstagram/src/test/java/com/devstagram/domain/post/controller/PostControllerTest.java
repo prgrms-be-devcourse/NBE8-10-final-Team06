@@ -152,7 +152,7 @@ class PostControllerTest {
         int pageNumber = 0;
         LocalDateTime now = LocalDateTime.now();
 
-        CommentInfoRes comment1 = new CommentInfoRes(1L, "첫 번째 댓글입니다.", 10L, "테스트유저", now, now, 2L);
+        CommentInfoRes comment1 = new CommentInfoRes(1L,10L, "첫 번째 댓글입니다.",  "테스트유저", now, now, 2L);
         List<CommentInfoRes> commentList = List.of(comment1);
 
         Slice<CommentInfoRes> commentSlice = new SliceImpl<>(commentList, PageRequest.of(pageNumber, 10), true);
