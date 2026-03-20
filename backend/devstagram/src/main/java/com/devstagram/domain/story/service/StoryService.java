@@ -188,7 +188,14 @@ public class StoryService {
                 .findByStoryIdAndUserId(storyId, userId)
                 .orElseThrow(() -> new ServiceException("500-F-1", "조회 기록 갱신 실패"));
 
-        storyViewed.updateLike(); // 스토리의 좋아요 갱신
+        if (storyViewed.isLiked()) {
+            storyViewed.unlike();
+            storyRepository.decreaseLikeCount(storyId);
+        } else {
+            storyViewed.like();
+            storyRepository.increaseLikeCount(storyId);
+        }
+        storyViewedRepository.save(storyViewed);
 
         return StoryViewResponse.from(storyViewed);
     }

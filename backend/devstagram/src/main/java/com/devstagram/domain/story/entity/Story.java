@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.devstagram.domain.user.entity.User;
 
@@ -17,6 +18,7 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class Story {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,14 +63,5 @@ public class Story {
 
     public void softDelete() {
         this.isDeleted = true;
-    }
-
-    // 좋아요 증감
-    public void increaseLikeCount() {
-        this.likeCount++;
-    }
-
-    public void decreaseLikeCount() {
-        if (this.likeCount > 0) this.likeCount--;
     }
 }

@@ -21,4 +21,12 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Story s SET s.isDeleted = true " + "WHERE s.expiredAt <= :now AND s.isDeleted = false")
     void softDeleteAllExpiredStories(@Param("now") LocalDateTime now);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Story s SET s.likeCount = s.likeCount + 1 WHERE s.id = :id")
+    void increaseLikeCount(@Param("id") Long id);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Story s SET s.likeCount = s.likeCount - 1 WHERE s.id = :id AND s.likeCount > 0")
+    void decreaseLikeCount(@Param("id") Long id);
 }
