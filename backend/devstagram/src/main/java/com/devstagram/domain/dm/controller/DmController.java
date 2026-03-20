@@ -2,6 +2,7 @@ package com.devstagram.domain.dm.controller;
 
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,12 +13,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
 import com.devstagram.domain.dm.dto.DmCreateGroupWithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmGroupInviteRequest;
 import com.devstagram.domain.dm.dto.DmGroupRoomCreateRequest;
+import com.devstagram.domain.dm.dto.DmInviteGroupMembersResponse;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
+import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.rsdata.RsData;
-import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.security.SecurityUser;
 
 @RestController
 @RequestMapping("/api/dm")
@@ -36,10 +40,11 @@ public class DmController {
      */
     @GetMapping("/rooms/{roomId}/messages")
     public RsData<DmMessageSliceResponse> getMessages(
+            @AuthenticationPrincipal SecurityUser securityUser,
             @PathVariable("roomId") Long roomId,
             @RequestParam(name = "cursor", required = false) Long cursor,
             @RequestParam(name = "size", defaultValue = "10") int size) {
-        Long currentUserId = SecurityUtil.getCurrentUserId();
+        Long currentUserId = getCurrentUserId(securityUser);
 
         // 첫 진입 시 기본 15개
         int effectiveSize = (cursor == null) ? 15 : size;
@@ -55,8 +60,8 @@ public class DmController {
      * - Room 에서 가장 최신의 대화 포함
      */
     @GetMapping("/rooms")
-    public RsData<List<DmRoomSummaryResponse>> getRooms() {
-        Long currentUserId = SecurityUtil.getCurrentUserId();
+    public RsData<List<DmRoomSummaryResponse>> getRooms(@AuthenticationPrincipal SecurityUser securityUser) {
+        Long currentUserId = getCurrentUserId(securityUser);
 
         List<DmRoomSummaryResponse> rooms = dmService.getRoomsWithLastMessage(currentUserId);
 
@@ -67,8 +72,9 @@ public class DmController {
      * 1:1 DM 방 생성/재사용 + 내 room list 반환
      */
     @PostMapping("/rooms/1v1/{otherUserId}")
-    public RsData<DmCreate1v1WithRoomListResponse> create1v1Room(@PathVariable("otherUserId") Long otherUserId) {
-        Long currentUserId = SecurityUtil.getCurrentUserId();
+    public RsData<DmCreate1v1WithRoomListResponse> create1v1Room(
+            @AuthenticationPrincipal SecurityUser securityUser, @PathVariable("otherUserId") Long otherUserId) {
+        Long currentUserId = getCurrentUserId(securityUser);
         return RsData.success(dmService.create1v1RoomAndReturnRooms(currentUserId, otherUserId));
     }
 
@@ -76,8 +82,28 @@ public class DmController {
      * 그룹 채팅방 생성 + 내 room list 반환
      */
     @PostMapping("/rooms/group")
-    public RsData<DmCreateGroupWithRoomListResponse> createGroupRoom(@RequestBody DmGroupRoomCreateRequest request) {
-        Long currentUserId = SecurityUtil.getCurrentUserId();
+    public RsData<DmCreateGroupWithRoomListResponse> createGroupRoom(
+            @AuthenticationPrincipal SecurityUser securityUser, @RequestBody DmGroupRoomCreateRequest request) {
+        Long currentUserId = getCurrentUserId(securityUser);
         return RsData.success(dmService.createGroupRoomAndReturnRooms(currentUserId, request));
+    }
+
+    /**
+     * 그룹 DM 방에 멤버 초대 (참여 중인 사용자만 가능)
+     */
+    @PostMapping("/rooms/{roomId}/members")
+    public RsData<DmInviteGroupMembersResponse> inviteGroupMembers(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @PathVariable("roomId") Long roomId,
+            @RequestBody DmGroupInviteRequest request) {
+        Long currentUserId = getCurrentUserId(securityUser);
+        return RsData.success(dmService.inviteMembersToGroupRoom(currentUserId, roomId, request));
+    }
+
+    private Long getCurrentUserId(SecurityUser securityUser) {
+        if (securityUser == null || securityUser.getId() == null) {
+            throw new ServiceException("401-F-1", "인증 정보가 필요합니다.");
+        }
+        return securityUser.getId();
     }
 }

@@ -1,5 +1,6 @@
 package com.devstagram.domain.dm.service;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -10,10 +11,13 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
 import com.devstagram.domain.dm.dto.DmCreateGroupWithRoomListResponse;
+import com.devstagram.domain.dm.dto.DmGroupInviteRequest;
 import com.devstagram.domain.dm.dto.DmGroupRoomCreateRequest;
+import com.devstagram.domain.dm.dto.DmInviteGroupMembersResponse;
 import com.devstagram.domain.dm.dto.DmMessageResponse;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.dto.DmRoomParticipantSummary;
@@ -187,6 +191,74 @@ public class DmService {
 
         List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
         return new DmCreateGroupWithRoomListResponse(savedRoom.getId(), rooms);
+    }
+
+    /**
+     * 기존 그룹 DM 방에 참여자를 초대합니다.
+     * - 1:1 방이거나 그룹이 아닌 방이면 거절
+     * - 요청자는 반드시 해당 방의 참여자여야 함
+     * - 이미 참여 중인 유저는 건너뜀 (멱등)
+     */
+    @Transactional
+    public DmInviteGroupMembersResponse inviteMembersToGroupRoom(
+            Long currentUserId, Long roomId, DmGroupInviteRequest request) {
+        if (currentUserId == null) {
+            throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
+        }
+        if (request == null) {
+            throw new ServiceException("400-F-1", "요청 값이 필요합니다.");
+        }
+        if (request.userIds() == null || request.userIds().isEmpty()) {
+            throw new ServiceException("400-F-3", "초대할 사용자 목록이 필요합니다.");
+        }
+
+        DmRoom room =
+                dmRoomRepository.findById(roomId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 채팅방입니다."));
+
+        if (!Boolean.TRUE.equals(room.getIsGroup())) {
+            throw new ServiceException("400-F-5", "그룹 채팅방에서만 멤버를 초대할 수 있습니다.");
+        }
+
+        boolean inviterIsMember = dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, currentUserId);
+        if (!inviterIsMember) {
+            throw new ServiceException("403-F-1", "채팅방에 참여하고 있지 않습니다.");
+        }
+
+        Set<Long> existingMemberIds = dmRoomUserRepository.findByDmRoom_Id(roomId).stream()
+                .map(ru -> ru.getUser() == null ? null : ru.getUser().getId())
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+
+        Set<Long> candidateIds =
+                request.userIds().stream().filter(id -> id != null).collect(Collectors.toSet());
+        candidateIds.remove(currentUserId); // 초대자 본인은 제외
+
+        if (candidateIds.isEmpty()) {
+            throw new ServiceException("400-F-6", "유효한 초대 대상이 없습니다.");
+        }
+
+        List<Long> addedIds = new ArrayList<>();
+        List<DmRoomUser> toSave = new ArrayList<>();
+        Date joinedAt = new Date();
+
+        for (Long inviteeId : candidateIds) {
+            if (existingMemberIds.contains(inviteeId)) {
+                continue;
+            }
+            User invitee = userRepository
+                    .findById(inviteeId)
+                    .orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
+            toSave.add(DmRoomUser.create(room, invitee, joinedAt));
+            existingMemberIds.add(inviteeId);
+            addedIds.add(inviteeId);
+        }
+
+        if (!toSave.isEmpty()) {
+            dmRoomUserRepository.saveAll(toSave);
+        }
+
+        List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
+        return new DmInviteGroupMembersResponse(roomId, addedIds, rooms);
     }
 
     private List<DmRoomSummaryResponse> buildRoomsSummary(Long userId, List<DmRoomUser> myRoomUsers) {

@@ -22,6 +22,7 @@ import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
+import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
@@ -88,7 +89,7 @@ class DmControllerAuthHeaderTest {
 
         when(dmService.getRoomsWithLastMessage(eq(1L))).thenReturn(List.of());
 
-        dmController.getRooms();
+        dmController.getRooms(securityUser);
 
         verify(dmService).getRoomsWithLastMessage(1L);
     }
@@ -106,11 +107,20 @@ class DmControllerAuthHeaderTest {
 
         when(dmService.getRoomsWithLastMessage(eq(1L))).thenReturn(List.of());
 
-        var rs = dmController.getRooms();
+        var rs = dmController.getRooms(securityUser);
 
         assertThat(rs).isNotNull();
         assertThat(rs.isSuccess()).isTrue();
         assertThat(rs.data()).isEqualTo(List.<DmRoomSummaryResponse>of());
+    }
+
+    @Test
+    void dmController_getRooms_withoutPrincipal_throwsServiceException() {
+        DmService dmService = mock(DmService.class);
+        DmController dmController = new DmController(dmService);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dmController.getRooms(null))
+                .isInstanceOf(ServiceException.class);
     }
 
     private CustomAuthenticationFilter newFilter(

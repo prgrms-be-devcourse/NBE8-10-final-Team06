@@ -10,6 +10,7 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 
 import com.devstagram.domain.dm.dto.DmMessageResponse;
@@ -17,7 +18,8 @@ import com.devstagram.domain.dm.dto.DmSendMessageRequest;
 import com.devstagram.domain.dm.dto.TypingEventDto;
 import com.devstagram.domain.dm.dto.WebSocketEventPayload;
 import com.devstagram.domain.dm.service.DmService;
-import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.security.SecurityUser;
 
 /**
  * DM WebSocket(STOMP) 이벤트 컨트롤러.
@@ -56,9 +58,11 @@ public class DmWebSocketController {
     }
 
     @MessageMapping("/dm/{roomId}/message")
-    public void message(@DestinationVariable Long roomId, @Payload DmSendMessageRequest request) {
-        // STOMP 인증 연동 시 SecurityContext 에서 유저를 읽는다.
-        Long userId = SecurityUtil.getCurrentUserId();
+    public void message(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @DestinationVariable Long roomId,
+            @Payload DmSendMessageRequest request) {
+        Long userId = requireUserId(securityUser);
 
         DmMessageResponse saved = dmService.sendMessage(userId, roomId, request);
         WebSocketEventPayload<DmMessageResponse> payload = new WebSocketEventPayload<>("message", saved);
@@ -67,15 +71,18 @@ public class DmWebSocketController {
     }
 
     @MessageMapping("/dm/{roomId}/typing")
-    public void typing(@DestinationVariable Long roomId, @Payload TypingEventDto typingEventDto) {
-        Long userId = resolveUserId(typingEventDto.userId());
+    public void typing(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @DestinationVariable Long roomId,
+            @Payload TypingEventDto typingEventDto) {
+        Long userId = resolveUserId(securityUser, typingEventDto.userId());
         String status = typingEventDto.status();
 
         TypingWsPayload payload = new TypingWsPayload("typing", roomId, userId, status);
         messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
 
-        // 인증이 없는 상태(테스트/특수 케이스)에서는 타이핑 stop 스케줄을 생략한다.
-        if (!isAuthenticated() || userId == null) return;
+        // 인증 Principal이 없고 payload userId 도 없으면 stop 스케줄 생략
+        if (!isAuthenticated(securityUser) || userId == null) return;
 
         String key = typingKey(roomId, userId);
 
@@ -99,8 +106,11 @@ public class DmWebSocketController {
     public record ReadEventDto(Long roomId, Long userId, Long messageId) {}
 
     @MessageMapping("/dm/{roomId}/read")
-    public void read(@DestinationVariable Long roomId, @Payload ReadEventDto readEventDto) {
-        Long userId = SecurityUtil.getCurrentUserId();
+    public void read(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @DestinationVariable Long roomId,
+            @Payload ReadEventDto readEventDto) {
+        Long userId = requireUserId(securityUser);
         Long messageId = dmService.markRead(userId, roomId, readEventDto.messageId());
 
         ReadWsPayload payload = new ReadWsPayload("read", messageId);
@@ -111,14 +121,21 @@ public class DmWebSocketController {
     public record JoinLeaveEventDto(Long roomId, Long userId) {}
 
     @MessageMapping("/dm/{roomId}/join")
-    public void join(@DestinationVariable Long roomId, @Payload JoinLeaveEventDto dto) {
-        JoinLeaveWsPayload payload = new JoinLeaveWsPayload("join", roomId, dto.userId());
+    public void join(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @DestinationVariable Long roomId,
+            @Payload JoinLeaveEventDto dto) {
+        Long userId = resolveUserId(securityUser, dto.userId());
+        JoinLeaveWsPayload payload = new JoinLeaveWsPayload("join", roomId, userId);
         messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
     }
 
     @MessageMapping("/dm/{roomId}/leave")
-    public void leave(@DestinationVariable Long roomId, @Payload JoinLeaveEventDto dto) {
-        Long userId = dto.userId();
+    public void leave(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @DestinationVariable Long roomId,
+            @Payload JoinLeaveEventDto dto) {
+        Long userId = resolveUserId(securityUser, dto.userId());
         if (userId != null) {
             cancelTypingStopTask(typingKey(roomId, userId));
 
@@ -139,21 +156,23 @@ public class DmWebSocketController {
 
     public record JoinLeaveWsPayload(String type, Long roomId, Long userId) {}
 
-    private boolean isAuthenticated() {
-        try {
-            return SecurityUtil.getCurrentUserId() != null;
-        } catch (Exception e) {
-            return false;
-        }
+    private boolean isAuthenticated(SecurityUser securityUser) {
+        return securityUser != null && securityUser.getId() != null;
     }
 
-    private Long resolveUserId(Long fallbackUserId) {
-        try {
-            Long current = SecurityUtil.getCurrentUserId();
-            return current != null ? current : fallbackUserId;
-        } catch (Exception e) {
-            return fallbackUserId;
+    private Long requireUserId(SecurityUser securityUser) {
+        if (!isAuthenticated(securityUser)) {
+            throw new ServiceException("401-F-1", "인증 정보가 필요합니다.");
         }
+        return securityUser.getId();
+    }
+
+    /** Principal 이 있으면 우선 사용, 없으면 payload 의 userId (레거시/테스트 호환). */
+    private Long resolveUserId(SecurityUser securityUser, Long fallbackUserId) {
+        if (isAuthenticated(securityUser)) {
+            return securityUser.getId();
+        }
+        return fallbackUserId;
     }
 
     private String typingKey(Long roomId, Long userId) {

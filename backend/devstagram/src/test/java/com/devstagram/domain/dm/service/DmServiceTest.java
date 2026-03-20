@@ -3,6 +3,7 @@ package com.devstagram.domain.dm.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
@@ -18,13 +19,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
 
+import com.devstagram.domain.dm.dto.DmGroupInviteRequest;
+import com.devstagram.domain.dm.dto.DmInviteGroupMembersResponse;
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.entity.Dm;
+import com.devstagram.domain.dm.entity.DmRoom;
+import com.devstagram.domain.dm.entity.DmRoomUser;
 import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
@@ -123,5 +129,55 @@ class DmServiceTest {
         assertThat(res.messages()).hasSize(1);
         assertThat(res.hasNext()).isFalse();
         assertThat(res.nextCursor()).isNull();
+    }
+
+    @Test
+    void inviteMembersToGroupRoom_notGroupRoom_throws() {
+        DmRoom room = mock(DmRoom.class);
+        when(room.getIsGroup()).thenReturn(false);
+        when(dmRoomRepository.findById(10L)).thenReturn(java.util.Optional.of(room));
+
+        assertThatThrownBy(() -> dmService.inviteMembersToGroupRoom(1L, 10L, new DmGroupInviteRequest(List.of(2L))))
+                .isInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    void inviteMembersToGroupRoom_notParticipant_throws() {
+        DmRoom room = mock(DmRoom.class);
+        when(room.getIsGroup()).thenReturn(true);
+        when(dmRoomRepository.findById(10L)).thenReturn(java.util.Optional.of(room));
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(10L, 1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> dmService.inviteMembersToGroupRoom(1L, 10L, new DmGroupInviteRequest(List.of(2L))))
+                .isInstanceOf(ServiceException.class);
+    }
+
+    @Test
+    void inviteMembersToGroupRoom_addsNewMembersAndReturnsAddedIds() {
+        DmRoom room = mock(DmRoom.class);
+        when(room.getIsGroup()).thenReturn(true);
+        when(dmRoomRepository.findById(10L)).thenReturn(java.util.Optional.of(room));
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(10L, 1L)).thenReturn(true);
+
+        DmRoomUser existing = mock(DmRoomUser.class);
+        User existingUser = mock(User.class);
+        when(existingUser.getId()).thenReturn(1L);
+        when(existing.getUser()).thenReturn(existingUser);
+        when(dmRoomUserRepository.findByDmRoom_Id(10L)).thenReturn(List.of(existing));
+
+        User u2 = mock(User.class);
+        User u3 = mock(User.class);
+        when(userRepository.findById(2L)).thenReturn(java.util.Optional.of(u2));
+        when(userRepository.findById(3L)).thenReturn(java.util.Optional.of(u3));
+
+        when(dmRoomUserRepository.findByUser_Id(1L)).thenReturn(List.of());
+
+        DmInviteGroupMembersResponse res =
+                dmService.inviteMembersToGroupRoom(1L, 10L, new DmGroupInviteRequest(List.of(2L, 3L, 2L)));
+
+        verify(dmRoomUserRepository).saveAll(anyList());
+        assertThat(res.roomId()).isEqualTo(10L);
+        assertThat(res.addedUserIds()).containsExactlyInAnyOrder(2L, 3L);
+        assertThat(res.rooms()).isNotNull();
     }
 }
