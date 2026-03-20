@@ -25,7 +25,6 @@ import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.JsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -95,37 +94,23 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회 - 발급받은 원본 API Key(ID.UUID)로 인증 성공")
+    @DisplayName("내 정보 조회 - 쿠키 인증으로 성공")
     void meTest() throws Exception {
-        // 1. 회원가입 시점에 발급되는 '원본 API Key'를 추출합니다.
-        SignupRequest signupRequest = new SignupRequest(
-                "dohwan",
-                "test@test.com",
-                "password123!",
-                LocalDate.of(2000, 1, 1),
-                Gender.MALE,
-                "https://github.com/dohwa",
-                Resume.UNDERGRADUATE);
+        // 1. 회원가입 & 로그인하여 쿠키 획득
+        saveTestUser("test2@test.com", "dohwa2");
 
-        MvcResult signupResult = mvc.perform(post("/api/auth/signup")
-                        .content(objectMapper.writeValueAsString(signupRequest))
-                        .contentType(MediaType.APPLICATION_JSON))
+        String loginRequest = "{\"email\":\"test2@test.com\",\"password\":\"password123!\"}";
+        MvcResult loginResult = mvc.perform(
+                        post("/api/auth/login").content(loginRequest).contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
 
-        // 응답 JSON에서 apiKey(ID.UUID 형태) 추출
-        String responseBody = signupResult.getResponse().getContentAsString();
-        String publicApiKey = JsonPath.read(responseBody, "$.data.apiKey");
+        jakarta.servlet.http.Cookie authCookie = loginResult.getResponse().getCookie("accessToken");
 
-        // 2. [핵심] 쿠키 없이 헤더에 X-API-KEY만 담아서 요청 보냅니다.
-        // 필터가 ID로 유저를 찾고 뒤의 UUID를 matches()로 검증하는지 확인하는 테스트입니다.
-        ResultActions resultActions = mvc.perform(get("/api/auth/me").header("X-API-KEY", publicApiKey));
-
-        // Then
-        resultActions
+        // 2. 발급받은 쿠키를 들고 /me 호출
+        mvc.perform(get("/api/auth/me").cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.data.nickname").value("dohwan"))
-                .andExpect(jsonPath("$.data.email").value("test@test.com"))
+                .andExpect(jsonPath("$.data.email").value("test2@test.com"))
+                .andExpect(jsonPath("$.data.nickname").value("dohwa2"))
                 .andDo(print());
     }
 

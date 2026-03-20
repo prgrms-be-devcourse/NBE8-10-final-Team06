@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,7 +17,6 @@ import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
-import com.devstagram.global.security.SecurityUtil;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -45,9 +45,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public RsData<SignupResponse> me() {
-        SecurityUser user = SecurityUtil.getCurrentUser();
-
+    public RsData<SignupResponse> me(@AuthenticationPrincipal SecurityUser user) {
         SignupResponse response = userSecurityService.getMyInfo(user.getId());
 
         return RsData.success("내 정보 조회 성공", response);
