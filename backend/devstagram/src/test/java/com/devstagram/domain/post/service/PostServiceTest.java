@@ -8,10 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.devstagram.domain.comment.dto.CommentInfoRes;
-import com.devstagram.domain.comment.entity.Comment;
-import com.devstagram.domain.comment.repository.CommentRepository;
-import com.devstagram.domain.post.dto.PostDetailRes;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,10 +15,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.PostCreateReq;
+import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.entity.Post;
@@ -30,8 +30,6 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -96,8 +94,7 @@ class PostServiceTest {
         // [수정] Post 생성 시 User 객체 연결
         List<Post> posts = List.of(
                 Post.builder().title("제목1").user(writer).build(),
-                Post.builder().title("제목2").user(writer).build()
-        );
+                Post.builder().title("제목2").user(writer).build());
 
         Slice<Post> slice = new SliceImpl<>(posts, pageable, false);
 
@@ -125,10 +122,7 @@ class PostServiceTest {
 
         List<Post> posts = new ArrayList<>();
         for (int i = 1; i <= 11; i++) {
-            posts.add(Post.builder()
-                    .title("제목" + i)
-                    .user(mockUser)
-                    .build());
+            posts.add(Post.builder().title("제목" + i).user(mockUser).build());
         }
 
         List<Post> firstPageContent = posts.subList(0, 10);
@@ -157,11 +151,8 @@ class PostServiceTest {
         User writer = mock(User.class);
         given(writer.getId()).willReturn(userId);
 
-        Post mockPost = Post.builder()
-                .title("기존 제목")
-                .content("기존 내용")
-                .user(writer)
-                .build();
+        Post mockPost =
+                Post.builder().title("기존 제목").content("기존 내용").user(writer).build();
 
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 

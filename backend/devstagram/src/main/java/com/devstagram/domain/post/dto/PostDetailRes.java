@@ -2,11 +2,12 @@ package com.devstagram.domain.post.dto;
 
 import java.time.LocalDateTime;
 
+import org.springframework.data.domain.Slice;
+
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.post.entity.Post;
 
 import lombok.Builder;
-import org.springframework.data.domain.Slice;
 
 @Builder
 public record PostDetailRes(

@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.devstagram.domain.comment.dto.CommentInfoRes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +24,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.post.dto.PostCreateReq;
 import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
@@ -152,9 +152,7 @@ class PostControllerTest {
         int pageNumber = 0;
         LocalDateTime now = LocalDateTime.now();
 
-        CommentInfoRes comment1 = new CommentInfoRes(
-                1L, "첫 번째 댓글입니다.", 10L, "테스트유저", now, now, 2L
-        );
+        CommentInfoRes comment1 = new CommentInfoRes(1L, "첫 번째 댓글입니다.", 10L, "테스트유저", now, now, 2L);
         List<CommentInfoRes> commentList = List.of(comment1);
 
         Slice<CommentInfoRes> commentSlice = new SliceImpl<>(commentList, PageRequest.of(pageNumber, 10), true);
@@ -172,8 +170,7 @@ class PostControllerTest {
         given(postService.getPostDetail(postId, pageNumber)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/api/posts/{postId}", postId)
-                        .param("page", String.valueOf(pageNumber)))
+        mockMvc.perform(get("/api/posts/{postId}", postId).param("page", String.valueOf(pageNumber)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("게시물 조회 성공"))

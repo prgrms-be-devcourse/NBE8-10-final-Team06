@@ -3,7 +3,6 @@ package com.devstagram.domain.post.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +49,7 @@ class PostRepositoryTest {
                 .title("테스트 제목")
                 .content("테스트 내용")
                 .user(testUser)
-                //.likeCount(0L)
+                // .likeCount(0L)
                 .is_deleted(false)
                 .build();
 
@@ -69,9 +68,12 @@ class PostRepositoryTest {
     @DisplayName("[게시글 피드 조회]")
     void findAllByOrderByCreatedAtDescTest() {
         // given
-        postRepository.save(Post.builder().title("제목1").content("내용1").user(testUser).build());
-        postRepository.save(Post.builder().title("제목2").content("내용2").user(testUser).build());
-        postRepository.save(Post.builder().title("제목3").content("내용3").user(testUser).build());
+        postRepository.save(
+                Post.builder().title("제목1").content("내용1").user(testUser).build());
+        postRepository.save(
+                Post.builder().title("제목2").content("내용2").user(testUser).build());
+        postRepository.save(
+                Post.builder().title("제목3").content("내용3").user(testUser).build());
 
         PageRequest pageRequest = PageRequest.of(0, 2);
 
@@ -131,7 +133,8 @@ class PostRepositoryTest {
         postRepository.flush();
 
         // then
-        Post updatedPost = postRepository.findById(savedPost.getId())
+        Post updatedPost = postRepository
+                .findById(savedPost.getId())
                 .orElseThrow(() -> new IllegalArgumentException("게시글이 없습니다."));
         assertThat(updatedPost.getTitle()).isEqualTo("수정된 제목");
         assertThat(updatedPost.getContent()).isEqualTo("수정된 내용");

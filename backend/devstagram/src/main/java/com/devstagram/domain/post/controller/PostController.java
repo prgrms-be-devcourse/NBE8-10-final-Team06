@@ -26,9 +26,7 @@ public class PostController {
 
     @PostMapping
     public ResponseEntity<RsData<Long>> createPost(
-            @AuthenticationPrincipal SecurityUser user,
-            @Valid @RequestBody PostCreateReq req
-    ) {
+            @AuthenticationPrincipal SecurityUser user, @Valid @RequestBody PostCreateReq req) {
         Long postId = postService.createPost(user.getId(), req);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "게시글 생성 성공", postId);
@@ -40,18 +38,14 @@ public class PostController {
     public RsData<Void> updatePost(
             @AuthenticationPrincipal SecurityUser user,
             @PathVariable Long postId,
-            @Valid @RequestBody PostUpdateReq req
-    ) {
+            @Valid @RequestBody PostUpdateReq req) {
         postService.updatePost(user.getId(), postId, req);
 
         return RsData.success();
     }
 
     @DeleteMapping("/{postId}")
-    public RsData<Void> deletePost(
-            @AuthenticationPrincipal SecurityUser user,
-            @PathVariable Long postId
-    ) {
+    public RsData<Void> deletePost(@AuthenticationPrincipal SecurityUser user, @PathVariable Long postId) {
         postService.deletePost(user.getId(), postId);
 
         return RsData.success();
@@ -59,9 +53,7 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public RsData<PostDetailRes> getPost(
-            @PathVariable Long postId,
-            @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber
-    ) {
+            @PathVariable Long postId, @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber) {
         PostDetailRes postDetail = postService.getPostDetail(postId, pageNumber);
 
         return RsData.success("게시물 조회 성공", postDetail);
@@ -69,17 +61,14 @@ public class PostController {
 
     @GetMapping
     public RsData<Slice<PostFeedRes>> getPosts(
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Slice<PostFeedRes> feed = postService.getPostFeed(pageable);
 
         return RsData.success("피드 조회 성공", feed);
     }
 
     @PostMapping("/{postId}")
-    public RsData<Void> toggleLike(
-            @PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser
-    ) {
+    public RsData<Void> toggleLike(@PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) {
         boolean isLiked = postService.togglePostLike(postId, securityUser.getId());
 
         String message = isLiked ? "좋아요 성공" : "좋아요 취소 성공";
@@ -90,8 +79,7 @@ public class PostController {
     @GetMapping("/{postId}/likers")
     public RsData<Slice<PostLikerRes>> getLikers(
             @PathVariable Long postId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
-    ) {
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Slice<PostLikerRes> likers = postService.getPostLikers(postId, pageable);
 
         return RsData.success("좋아요 목록 조회 성공", likers);

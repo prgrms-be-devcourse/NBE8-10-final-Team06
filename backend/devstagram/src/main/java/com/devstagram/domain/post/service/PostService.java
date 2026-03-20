@@ -2,10 +2,6 @@ package com.devstagram.domain.post.service;
 
 import java.util.Optional;
 
-import com.devstagram.domain.comment.constant.CommentConstants;
-import com.devstagram.domain.comment.dto.CommentInfoRes;
-import com.devstagram.domain.comment.entity.Comment;
-import com.devstagram.domain.comment.repository.CommentRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -13,6 +9,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.comment.constant.CommentConstants;
+import com.devstagram.domain.comment.dto.CommentInfoRes;
+import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostLike;
@@ -105,7 +105,7 @@ public class PostService {
 
         commentRepository.deleteRepliesByPostId(postId);
         commentRepository.deleteParentsByPostId(postId);
-        //TODO: 기술태그 순차 삭제도 구현 예정
+        // TODO: 기술태그 순차 삭제도 구현 예정
 
         post.softDelete();
     }
