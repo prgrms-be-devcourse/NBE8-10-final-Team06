@@ -1,11 +1,13 @@
 package com.devstagram.domain.post.controller;
 
 import java.net.URI;
+import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import com.devstagram.global.security.SecurityUser;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -24,10 +27,13 @@ import lombok.RequiredArgsConstructor;
 public class PostController {
     private final PostService postService;
 
-    @PostMapping
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<RsData<Long>> createPost(
-            @AuthenticationPrincipal SecurityUser user, @Valid @RequestBody PostCreateReq req) {
-        Long postId = postService.createPost(user.getId(), req);
+            @AuthenticationPrincipal SecurityUser user,
+            @Valid @RequestPart("request") PostCreateReq req,
+            @RequestPart("files") List<MultipartFile> files) {
+
+        Long postId = postService.createPost(user.getId(), req, files);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "게시글 생성 성공", postId);
 

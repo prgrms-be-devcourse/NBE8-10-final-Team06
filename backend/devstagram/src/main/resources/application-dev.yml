@@ -14,3 +14,6 @@ spring:
     hibernate:
       ddl-auto: create
     show-sql: true
+
+  file:
+    upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}

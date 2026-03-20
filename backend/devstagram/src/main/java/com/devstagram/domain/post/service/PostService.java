@@ -1,7 +1,12 @@
 package com.devstagram.domain.post.service;
 
+import java.util.List;
 import java.util.Optional;
 
+import com.devstagram.domain.post.entity.PostMedia;
+import com.devstagram.domain.post.repository.PostMediaRepository;
+import com.devstagram.global.enumtype.MediaType;
+import com.devstagram.global.storage.StorageService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -23,6 +28,7 @@ import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +37,8 @@ public class PostService {
     private final UserRepository userRepository;
     private final PostLikeRepository postLikeRepository;
     private final CommentRepository commentRepository;
+    private final StorageService storageService;
+    private final PostMediaRepository postMediaRepository;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
@@ -59,7 +67,7 @@ public class PostService {
     }
 
     @Transactional
-    public Long createPost(Long userId, PostCreateReq req) {
+    public Long createPost(Long userId, PostCreateReq req, List<MultipartFile> files) {
 
         User user = userRepository.getReferenceById(userId);
 
@@ -71,7 +79,42 @@ public class PostService {
 
         post = postRepository.save(post);
 
+        //TODO: 업로드된 미디어들 처리 로직 작업중
+
+        if (files != null && !files.isEmpty()) {
+            for (int i = 0; i < files.size(); i++) {
+                MultipartFile file = files.get(i);
+
+                // 로컬 디렉토리에 파일 물리적 저장 후 파일명 반환받음
+                String savedFileName = storageService.store(file);
+
+                // PostMedia 엔티티 생성 (순서 sequence 포함)
+                PostMedia postMedia = PostMedia.builder()
+                        .post(post)
+                        .sourceUrl(savedFileName)
+                        .mediaType(extractMediaType(file)) // 확장자 추출 로직
+                        .sequence((short) (i + 1))
+                        .build();
+
+                postMediaRepository.save(postMedia);
+            }
+        }
+
         return post.getId();
+    }
+
+    // 파일 확장자를 보고 MediaType Enum으로 변환하는 간단한 메서드
+    private MediaType extractMediaType(MultipartFile file) {
+        String contentType = file.getContentType(); // 예: image/jpeg
+        if (contentType == null) return MediaType.jpg;
+
+        // 간단하게 확장자만 잘라서 MediaType과 매칭 (로직은 프로젝트에 맞게 보완 가능)
+        String extension = contentType.split("/")[1].toLowerCase();
+        try {
+            return MediaType.valueOf(extension);
+        } catch (IllegalArgumentException e) {
+            return MediaType.jpg; // 기본값
+        }
     }
 
     @Transactional
