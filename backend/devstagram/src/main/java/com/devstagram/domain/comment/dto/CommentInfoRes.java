@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import com.devstagram.domain.comment.entity.Comment;
 
 public record CommentInfoRes(
-        long id,
         String content,
         long userId,
         String nickname,
@@ -14,7 +13,6 @@ public record CommentInfoRes(
         long replyCount) {
     public CommentInfoRes(Comment comment) {
         this(
-                comment.getId(),
                 comment.getContent(),
                 comment.getUser().getId(),
                 comment.getUser().getNickname(),
