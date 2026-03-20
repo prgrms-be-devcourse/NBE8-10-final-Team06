@@ -25,7 +25,6 @@ import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.JsonPath;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -101,9 +100,8 @@ class AuthControllerTest {
         saveTestUser("test2@test.com", "dohwa2");
 
         String loginRequest = "{\"email\":\"test2@test.com\",\"password\":\"password123!\"}";
-        MvcResult loginResult = mvc.perform(post("/api/auth/login")
-                        .content(loginRequest)
-                        .contentType(MediaType.APPLICATION_JSON))
+        MvcResult loginResult = mvc.perform(
+                        post("/api/auth/login").content(loginRequest).contentType(MediaType.APPLICATION_JSON))
                 .andReturn();
 
         jakarta.servlet.http.Cookie authCookie = loginResult.getResponse().getCookie("accessToken");
