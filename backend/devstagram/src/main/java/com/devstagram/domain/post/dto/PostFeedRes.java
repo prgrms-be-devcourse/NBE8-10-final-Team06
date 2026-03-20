@@ -8,10 +8,10 @@ import lombok.Builder;
 
 @Builder
 public record PostFeedRes(
-        Long id, String title, String content, Long likeCount, Long commentCount, LocalDateTime createdAt) {
+        String nickname, String title, String content, Long likeCount, Long commentCount, LocalDateTime createdAt) {
     public static PostFeedRes from(Post post) {
         return PostFeedRes.builder()
-                .id(post.getId())
+                .nickname(post.getUser().getNickname())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .likeCount(post.getLikeCount())

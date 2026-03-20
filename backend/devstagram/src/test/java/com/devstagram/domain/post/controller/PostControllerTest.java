@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.devstagram.domain.comment.dto.CommentInfoRes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -148,29 +149,46 @@ class PostControllerTest {
     void getPostDetail_Success() throws Exception {
         // given
         Long postId = 1L;
+        int pageNumber = 0;
         LocalDateTime now = LocalDateTime.now();
 
+        CommentInfoRes comment1 = new CommentInfoRes(
+                1L, "첫 번째 댓글입니다.", 10L, "테스트유저", now, now, 2L
+        );
+        List<CommentInfoRes> commentList = List.of(comment1);
+
+        Slice<CommentInfoRes> commentSlice = new SliceImpl<>(commentList, PageRequest.of(pageNumber, 10), true);
+
         PostDetailRes response = PostDetailRes.builder()
-                .id(postId)
+                .nickname("게시글 유저")
                 .title("테스트 제목")
                 .content("테스트 내용")
                 .likeCount(10L)
                 .commentCount(5L)
                 .createdAt(now)
+                .comments(commentSlice)
                 .build();
 
-        given(postService.getPostDetail(postId)).willReturn(response);
+        given(postService.getPostDetail(postId, pageNumber)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/api/posts/{postId}", postId))
+        mockMvc.perform(get("/api/posts/{postId}", postId)
+                        .param("page", String.valueOf(pageNumber)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("게시물 조회 성공"))
-                .andExpect(jsonPath("$.data.id").value(postId))
+                .andExpect(jsonPath("$.data.nickname").value("게시글 유저"))
                 .andExpect(jsonPath("$.data.title").value("테스트 제목"))
+                .andExpect(jsonPath("$.data.content").value("테스트 내용"))
                 .andExpect(jsonPath("$.data.likeCount").value(10))
                 .andExpect(jsonPath("$.data.commentCount").value(5))
-                .andExpect(jsonPath("$.data.createdAt").exists());
+                .andExpect(jsonPath("$.data.comments.content[0].id").value(1L))
+                .andExpect(jsonPath("$.data.comments.content[0].content").value("첫 번째 댓글입니다."))
+                .andExpect(jsonPath("$.data.comments.content[0].nickname").value("테스트유저")) // 수정됨
+                .andExpect(jsonPath("$.data.comments.content[0].replyCount").value(2))
+                .andExpect(jsonPath("$.data.comments.first").value(true))
+                .andExpect(jsonPath("$.data.comments.last").value(false))
+                .andExpect(jsonPath("$.data.comments.numberOfElements").value(1));
     }
 
     @Test
@@ -182,7 +200,7 @@ class PostControllerTest {
 
         List<PostFeedRes> content = List.of(
                 PostFeedRes.builder()
-                        .id(1L)
+                        .nickname("게시글 작성자1")
                         .title("제목1")
                         .content("내용1")
                         .likeCount(10L)
@@ -190,7 +208,7 @@ class PostControllerTest {
                         .createdAt(now)
                         .build(),
                 PostFeedRes.builder()
-                        .id(2L)
+                        .nickname("게시글 작성자2")
                         .title("제목2")
                         .content("내용2")
                         .likeCount(5L)
@@ -208,11 +226,12 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("피드 조회 성공"))
-                .andExpect(jsonPath("$.data.content[0].id").value(1L))
+                .andExpect(jsonPath("$.data.content[0].nickname").value("게시글 작성자1"))
                 .andExpect(jsonPath("$.data.content[0].title").value("제목1"))
-                .andExpect(jsonPath("$.data.content[1].id").value(2L))
+                .andExpect(jsonPath("$.data.content[1].nickname").value("게시글 작성자2"))
                 .andExpect(jsonPath("$.data.content[1].likeCount").value(5))
                 .andExpect(jsonPath("$.data.last").value(true))
-                .andExpect(jsonPath("$.data.first").value(true));
+                .andExpect(jsonPath("$.data.first").value(true))
+                .andExpect(jsonPath("$.data.numberOfElements").value(2));
     }
 }

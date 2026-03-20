@@ -2,8 +2,14 @@ package com.devstagram.domain.post.service;
 
 import java.util.Optional;
 
+import com.devstagram.domain.comment.constant.CommentConstants;
+import com.devstagram.domain.comment.dto.CommentInfoRes;
+import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +30,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final PostLikeRepository postLikeRepository;
+    private final CommentRepository commentRepository;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
@@ -34,11 +41,21 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostDetailRes getPostDetail(Long postId) {
+    public PostDetailRes getPostDetail(Long postId, int pageNumber) {
         Post post = postRepository
                 .findById(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
-        return PostDetailRes.from(post);
+
+        Pageable pageable = PageRequest.of(
+                pageNumber,
+                CommentConstants.COMMENT_PAGE_SIZE,
+                Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
+
+        Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
+
+        Slice<CommentInfoRes> commentSlice = comments.map(CommentInfoRes::new);
+
+        return PostDetailRes.from(post, commentSlice);
     }
 
     @Transactional
@@ -86,7 +103,10 @@ public class PostService {
             throw new ServiceException("403-U-2", "삭제 권한이 없습니다.");
         }
 
-        // TODO: 댓글 적용 후 제약 조건 위반 방지를 위해 댓글 순차 삭제 로직 추가 예정.
+        commentRepository.deleteRepliesByPostId(postId);
+        commentRepository.deleteParentsByPostId(postId);
+        //TODO: 기술태그 순차 삭제도 구현 예정
+
         post.softDelete();
     }
 

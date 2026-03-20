@@ -2,24 +2,33 @@ package com.devstagram.domain.post.dto;
 
 import java.time.LocalDateTime;
 
+import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.post.entity.Post;
 
 import lombok.Builder;
+import org.springframework.data.domain.Slice;
 
 @Builder
 public record PostDetailRes(
-        Long id, String title, String content, Long likeCount, Long commentCount, LocalDateTime createdAt
+        String nickname,
+        String title,
+        String content,
+        Long likeCount,
+        Long commentCount,
+        LocalDateTime createdAt,
+        Slice<CommentInfoRes> comments
 
         // TODO: 댓글 슬라이스 추가
         ) {
-    public static PostDetailRes from(Post post) {
+    public static PostDetailRes from(Post post, Slice<CommentInfoRes> comments) {
         return PostDetailRes.builder()
-                .id(post.getId())
+                .nickname(post.getUser().getNickname())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())
+                .comments(comments)
                 .build();
     }
 }
