@@ -1,6 +1,5 @@
 package com.devstagram.domain.user.controller;
 
-import com.devstagram.domain.user.dto.FollowResponse;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -10,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.devstagram.domain.user.dto.FollowResponse;
 import com.devstagram.domain.user.dto.FollowUserResponse;
 import com.devstagram.domain.user.service.FollowService;
 import com.devstagram.global.rsdata.RsData;

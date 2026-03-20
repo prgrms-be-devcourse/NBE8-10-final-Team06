@@ -84,7 +84,11 @@ class FollowControllerTest {
         mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("팔로우가 완료되었습니다."))
+                // [추가] 데이터 필드 검증
+                .andExpect(jsonPath("$.data.toUserId").value(otherUser.getId()))
+                .andExpect(jsonPath("$.data.isFollowing").value(true))
+                .andExpect(jsonPath("$.data.followerCount").value(1)) // 상대방 팔로워 1명 증가 확인
+                .andExpect(jsonPath("$.data.followingCount").value(1)) // 내 팔로잉 1명 증가 확인
                 .andDo(print());
     }
 
@@ -121,11 +125,17 @@ class FollowControllerTest {
     @Test
     @DisplayName("언팔로우 성공 테스트")
     void unfollowSuccess() throws Exception {
+        // 먼저 팔로우 상태로 만듦
         mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie));
 
+        // 언팔로우 실행 및 응답 데이터 검증
         mvc.perform(delete("/api/follows/" + otherUser.getId()).cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("언팔로우가 완료되었습니다."))
+                // 언팔로우 후 상태와 카운트가 0이 되었는지 확인
+                .andExpect(jsonPath("$.data.isFollowing").value(false))
+                .andExpect(jsonPath("$.data.followerCount").value(0))
+                .andExpect(jsonPath("$.data.followingCount").value(0))
                 .andDo(print());
     }
 

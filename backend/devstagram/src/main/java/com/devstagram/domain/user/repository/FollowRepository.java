@@ -4,11 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import com.devstagram.domain.user.entity.Follow;
-import com.devstagram.domain.user.entity.User;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import com.devstagram.domain.user.entity.Follow;
 
 public interface FollowRepository extends JpaRepository<Follow, Long> {
     @Query("select f from Follow f join fetch f.toUser where f.fromUser.id = :fromUserId")

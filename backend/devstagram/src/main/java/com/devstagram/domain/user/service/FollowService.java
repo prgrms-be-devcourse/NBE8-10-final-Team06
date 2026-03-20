@@ -1,11 +1,11 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.user.dto.FollowResponse;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.user.dto.FollowResponse;
 import com.devstagram.domain.user.dto.FollowUserResponse;
 import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
