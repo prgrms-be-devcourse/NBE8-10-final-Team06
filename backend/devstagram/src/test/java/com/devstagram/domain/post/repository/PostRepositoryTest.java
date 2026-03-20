@@ -50,7 +50,7 @@ class PostRepositoryTest {
                 .content("테스트 내용")
                 .user(testUser)
                 // .likeCount(0L)
-                .is_deleted(false)
+                .isDeleted(false)
                 .build();
 
         // 2. when
@@ -98,7 +98,7 @@ class PostRepositoryTest {
                 .user(testUser)
                 .commentCount(0L)
                 .likeCount(0L)
-                .is_deleted(false)
+                .isDeleted(false)
                 .build();
         Post savedPost = postRepository.save(post);
 
@@ -123,7 +123,7 @@ class PostRepositoryTest {
                 .user(testUser)
                 .commentCount(0L)
                 .likeCount(0L)
-                .is_deleted(false)
+                .isDeleted(false)
                 .build();
         Post savedPost = postRepository.save(post);
 
@@ -150,7 +150,7 @@ class PostRepositoryTest {
                 .user(testUser)
                 .commentCount(0L)
                 .likeCount(0L)
-                .is_deleted(false)
+                .isDeleted(false)
                 .build();
         Post savedPost = postRepository.save(post);
 

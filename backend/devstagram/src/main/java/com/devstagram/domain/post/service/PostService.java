@@ -95,7 +95,7 @@ public class PostService {
                 .findById(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
-        if (post.is_deleted()) {
+        if (post.isDeleted()) {
             throw new ServiceException("404-P-2", "이미 삭제된 게시글입니다.");
         }
 

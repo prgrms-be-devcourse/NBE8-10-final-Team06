@@ -124,7 +124,7 @@ public class CommentService {
             throw new ServiceException("403-C-2", "삭제 권한이 없습니다.");
         }
 
-        if (comment.is_deleted()) {
+        if (comment.isDeleted()) {
             return;
         }
 

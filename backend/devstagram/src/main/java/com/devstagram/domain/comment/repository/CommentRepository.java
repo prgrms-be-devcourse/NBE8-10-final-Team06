@@ -16,10 +16,14 @@ import jakarta.persistence.LockModeType;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    @Query("select c from Comment c " + "join fetch c.user m " + "where c.post.id = :postId and c.parent is null ")
+    @Query("select c from Comment c " + "join fetch c.user m "
+            + "where c.post.id = :postId and c.parent is null "
+            + "order by c.createdAt desc")
     Slice<Comment> findCommentsWithUserAndImageByPostId(@Param("postId") Long postId, Pageable pageable);
 
-    @Query("select r from Comment r " + "join fetch r.user m " + "where r.parent.id = :parentId ")
+    @Query("select r from Comment r " + "join fetch r.user m "
+            + "where r.parent.id = :parentId "
+            + "order by r.createdAt asc")
     Slice<Comment> findRepliesWithUserAndImageByParentId(@Param("parentId") Long parentId, Pageable pageable);
 
     @Modifying

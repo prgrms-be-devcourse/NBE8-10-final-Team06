@@ -27,8 +27,8 @@ class CommentLikeRepositoryTest {
 
     @Test
     @DisplayName("[댓글 좋아요]")
-    void existsByCommentIdAndMemberId_Success() {
-        // given
+    void existsByCommentIdAndUserId_Success() {
+        // 1. given
         User user = User.builder()
                 .nickname("testUser")
                 .email("test@example.com")
@@ -38,12 +38,11 @@ class CommentLikeRepositoryTest {
                 .build();
         em.persist(user);
 
-        Post post = Post.builder().title("테스트 제목").content("테스트 내용").build();
+        Post post = Post.builder().title("테스트 제목").content("테스트 내용").user(user).build();
         em.persist(post);
 
         Comment comment =
                 Comment.builder().content("content").post(post).user(user).build();
-
         em.persist(comment);
 
         CommentLike like = CommentLike.builder().user(user).comment(comment).build();
@@ -52,10 +51,10 @@ class CommentLikeRepositoryTest {
         em.flush();
         em.clear();
 
-        // when
+        // 2. when
         boolean exists = commentLikeRepository.existsByCommentIdAndUserId(comment.getId(), user.getId());
 
-        // then
+        // 3. then
         assertThat(exists).isTrue();
     }
 }

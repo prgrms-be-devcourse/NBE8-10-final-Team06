@@ -87,11 +87,9 @@ class PostServiceTest {
         // 1. given
         Pageable pageable = PageRequest.of(0, 10);
 
-        // [추가] 작성자 Mock 생성 및 설정
         User writer = mock(User.class);
         given(writer.getNickname()).willReturn("작성자");
 
-        // [수정] Post 생성 시 User 객체 연결
         List<Post> posts = List.of(
                 Post.builder().title("제목1").user(writer).build(),
                 Post.builder().title("제목2").user(writer).build());
@@ -105,7 +103,6 @@ class PostServiceTest {
 
         // 3. then
         assertThat(result.getContent()).hasSize(2);
-        // DTO 변환 후 작성자 닉네임이 잘 들어갔는지 확인
         assertThat(result.getContent().get(0).nickname()).isEqualTo("작성자");
 
         verify(postRepository).findAllByOrderByCreatedAtDesc(pageable);
@@ -177,7 +174,7 @@ class PostServiceTest {
 
         Post mockPost = Post.builder().user(writer).build();
 
-        ReflectionTestUtils.setField(mockPost, "is_deleted", false);
+        ReflectionTestUtils.setField(mockPost, "isDeleted", false);
 
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 
@@ -185,7 +182,7 @@ class PostServiceTest {
         postService.deletePost(userId, postId);
 
         // then
-        assertThat(mockPost.is_deleted()).isTrue();
+        assertThat(mockPost.isDeleted()).isTrue();
         verify(commentRepository).deleteRepliesByPostId(postId);
         verify(commentRepository).deleteParentsByPostId(postId);
         verify(postRepository).findById(postId);
@@ -198,7 +195,6 @@ class PostServiceTest {
         Long postId = 1L;
         int pageNumber = 0;
 
-        // 작성자 및 게시글 (ReflectionTestUtils로 ID 주입 필수)
         User writer = mock(User.class);
         given(writer.getNickname()).willReturn("작성자닉네임");
 

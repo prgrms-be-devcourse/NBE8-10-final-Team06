@@ -36,9 +36,9 @@ public class Post extends BaseEntity {
     @Column(nullable = false)
     private Long commentCount = 0L;
 
-    @Column(nullable = false)
+    @Column(name = "is_deleted", nullable = false)
     @Builder.Default
-    private boolean is_deleted = false;
+    private boolean isDeleted = false;
 
     //    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
     //    private List<PostMedia> postMedia;
@@ -46,6 +46,7 @@ public class Post extends BaseEntity {
     //    @Column
     //    private List<Comment> comment;
 
+    @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
     private List<PostMedia> mediaList = new ArrayList<>();
@@ -65,6 +66,6 @@ public class Post extends BaseEntity {
     }
 
     public void softDelete() {
-        this.is_deleted = true;
+        this.isDeleted = true;
     }
 }
