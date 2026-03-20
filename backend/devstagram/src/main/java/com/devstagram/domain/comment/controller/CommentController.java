@@ -40,7 +40,6 @@ public class CommentController {
             @PathVariable Long commentId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @AuthenticationPrincipal SecurityUser securityUser) {
-
         Slice<ReplyInfoRes> replyList = commentService.getRepliesByCommentId(commentId, pageNumber);
 
         return RsData.success("대댓글 조회 성공", replyList);
@@ -51,7 +50,6 @@ public class CommentController {
             @PathVariable Long postId,
             @Valid @RequestBody CommentCreateReq req,
             @AuthenticationPrincipal SecurityUser securityUser) {
-
         Long commentId = commentService.createComment(postId, securityUser.getId(), req);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "댓글 작성 성공", commentId);

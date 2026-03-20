@@ -2,6 +2,7 @@ package com.devstagram.domain.user.controller;
 
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,10 +10,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.devstagram.domain.user.dto.FollowResponse;
 import com.devstagram.domain.user.dto.FollowUserResponse;
 import com.devstagram.domain.user.service.FollowService;
 import com.devstagram.global.rsdata.RsData;
-import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.security.SecurityUser;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,20 +27,17 @@ public class FollowController {
 
     // 팔로우 실행
     @PostMapping("/{toUserId}")
-    public RsData<Void> follow(@PathVariable Long toUserId) {
-        Long loginUserId = SecurityUtil.getCurrentUserId();
-
-        followService.follow(loginUserId, toUserId);
-        return RsData.success("팔로우가 완료되었습니다.", null);
+    public RsData<FollowResponse> follow(@PathVariable Long toUserId, @AuthenticationPrincipal SecurityUser loginUser) {
+        FollowResponse response = followService.follow(loginUser.getId(), toUserId);
+        return RsData.success("팔로우가 완료되었습니다.", response);
     }
 
     // 팔로우 취소 (언팔로우)
     @DeleteMapping("/{toUserId}")
-    public RsData<Void> unfollow(@PathVariable Long toUserId) {
-        Long loginUserId = SecurityUtil.getCurrentUserId();
-
-        followService.unfollow(loginUserId, toUserId);
-        return RsData.success("언팔로우가 완료되었습니다.", null);
+    public RsData<FollowResponse> unfollow(
+            @PathVariable Long toUserId, @AuthenticationPrincipal SecurityUser loginUser) {
+        FollowResponse response = followService.unfollow(loginUser.getId(), toUserId);
+        return RsData.success("언팔로우가 완료되었습니다.", response);
     }
 
     // 특정 유저의 팔로워 수 조회
@@ -71,9 +70,8 @@ public class FollowController {
 
     // 내가 이 유저를 팔로우하고 있는지 확인
     @GetMapping("/{toUserId}/status")
-    public RsData<Boolean> isFollowing(@PathVariable Long toUserId) {
-        Long loginUserId = SecurityUtil.getCurrentUserId();
-        boolean status = followService.isFollowing(loginUserId, toUserId);
+    public RsData<Boolean> isFollowing(@PathVariable Long toUserId, @AuthenticationPrincipal SecurityUser loginUser) {
+        boolean status = followService.isFollowing(loginUser.getId(), toUserId);
         return RsData.success("팔로우 여부 조회 성공", status);
     }
 }

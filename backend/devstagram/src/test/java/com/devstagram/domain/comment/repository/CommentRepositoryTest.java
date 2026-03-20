@@ -47,7 +47,7 @@ class CommentRepositoryTest {
         User user = createTestUser("user1@test.com", "user1");
         em.persist(user);
 
-        Post post = createTestPost("테스트 제목", "테스트 내용");
+        Post post = Post.builder().title("테스트 제목").content("테스트 내용").user(user).build();
         em.persist(post);
 
         Comment comment1 =
@@ -75,7 +75,7 @@ class CommentRepositoryTest {
         User user = createTestUser("user2@test.com", "user2");
         em.persist(user);
 
-        Post post = createTestPost("title", "content");
+        Post post = Post.builder().title("테스트 제목").content("테스트 내용").user(user).build();
         em.persist(post);
 
         Comment parent = Comment.builder().content("부모").post(post).user(user).build();
