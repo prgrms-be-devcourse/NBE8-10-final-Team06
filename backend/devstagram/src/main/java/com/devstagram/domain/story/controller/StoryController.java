@@ -2,6 +2,7 @@ package com.devstagram.domain.story.controller;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,9 +22,9 @@ public class StoryController {
     private final StoryService storyService;
 
     // 스토리 생성
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public RsData<StoryCreateResponse> createStory(
-            @AuthenticationPrincipal SecurityUser securityUser, StoryCreateRequest request) {
+            @AuthenticationPrincipal SecurityUser securityUser, @ModelAttribute StoryCreateRequest request) {
 
         StoryCreateResponse response = storyService.createStory(securityUser.getId(), request);
 

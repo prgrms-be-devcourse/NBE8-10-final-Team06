@@ -80,11 +80,11 @@ public class StoryService {
         eventPublisher.publishEvent(new StoryCreatedEvent(savedStory, request.tagUserIds(), userId));
 
         return StoryCreateResponse.builder()
-                .storyId(story.getId())
-                .userId(story.getUser().getId())
-                .createdAt(story.getCreatedAt())
-                .expiredAt(story.getExpiredAt())
-                .content(story.getContent())
+                .storyId(savedStory.getId())
+                .userId(savedStory.getUser().getId())
+                .createdAt(savedStory.getCreatedAt())
+                .expiredAt(savedStory.getExpiredAt())
+                .content(savedStory.getContent())
                 .taggedUserIds(request.tagUserIds())
                 .build();
     }
