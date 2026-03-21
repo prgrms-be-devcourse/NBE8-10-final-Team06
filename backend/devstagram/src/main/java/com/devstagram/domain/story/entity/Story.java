@@ -53,7 +53,6 @@ public class Story {
     @OneToMany(mappedBy = "story", cascade = CascadeType.ALL, orphanRemoval = true) // 스토리 삭제시 자동 삭제
     private List<StoryTag> tags = new ArrayList<>();
 
-    @BatchSize(size = 100)
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL) // 스토리 삭제시 자동 삭제
     @JoinColumn(name = "story_media_id")
     StoryMedia storyMedia;

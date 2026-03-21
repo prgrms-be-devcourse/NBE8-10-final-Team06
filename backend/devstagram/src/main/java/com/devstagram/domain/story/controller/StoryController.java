@@ -23,7 +23,7 @@ public class StoryController {
     // 스토리 생성
     @PostMapping
     public RsData<StoryCreateResponse> createStory(
-            @AuthenticationPrincipal SecurityUser securityUser, @RequestBody StoryCreateRequest request) {
+            @AuthenticationPrincipal SecurityUser securityUser, StoryCreateRequest request) {
 
         StoryCreateResponse response = storyService.createStory(securityUser.getId(), request);
 

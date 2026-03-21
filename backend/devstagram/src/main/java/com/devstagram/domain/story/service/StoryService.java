@@ -7,10 +7,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.story.dto.*;
+import com.devstagram.domain.story.dto.StoryCreatedEvent;
 import com.devstagram.domain.story.entity.*;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
@@ -30,6 +32,7 @@ public class StoryService {
     private final UserRepository userRepository;
     private final StoryViewedRepository storyViewedRepository;
     private final StorageService storageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public StoryCreateResponse createStory(Long userId, StoryCreateRequest request) {
@@ -72,6 +75,9 @@ public class StoryService {
 
             storyTagRepository.saveAll(tags);
         }
+
+        // 스토리 생성 이벤트 발행 (태그 알림 DM 전송 처리를 위함)
+        eventPublisher.publishEvent(new StoryCreatedEvent(savedStory, request.tagUserIds(), userId));
 
         return StoryCreateResponse.builder()
                 .storyId(story.getId())
