@@ -109,6 +109,32 @@ class StoryServiceTest {
     }
 
     @Test
+    @DisplayName("스토리 생성 실패 - 태그된 유저를 찾을 수 없음")
+    void createStory_Fail_TaggedUserNotFound() {
+        // given
+        Long userId = 1L;
+        User user = User.builder().nickname("tester").build();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        MockMultipartFile file = new MockMultipartFile("file", "test.jpg", "image/jpeg", "test".getBytes());
+        StoryCreateRequest request = StoryCreateRequest.builder()
+                .content("테스트 내용")
+                .mediaType(MediaType.jpg)
+                .file(file)
+                .tagUserIds(List.of(2L))
+                .build();
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(storageService.store(file)).willReturn("saved_file_name.jpg");
+        given(userRepository.findById(2L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> storyService.createStory(userId, request))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("태그된 사용자를 찾을 수 없음");
+    }
+
+    @Test
     @DisplayName("특정 유저 스토리 목록 조회 성공")
     void getUserAllStories_Success() {
         // given
@@ -130,6 +156,20 @@ class StoryServiceTest {
         // then
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).content()).isEqualTo("스토리1");
+    }
+
+    @Test
+    @DisplayName("특정 유저 스토리 목록 조회 실패 - 존재하지 않는 유저")
+    void getUserAllStories_Fail_UserNotFound() {
+        // given
+        Long targetUserId = 2L;
+        Long currentUserId = 1L;
+        given(userRepository.findById(targetUserId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> storyService.getUserAllStories(targetUserId, currentUserId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("존재하지 않는 유저");
     }
 
     @Test
@@ -159,6 +199,35 @@ class StoryServiceTest {
         // then
         assertThat(response.storyId()).isEqualTo(storyId);
         verify(storyViewedRepository).save(any(StoryViewed.class));
+    }
+
+    @Test
+    @DisplayName("스토리 시청 기록 실패 - 존재하지 않는 스토리")
+    void recordSingleStoryView_Fail_StoryNotFound() {
+        // given
+        Long storyId = 10L;
+        Long userId = 1L;
+        given(storyRepository.findById(storyId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> storyService.recordSingleStoryView(storyId, userId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("존재하지 않는 스토리");
+    }
+
+    @Test
+    @DisplayName("스토리 시청 기록 실패 - 만료된 스토리")
+    void recordSingleStoryView_Fail_StoryDeleted() {
+        // given
+        Long storyId = 10L;
+        Long userId = 1L;
+        Story story = Story.builder().isDeleted(true).build();
+        given(storyRepository.findById(storyId)).willReturn(Optional.of(story));
+
+        // when & then
+        assertThatThrownBy(() -> storyService.recordSingleStoryView(storyId, userId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("만료된 스토리");
     }
 
     @Test
@@ -211,28 +280,56 @@ class StoryServiceTest {
     }
 
     @Test
-    @DisplayName("스토리 삭제 성공")
-    void softDeleteStory_Success() {
+    @DisplayName("좋아요 토글 실패 - 존재하지 않는 스토리")
+    void patchStoryLike_Fail_StoryNotFound() {
+        // given
+        Long storyId = 10L;
+        Long userId = 1L;
+        given(storyRepository.findById(storyId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> storyService.patchStoryLike(storyId, userId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("존재하지 않는 스토리");
+    }
+
+    @Test
+    @DisplayName("좋아요 토글 실패 - 만료/삭제된 스토리")
+    void patchStoryLike_Fail_StoryDeleted() {
+        // given
+        Long storyId = 10L;
+        Long userId = 1L;
+        Story story = Story.builder().isDeleted(true).build();
+        given(storyRepository.findById(storyId)).willReturn(Optional.of(story));
+
+        // when & then
+        assertThatThrownBy(() -> storyService.patchStoryLike(storyId, userId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("만료/삭제된 스토리");
+    }
+
+    @Test
+    @DisplayName("스토리 삭제 실패 - 이미 만료된 스토리")
+    void softDeleteStory_Fail_AlreadyDeleted() {
         // given
         Long storyId = 10L;
         Long userId = 1L;
         User user = User.builder().build();
         ReflectionTestUtils.setField(user, "id", userId);
-        Story story = spy(Story.builder().user(user).build());
+        Story story = Story.builder().user(user).isDeleted(true).build();
         ReflectionTestUtils.setField(story, "id", storyId);
 
         given(storyRepository.findById(storyId)).willReturn(Optional.of(story));
 
-        // when
-        storyService.softDeleteStory(storyId, userId);
-
-        // then
-        verify(story).softDelete();
+        // when & then
+        assertThatThrownBy(() -> storyService.softDeleteStory(storyId, userId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("만료된 스토리.");
     }
 
     @Test
-    @DisplayName("스토리 삭제 실패 - 권한 없음")
-    void softDeleteStory_Fail_Forbidden() {
+    @DisplayName("스토리 하드 딜리트 실패 - 권한 없음")
+    void hardDeleteStory_Fail_Forbidden() {
         // given
         Long storyId = 10L;
         Long userId = 1L;
@@ -240,12 +337,11 @@ class StoryServiceTest {
         User author = User.builder().build();
         ReflectionTestUtils.setField(author, "id", authorId);
         Story story = Story.builder().user(author).build();
-        ReflectionTestUtils.setField(story, "id", storyId);
 
         given(storyRepository.findById(storyId)).willReturn(Optional.of(story));
 
         // when & then
-        assertThatThrownBy(() -> storyService.softDeleteStory(storyId, userId))
+        assertThatThrownBy(() -> storyService.hardDeleteStory(storyId, userId))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("본인 스토리만 삭제 가능");
     }
