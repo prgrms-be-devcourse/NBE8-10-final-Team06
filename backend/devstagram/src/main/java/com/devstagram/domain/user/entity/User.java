@@ -72,34 +72,4 @@ public class User extends BaseEntity {
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
-
-    public void increaseFollowerCount() {
-        this.followerCount++;
-    }
-
-    public void decreaseFollowerCount() {
-        if (this.followerCount > 0) {
-            this.followerCount--;
-        }
-    }
-
-    public void increaseFollowingCount() {
-        this.followingCount++;
-    }
-
-    public void decreaseFollowingCount() {
-        if (this.followingCount > 0) {
-            this.followingCount--;
-        }
-    }
-
-    public void increasePostCount() {
-        this.postCount++;
-    }
-
-    public void decreasePostCount() {
-        if (this.postCount > 0) {
-            this.postCount--;
-        }
-    }
 }
