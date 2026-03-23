@@ -3,16 +3,13 @@ package com.devstagram.domain.post.service;
 import java.util.List;
 import java.util.Optional;
 
-import com.devstagram.domain.post.entity.PostMedia;
-import com.devstagram.domain.post.repository.PostMediaRepository;
-import com.devstagram.global.enumtype.MediaType;
-import com.devstagram.global.storage.StorageService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.comment.constant.CommentConstants;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
@@ -21,14 +18,18 @@ import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostLike;
+import com.devstagram.domain.post.entity.PostMedia;
 import com.devstagram.domain.post.repository.PostLikeRepository;
+import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class PostService {
     private final CommentRepository commentRepository;
     private final StorageService storageService;
     private final PostMediaRepository postMediaRepository;
+    private final FileValidator fileValidator;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
@@ -51,7 +53,7 @@ public class PostService {
     @Transactional(readOnly = true)
     public PostDetailRes getPostDetail(Long postId, int pageNumber) {
         Post post = postRepository
-                .findById(postId)
+                .findPostWithDetails(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
         Pageable pageable = PageRequest.of(
@@ -79,20 +81,19 @@ public class PostService {
 
         post = postRepository.save(post);
 
-        //TODO: 업로드된 미디어들 처리 로직 작업중
-
         if (files != null && !files.isEmpty()) {
+
+            fileValidator.validateImages(files);
+
             for (int i = 0; i < files.size(); i++) {
                 MultipartFile file = files.get(i);
 
-                // 로컬 디렉토리에 파일 물리적 저장 후 파일명 반환받음
                 String savedFileName = storageService.store(file);
 
-                // PostMedia 엔티티 생성 (순서 sequence 포함)
                 PostMedia postMedia = PostMedia.builder()
                         .post(post)
                         .sourceUrl(savedFileName)
-                        .mediaType(extractMediaType(file)) // 확장자 추출 로직
+                        .mediaType(extractMediaType(file))
                         .sequence((short) (i + 1))
                         .build();
 
@@ -103,22 +104,21 @@ public class PostService {
         return post.getId();
     }
 
-    // 파일 확장자를 보고 MediaType Enum으로 변환하는 간단한 메서드
     private MediaType extractMediaType(MultipartFile file) {
-        String contentType = file.getContentType(); // 예: image/jpeg
-        if (contentType == null) return MediaType.jpg;
+        String originalFilename = file.getOriginalFilename();
 
-        // 간단하게 확장자만 잘라서 MediaType과 매칭 (로직은 프로젝트에 맞게 보완 가능)
-        String extension = contentType.split("/")[1].toLowerCase();
-        try {
-            return MediaType.valueOf(extension);
-        } catch (IllegalArgumentException e) {
-            return MediaType.jpg; // 기본값
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename
+                    .substring(originalFilename.lastIndexOf(".") + 1)
+                    .toLowerCase();
         }
+
+        return MediaType.fromString(extension);
     }
 
     @Transactional
-    public void updatePost(Long userId, Long postId, PostUpdateReq req) {
+    public void updatePost(Long userId, Long postId, PostUpdateReq req, List<MultipartFile> files) {
 
         Post post = postRepository
                 .findById(postId)
@@ -129,6 +129,33 @@ public class PostService {
         }
 
         post.update(req.title(), req.content());
+
+        if (files != null && !files.isEmpty()) {
+
+            fileValidator.validateImages(files);
+
+            List<String> oldFileNames =
+                    post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
+
+            post.getMediaList().clear();
+
+            for (int i = 0; i < files.size(); i++) {
+                MultipartFile file = files.get(i);
+
+                String savedFileName = storageService.store(file);
+
+                PostMedia postMedia = PostMedia.builder()
+                        .post(post)
+                        .sourceUrl(savedFileName)
+                        .mediaType(extractMediaType(file))
+                        .sequence((short) (i + 1))
+                        .build();
+
+                post.getMediaList().add(postMedia);
+            }
+
+            oldFileNames.forEach(storageService::delete);
+        }
     }
 
     @Transactional
@@ -150,7 +177,12 @@ public class PostService {
         commentRepository.deleteParentsByPostId(postId);
         // TODO: 기술태그 순차 삭제도 구현 예정
 
+        List<String> fileNames =
+                post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
+
         post.softDelete();
+
+        fileNames.forEach(storageService::delete);
     }
 
     @Transactional

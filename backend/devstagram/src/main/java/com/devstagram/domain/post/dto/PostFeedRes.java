@@ -1,6 +1,7 @@
 package com.devstagram.domain.post.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.devstagram.domain.post.entity.Post;
 
@@ -13,6 +14,7 @@ public record PostFeedRes(
         String nickname,
         String title,
         String content,
+        List<PostMediaRes> medias,
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt) {
@@ -23,6 +25,7 @@ public record PostFeedRes(
                 .nickname(post.getUser().getNickname())
                 .title(post.getTitle())
                 .content(post.getContent())
+                .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())

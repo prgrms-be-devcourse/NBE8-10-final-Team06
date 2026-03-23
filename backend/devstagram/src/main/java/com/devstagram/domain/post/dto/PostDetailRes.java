@@ -1,6 +1,7 @@
 package com.devstagram.domain.post.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.data.domain.Slice;
 
@@ -19,6 +20,7 @@ public record PostDetailRes(
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt,
+        List<PostMediaRes> medias,
         Slice<CommentInfoRes> comments) {
     public static PostDetailRes from(Post post, Slice<CommentInfoRes> comments) {
         return PostDetailRes.builder()
@@ -30,6 +32,7 @@ public record PostDetailRes(
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())
+                .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
                 .comments(comments)
                 .build();
     }

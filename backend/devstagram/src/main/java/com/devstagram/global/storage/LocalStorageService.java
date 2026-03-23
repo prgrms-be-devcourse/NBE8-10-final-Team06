@@ -1,13 +1,19 @@
 package com.devstagram.global.storage;
 
-import lombok.extern.slf4j.Slf4j;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
+import com.devstagram.global.exception.ServiceException;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -46,14 +52,23 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public void delete(String fileName) {
-        // 저장된 파일명을 가지고 전체 경로를 찾아 파일을 삭제합니다.
-        File file = new File(uploadDir + fileName);
-        if (file.exists()) {
-            if (file.delete()) {
-                log.info("파일 삭제 완료: {}", fileName);
+        try {
+            // Paths.resolve를 사용하면 'D:/uploads' + 'test.jpg'를 안전하게 결합합니다.
+            Path filePath = Paths.get(uploadDir).resolve(fileName);
+
+            // 파일이 존재할 때만 삭제 시도
+            boolean deleted = Files.deleteIfExists(filePath);
+
+            if (deleted) {
+                log.info("파일 삭제 성공: {}", fileName);
             } else {
-                log.warn("파일 삭제 실패: {}", fileName);
+                log.warn("삭제할 파일이 존재하지 않음: {}", fileName);
             }
+        } catch (IOException e) {
+            log.error("파일 삭제 중 기술적 오류 발생: {}", fileName, e);
+            // 깃 이슈 4번: Custom Exception Handling 적용
+            // 삭제 실패 시 서비스 로직에 전파하여 정합성을 체크하게 함
+            throw new ServiceException("500-F-2", "서버 파일 삭제 중 오류가 발생했습니다.");
         }
     }
 

@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.service.PostService;
@@ -19,7 +20,6 @@ import com.devstagram.global.security.SecurityUser;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -40,12 +40,15 @@ public class PostController {
         return ResponseEntity.created(URI.create("/api/posts/" + postId)).body(rsData);
     }
 
-    @PutMapping("/{postId}")
+    @PutMapping(
+            value = "/{postId}",
+            consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public RsData<Void> updatePost(
             @AuthenticationPrincipal SecurityUser user,
             @PathVariable Long postId,
-            @Valid @RequestBody PostUpdateReq req) {
-        postService.updatePost(user.getId(), postId, req);
+            @Valid @RequestPart("request") PostUpdateReq req,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        postService.updatePost(user.getId(), postId, req, files);
 
         return RsData.success();
     }
