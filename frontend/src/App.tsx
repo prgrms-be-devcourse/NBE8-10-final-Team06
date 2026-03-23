@@ -2,10 +2,13 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
+import StoryViewer from './pages/story/StoryViewer';
+import StoryCreate from './pages/story/StoryCreate';
+import StoryBar from './components/story/StoryBar';
 import { useAuthStore } from './store/useAuthStore';
 import './App.css';
 
-// 보호된 라우트 컴포넌트 (추후 메인 피드 등 적용)
+// 보호된 라우트 컴포넌트
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   return isLoggedIn ? <>{children}</> : <Navigate to="/login" />;
@@ -21,16 +24,22 @@ function App() {
           path="/" 
           element={
             <PrivateRoute>
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <h1>환영합니다! 메인 피드가 곧 준비될 예정입니다.</h1>
-                <button onClick={() => {
-                  localStorage.clear();
-                  window.location.reload();
-                }}>로그아웃</button>
+              <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
+                <StoryBar />
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <h1>환영합니다!</h1>
+                  <button onClick={() => window.location.href = '/story/create'}>스토리 올리기</button>
+                  <button onClick={() => {
+                    localStorage.clear();
+                    window.location.reload();
+                  }} style={{ marginLeft: '10px' }}>로그아웃</button>
+                </div>
               </div>
             </PrivateRoute>
           } 
         />
+        <Route path="/story/:userId" element={<PrivateRoute><StoryViewer /></PrivateRoute>} />
+        <Route path="/story/create" element={<PrivateRoute><StoryCreate /></PrivateRoute>} />
       </Routes>
     </Router>
   );
