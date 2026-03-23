@@ -183,6 +183,7 @@ EOF
 resource "aws_instance" "ec2_1" {
   ami                         = data.aws_ssm_parameter.ami.value
   instance_type               = "t3.small"
+  key_name                    = "my-key"
   subnet_id                   = aws_subnet.subnet_2.id
   vpc_security_group_ids      = [aws_security_group.sg_ec2.id]
   iam_instance_profile        = aws_iam_instance_profile.profile.name
