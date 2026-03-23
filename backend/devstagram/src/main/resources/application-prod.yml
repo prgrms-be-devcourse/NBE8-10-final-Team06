@@ -1,0 +1,12 @@
+spring:
+  config:
+    # 서버 환경의 .env 파일 위치를 지정 (보통 jar 파일과 같은 위치)
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:mysql://${RDS_HOSTNAME}:3306/${RDS_DB_NAME}?serverTimezone=Asia/Seoul
+    username: ${RDS_USERNAME}
+    password: ${RDS_PASSWORD}
+
+storage:
+  location: ${STORAGE_PATH:/home/ec2-user/uploads}
