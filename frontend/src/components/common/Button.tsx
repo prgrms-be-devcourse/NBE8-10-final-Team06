@@ -1,30 +1,25 @@
+// src/components/common/Button.tsx
 import React, { ButtonHTMLAttributes } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
   fullWidth?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({
-  children,
-  variant = 'primary',
-  fullWidth = false,
-  className = '',
-  disabled,
-  ...props
-}) => {
-  const baseStyles = 'px-4 py-2 rounded-md font-semibold text-sm transition-all focus:outline-none active:scale-95 disabled:opacity-50 disabled:active:scale-100';
-  
-  const variants = {
-    primary: 'bg-[#0095f6] text-white hover:bg-[#1877f2]',
-    secondary: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
-    outline: 'border border-gray-300 text-gray-800 hover:bg-gray-50'
-  };
-
+export const Button: React.FC<ButtonProps> = ({ children, fullWidth = true, style, ...props }) => {
   return (
     <button
-      className={`${baseStyles} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
-      disabled={disabled}
+      style={{
+        width: fullWidth ? '100%' : 'auto',
+        backgroundColor: '#0095f6',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        padding: '8px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        opacity: props.disabled ? 0.7 : 1,
+        ...style
+      }}
       {...props}
     >
       {children}
