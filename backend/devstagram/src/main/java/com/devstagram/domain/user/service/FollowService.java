@@ -110,11 +110,6 @@ public class FollowService {
         User toUser = getUserById(toUserId);
         User fromUser = getUserById(fromUserId);
 
-        return FollowResponse.of(
-                toUserId,
-                isFollowing,
-                toUser.getFollowerCount(),
-                fromUser.getFollowingCount()
-        );
+        return FollowResponse.of(toUserId, isFollowing, toUser.getFollowerCount(), fromUser.getFollowingCount());
     }
 }

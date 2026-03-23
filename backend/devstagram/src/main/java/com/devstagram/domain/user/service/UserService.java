@@ -1,13 +1,14 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.post.repository.PostRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,8 @@ public class UserService {
      * 특정 사용자의 프로필 정보 조회
      */
     public UserProfileResponse getUserProfile(String nickname, Long currentUserId) {
-        User targetUser = userRepository.findByNickname(nickname)
+        User targetUser = userRepository
+                .findByNickname(nickname)
                 .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다. 닉네임: " + nickname));
 
         long postCount = targetUser.getPostCount();

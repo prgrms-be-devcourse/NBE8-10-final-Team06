@@ -28,7 +28,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     void increaseFollowerCount(@Param("id") Long id);
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE User u SET u.followerCount = CASE WHEN u.followerCount > 0 THEN u.followerCount - 1 ELSE 0 END WHERE u.id = :id")
+    @Query(
+            "UPDATE User u SET u.followerCount = CASE WHEN u.followerCount > 0 THEN u.followerCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreaseFollowerCount(@Param("id") Long id);
 
     @Modifying(clearAutomatically = true)
@@ -36,7 +37,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     void increaseFollowingCount(@Param("id") Long id);
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE User u SET u.followingCount = CASE WHEN u.followingCount > 0 THEN u.followingCount - 1 ELSE 0 END WHERE u.id = :id")
+    @Query(
+            "UPDATE User u SET u.followingCount = CASE WHEN u.followingCount > 0 THEN u.followingCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreaseFollowingCount(@Param("id") Long id);
 
     @Modifying(clearAutomatically = true)

@@ -1,11 +1,12 @@
 package com.devstagram.domain.user.dto;
 
+import java.time.LocalDate;
+import java.util.Optional;
+
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
-import java.time.LocalDate;
-import java.util.Optional;
 
 public record UserProfileResponse(
         Long userId,
@@ -18,15 +19,9 @@ public record UserProfileResponse(
         long postCount,
         long followerCount,
         long followingCount,
-        boolean isFollowing
-) {
+        boolean isFollowing) {
     public static UserProfileResponse of(
-            User user,
-            long postCount,
-            long followerCount,
-            long followingCount,
-            boolean isFollowing
-    ) {
+            User user, long postCount, long followerCount, long followingCount, boolean isFollowing) {
         // 실무적 포인트: Optional을 활용해 UserInfo가 null이어도 터지지 않게 보호
         UserInfo info = user.getUserInfo();
 
@@ -43,7 +38,6 @@ public record UserProfileResponse(
                 postCount,
                 followerCount,
                 followingCount,
-                isFollowing
-        );
+                isFollowing);
     }
 }
