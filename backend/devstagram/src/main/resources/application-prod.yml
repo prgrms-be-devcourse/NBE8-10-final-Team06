@@ -1,12 +1,21 @@
 spring:
-  config:
-    # 서버 환경의 .env 파일 위치를 지정 (보통 jar 파일과 같은 위치)
-    import: optional:file:.env[.properties]
-
   datasource:
-    url: jdbc:mysql://${RDS_HOSTNAME}:3306/${RDS_DB_NAME}?serverTimezone=Asia/Seoul
+    # GitHub Actions에서 넘겨주는 변수명과 매칭
+    url: jdbc:postgresql://${RDS_HOSTNAME}:5432/${RDS_DB_NAME}
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 운영 환경에서는 보통 update 또는 none을 사용합니다.
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
 
 storage:
+  # EC2 내부 경로
   location: ${STORAGE_PATH:/home/ec2-user/uploads}

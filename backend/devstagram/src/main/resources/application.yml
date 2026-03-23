@@ -1,19 +1,14 @@
 spring:
   profiles:
-    active: dev
+    # 1. 외부(Docker -e)에서 넣어주는 값이 없으면 기본적으로 dev를 사용합니다.
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   config:
-    import: optional:file:./backend/devstagram/.env[.properties]
+    import: optional:file:.env[.properties]
   servlet:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
-
-
-    servlet:
-      multipart:
-        enabled: true
-        max-file-size: 50MB      # 파일 업로드 시 하나당 최대 용량
-        max-request-size: 50MB   # 전체 요청당 최대 용량
 
 server:
   port: 8080
