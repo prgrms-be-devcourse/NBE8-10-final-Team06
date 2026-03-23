@@ -52,12 +52,13 @@ jobs:
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
-            docker stop backend || true
-            docker rm backend || true
-            docker run -d --name backend -p 8080:8080 \
+            # 모든 docker 명령어 앞에 sudo를 추가합니다!
+            sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+            sudo docker stop backend || true
+            sudo docker rm backend || true
+            sudo docker run -d --name backend -p 8080:8080 \
               -e SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram \
               -e SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }} \
               -e JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }} \
               -e JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }} \
-              ghcr.io/${{ github.repository_owner }}/devstagram-backend:latestWT_ACCESS_TOKEN_EXPIRE_SECONDS }} \
+              ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
