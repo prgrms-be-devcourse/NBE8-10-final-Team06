@@ -39,7 +39,11 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
 
         if (!uri.startsWith("/api/")) return true;
 
-        if (uri.equals("/api/auth/login") || uri.equals("/api/auth/signup")) {
+        // 로그인& 회원가입 뿐만 아니라 이메일&닉네임 중복 체크도 허용해줌
+        if (uri.equals("/api/auth/login")
+                || uri.equals("/api/auth/signup")
+                || uri.equals("/api/auth/check-email")
+                || uri.equals("/api/auth/check-nickname")) {
             return true;
         }
 
