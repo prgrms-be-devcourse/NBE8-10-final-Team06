@@ -99,7 +99,7 @@ class CommentControllerTest {
         // given
         Long postId = 1L;
         CommentInfoRes comment =
-                new CommentInfoRes(1L, "댓글 내용", 1L, "닉네임", LocalDateTime.now(), LocalDateTime.now(), 0L);
+                new CommentInfoRes(1L, 10L, "댓글 내용", "닉네임", LocalDateTime.now(), LocalDateTime.now(), 0L);
         Slice<CommentInfoRes> slice = new SliceImpl<>(List.of(comment));
 
         given(commentService.getCommentsByPostId(eq(postId), anyInt())).willReturn(slice);
@@ -118,7 +118,7 @@ class CommentControllerTest {
     void getReplies_Success() throws Exception {
         // given
         Long commentId = 1L;
-        ReplyInfoRes reply = new ReplyInfoRes(2L, "대댓글 내용", 1L, "닉네임", LocalDateTime.now(), LocalDateTime.now());
+        ReplyInfoRes reply = new ReplyInfoRes(1L, 10L, "대댓글 내용", "닉네임", LocalDateTime.now(), LocalDateTime.now());
         Slice<ReplyInfoRes> slice = new SliceImpl<>(List.of(reply));
 
         given(commentService.getRepliesByCommentId(eq(commentId), anyInt())).willReturn(slice);

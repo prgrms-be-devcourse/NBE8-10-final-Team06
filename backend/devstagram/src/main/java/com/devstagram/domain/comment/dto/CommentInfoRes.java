@@ -5,9 +5,9 @@ import java.time.LocalDateTime;
 import com.devstagram.domain.comment.entity.Comment;
 
 public record CommentInfoRes(
-        long id,
+        Long id,
+        Long userId,
         String content,
-        long userId,
         String nickname,
         LocalDateTime createdAt,
         LocalDateTime modifiedAt,
@@ -15,8 +15,8 @@ public record CommentInfoRes(
     public CommentInfoRes(Comment comment) {
         this(
                 comment.getId(),
-                comment.getContent(),
                 comment.getUser().getId(),
+                comment.getContent(),
                 comment.getUser().getNickname(),
                 comment.getCreatedAt(),
                 comment.getModifiedAt(),
