@@ -1,14 +1,17 @@
 package com.devstagram.domain.post.controller;
 
 import java.net.URI;
+import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.service.PostService;
@@ -24,22 +27,28 @@ import lombok.RequiredArgsConstructor;
 public class PostController {
     private final PostService postService;
 
-    @PostMapping
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<RsData<Long>> createPost(
-            @AuthenticationPrincipal SecurityUser user, @Valid @RequestBody PostCreateReq req) {
-        Long postId = postService.createPost(user.getId(), req);
+            @AuthenticationPrincipal SecurityUser user,
+            @Valid @RequestPart("request") PostCreateReq req,
+            @RequestPart("files") List<MultipartFile> files) {
+
+        Long postId = postService.createPost(user.getId(), req, files);
 
         RsData<Long> rsData = new RsData<>("201-S-1", "게시글 생성 성공", postId);
 
         return ResponseEntity.created(URI.create("/api/posts/" + postId)).body(rsData);
     }
 
-    @PutMapping("/{postId}")
+    @PutMapping(
+            value = "/{postId}",
+            consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public RsData<Void> updatePost(
             @AuthenticationPrincipal SecurityUser user,
             @PathVariable Long postId,
-            @Valid @RequestBody PostUpdateReq req) {
-        postService.updatePost(user.getId(), postId, req);
+            @Valid @RequestPart("request") PostUpdateReq req,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
+        postService.updatePost(user.getId(), postId, req, files);
 
         return RsData.success();
     }

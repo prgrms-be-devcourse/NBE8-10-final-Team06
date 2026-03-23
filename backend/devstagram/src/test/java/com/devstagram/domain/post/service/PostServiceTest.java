@@ -30,6 +30,7 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.storage.StorageService;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -44,6 +45,9 @@ class PostServiceTest {
     @Mock
     private CommentRepository commentRepository;
 
+    @Mock
+    private StorageService storageService;
+
     @InjectMocks
     private PostService postService;
 
@@ -56,6 +60,7 @@ class PostServiceTest {
         // 1. given
         Long userId = 1L;
         PostCreateReq req = new PostCreateReq("테스트 제목", "테스트 내용");
+        List<org.springframework.web.multipart.MultipartFile> files = new java.util.ArrayList<>();
 
         User mockUser = mock(User.class);
         ReflectionTestUtils.setField(mockUser, "id", userId);
@@ -73,7 +78,7 @@ class PostServiceTest {
         given(postRepository.save(any(Post.class))).willReturn(savedPost);
 
         // 2. when
-        Long postId = postService.createPost(userId, req);
+        Long postId = postService.createPost(userId, req, files);
 
         // 3. then
         assertThat(postId).isEqualTo(1L);
@@ -144,6 +149,7 @@ class PostServiceTest {
         Long userId = 1L;
         Long postId = 100L;
         PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
+        List<org.springframework.web.multipart.MultipartFile> files = null; // 파일이 없는 경우 테스트
 
         User writer = mock(User.class);
         given(writer.getId()).willReturn(userId);
@@ -154,7 +160,7 @@ class PostServiceTest {
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 
         // when
-        postService.updatePost(userId, postId, updateReq);
+        postService.updatePost(userId, postId, updateReq, files);
 
         // then
         assertThat(mockPost.getTitle()).isEqualTo("수정된 제목");
@@ -172,8 +178,9 @@ class PostServiceTest {
         User writer = mock(User.class);
         given(writer.getId()).willReturn(userId);
 
-        Post mockPost = Post.builder().user(writer).build();
+        Post mockPost = Post.builder().user(writer).mediaList(new ArrayList<>()).build();
 
+        ReflectionTestUtils.setField(mockPost, "id", postId);
         ReflectionTestUtils.setField(mockPost, "isDeleted", false);
 
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
@@ -204,10 +211,10 @@ class PostServiceTest {
                 .user(writer)
                 .commentCount(5L)
                 .likeCount(10L)
+                .mediaList(new ArrayList<>())
                 .build();
         ReflectionTestUtils.setField(post, "id", postId);
 
-        // 댓글 데이터 준비
         User commentWriter = mock(User.class);
         given(commentWriter.getNickname()).willReturn("댓글러1");
         given(commentWriter.getId()).willReturn(10L);
@@ -223,9 +230,8 @@ class PostServiceTest {
 
         Slice<Comment> commentEntitySlice = new SliceImpl<>(List.of(realComment), PageRequest.of(pageNumber, 10), true);
 
-        given(postRepository.findById(anyLong())).willReturn(Optional.of(post));
-
-        given(commentRepository.findCommentsWithUserAndImageByPostId(anyLong(), any(Pageable.class)))
+        given(postRepository.findPostWithDetails(postId)).willReturn(Optional.of(post));
+        given(commentRepository.findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class)))
                 .willReturn(commentEntitySlice);
 
         // 2. When
@@ -238,7 +244,7 @@ class PostServiceTest {
         assertThat(result.comments().getContent().get(0).content()).isEqualTo("첫 번째 댓글");
 
         // 4. Verify
-        verify(postRepository).findById(postId);
+        verify(postRepository).findPostWithDetails(postId); // findById -> findPostWithDetails
         verify(commentRepository).findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class));
     }
 }

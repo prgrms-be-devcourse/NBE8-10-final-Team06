@@ -14,3 +14,10 @@ spring:
     hibernate:
       ddl-auto: create
     show-sql: true
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+        format_sql: true
+
+  file:
+    upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}

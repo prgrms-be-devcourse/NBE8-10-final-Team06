@@ -3,6 +3,10 @@ spring:
     active: dev
   config:
     import: optional:file:./backend/devstagram/.env[.properties]
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 
     servlet:
@@ -22,3 +26,6 @@ custom:
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expire-seconds: ${JWT_ACCESS_TOKEN_EXPIRE_SECONDS}
+
+file:
+  upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}
