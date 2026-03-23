@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class LocalStorageService implements StorageService {
 
-    // application.yml에 설정한 경로를 가져옵니다. (ex: /Users/username/uploads/)
     @Value("${file.upload-dir}")
     private String uploadDir;
 
@@ -29,20 +28,15 @@ public class LocalStorageService implements StorageService {
             throw new RuntimeException("비어있는 파일은 저장할 수 없습니다.");
         }
 
-        // 1. 고유한 파일명 생성 (예: abc123-def456_myphoto.jpg)
         String originalFilename = file.getOriginalFilename();
         String savedFileName = createSavedFileName(originalFilename);
 
         try {
-            // 2. 물리적 디렉토리에 파일 저장
-            // File 객체는 '파일의 경로'를 나타냅니다.
             File destination = new File(uploadDir, savedFileName);
-            // MultipartFile의 데이터를 실제 하드디스크로 옮깁니다.
             file.transferTo(destination);
 
             log.info("파일 저장 성공: {} -> {}", originalFilename, savedFileName);
 
-            // 3. DB에 저장할 '파일명'을 반환합니다.
             return savedFileName;
         } catch (IOException e) {
             log.error("파일 저장 중 오류 발생", e);
@@ -53,10 +47,8 @@ public class LocalStorageService implements StorageService {
     @Override
     public void delete(String fileName) {
         try {
-            // Paths.resolve를 사용하면 'D:/uploads' + 'test.jpg'를 안전하게 결합합니다.
             Path filePath = Paths.get(uploadDir).resolve(fileName);
 
-            // 파일이 존재할 때만 삭제 시도
             boolean deleted = Files.deleteIfExists(filePath);
 
             if (deleted) {
@@ -66,8 +58,7 @@ public class LocalStorageService implements StorageService {
             }
         } catch (IOException e) {
             log.error("파일 삭제 중 기술적 오류 발생: {}", fileName, e);
-            // 깃 이슈 4번: Custom Exception Handling 적용
-            // 삭제 실패 시 서비스 로직에 전파하여 정합성을 체크하게 함
+
             throw new ServiceException("500-F-2", "서버 파일 삭제 중 오류가 발생했습니다.");
         }
     }

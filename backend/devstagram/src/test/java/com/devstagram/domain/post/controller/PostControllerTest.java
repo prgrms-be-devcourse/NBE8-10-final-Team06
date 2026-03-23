@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,7 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.data.domain.*;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -96,13 +99,22 @@ class PostControllerTest {
     void createPost_Success() throws Exception {
         // given
         PostCreateReq req = new PostCreateReq("새 제목", "새 내용");
-        given(postService.createPost(any(), any(PostCreateReq.class))).willReturn(1L);
+        String requestJson = objectMapper.writeValueAsString(req);
+
+        MockMultipartFile requestPart =
+                new MockMultipartFile("request", "", "application/json", requestJson.getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile filePart =
+                new MockMultipartFile("files", "test.jpg", "image/jpeg", "test image content".getBytes());
+
+        given(postService.createPost(anyLong(), any(PostCreateReq.class), anyList()))
+                .willReturn(1L);
 
         // when & then
-        mockMvc.perform(post("/api/posts")
+        mockMvc.perform(multipart("/api/posts")
+                        .file(requestPart)
+                        .file(filePart)
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/posts/1"));
     }
@@ -114,18 +126,21 @@ class PostControllerTest {
         // given
         Long postId = 1L;
         PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
+        String updateJson = objectMapper.writeValueAsString(updateReq);
 
-        doNothing().when(postService).updatePost(eq(1L), eq(postId), any(PostUpdateReq.class));
+        MockMultipartFile requestPart =
+                new MockMultipartFile("request", "", "application/json", updateJson.getBytes(StandardCharsets.UTF_8));
+
+        doNothing().when(postService).updatePost(anyLong(), eq(postId), any(PostUpdateReq.class), any());
 
         // when & then
-        mockMvc.perform(put("/api/posts/{postId}", postId)
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/posts/{postId}", postId)
+                        .file(requestPart)
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateReq)))
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").exists());
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"));
     }
 
     @Test
@@ -240,5 +255,19 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.last").value(true))
                 .andExpect(jsonPath("$.data.first").value(true))
                 .andExpect(jsonPath("$.data.numberOfElements").value(2));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("[좋아요 토글 성공]")
+    void toggleLike_Success() throws Exception {
+        // given
+        Long postId = 1L;
+        given(postService.togglePostLike(eq(postId), anyLong())).willReturn(true);
+
+        // when & then
+        mockMvc.perform(post("/api/posts/{postId}", postId).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.msg").value("좋아요 성공"));
     }
 }
