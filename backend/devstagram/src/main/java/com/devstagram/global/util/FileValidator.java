@@ -14,7 +14,7 @@ public class FileValidator {
     private static final List<String> ALLOWED_IMAGE_TYPES =
             Arrays.asList("image/jpeg", "image/png", "image/gif", "image/webp");
 
-    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024;
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
 
     public void validateImage(MultipartFile file) {
 
@@ -28,7 +28,7 @@ public class FileValidator {
         }
 
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new ServiceException("400-F-3", "파일 크기는 10MB를 초과할 수 없습니다.");
+            throw new ServiceException("400-F-3", "파일 크기는 50MB를 초과할 수 없습니다.");
         }
     }
 
