@@ -231,17 +231,33 @@ public class StoryService {
                     // 이 유저의 스토리 중 내가 안 본 게 있는지
                     boolean unread = storyRepository.existsUnreadStory(user.getId(), currentUserId, now);
 
+                    // 유저별 활성 스토리 총 개수 조회
+                    int totalCount =
+                            (int) storyRepository.countByUserIdAndIsDeletedFalseAndExpiredAtAfter(user.getId(), now);
+
+                    // 작성자의 프로필 이미지 URL 가져오기
+                    String profileImg =
+                            (user.getUserInfo() != null) ? user.getUserInfo().getProfileImageUrl() : null;
+
+                    // 파일명만 있는 경우 서버 경로를 붙여 완전한 URL로 변환
+                    if (profileImg != null && !profileImg.startsWith("http")) {
+                        profileImg = "/uploads/" + profileImg;
+                    }
+
                     return StoryFeedResponse.builder()
                             .userId(user.getId())
                             .nickname(user.getNickname())
+                            .profileImageUrl(profileImg)
                             .isUnread(unread)
+                            .totalStoryCount(totalCount)
+                            .lastUpdatedAt(now) // 임시로 현재 시간 설정, 실제로는 DB에서 가장 최근 생성일자를 가져와야 함
                             .build();
                 })
                 .sorted(Comparator
                         // 안 읽은 스토리들 isUnread=true 우선 앞으로
                         .comparing(StoryFeedResponse::isUnread)
                         .reversed()
-                        // 그 안에선 최신순으로 정렬
+                        // 그 안에선 최신순으로 정렬 (lastUpdatedAt 기준)
                         .thenComparing(StoryFeedResponse::lastUpdatedAt, Comparator.reverseOrder()))
                 .toList();
     }
@@ -290,9 +306,17 @@ public class StoryService {
                     .toList();
         }
 
+        // 미디어 파일명에 서버 경로를 붙여 완전한 URL 생성
+        String fullMediaUrl = story.getStoryMedia().getSourceUrl();
+        if (fullMediaUrl != null && !fullMediaUrl.startsWith("http")) {
+            fullMediaUrl = "/uploads/" + fullMediaUrl;
+        }
+
         return StoryDetailResponse.builder()
                 .storyId(story.getId())
                 .userId(story.getUser().getId())
+                .mediaUrl(fullMediaUrl)
+                .mediaType(story.getStoryMedia().getMediaType())
                 .content(story.getContent())
                 .createdAt(story.getCreatedAt())
                 .expiredAt(story.getExpiredAt())
@@ -300,7 +324,7 @@ public class StoryService {
                 // ㄴ 현재 조회자가 작성자면 정상 갯수 반환, 작성자가 아니면 무조건 좋아요 갯수 -1 반환
 
                 .isLiked(isLiked) // 좋아요 눌렀는지 여부
-                .tagedUserIds(story.getTags().stream()
+                .taggedUserIds(story.getTags().stream()
                         .map(tag -> tag.getTarget().getId())
                         .toList())
                 .viewers(viewers)

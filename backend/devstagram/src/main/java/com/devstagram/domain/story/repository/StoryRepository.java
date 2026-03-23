@@ -19,6 +19,8 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
     // 만료된 스토리 조회
     List<Story> findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(Long userId);
 
+    long countByUserIdAndIsDeletedFalseAndExpiredAtAfter(Long userId, LocalDateTime now);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Story s SET s.isDeleted = true " + "WHERE s.expiredAt <= :now AND s.isDeleted = false")
     void softDeleteAllExpiredStories(@Param("now") LocalDateTime now);

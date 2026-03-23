@@ -3,16 +3,20 @@ package com.devstagram.domain.story.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.devstagram.global.enumtype.MediaType;
+
 import lombok.Builder;
 
 @Builder
 public record StoryDetailResponse(
         Long storyId,
         Long userId,
+        String mediaUrl,
+        MediaType mediaType,
         LocalDateTime createdAt,
         LocalDateTime expiredAt,
         String content,
-        List<Long> tagedUserIds,
+        List<Long> taggedUserIds,
         Long totalLikeCount,
         // 작성자만 볼 수 있는 좋아요 총 갯수
         Boolean isLiked,
