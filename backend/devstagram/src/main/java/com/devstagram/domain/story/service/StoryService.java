@@ -231,10 +231,31 @@ public class StoryService {
                     // 이 유저의 스토리 중 내가 안 본 게 있는지
                     boolean unread = storyRepository.existsUnreadStory(user.getId(), currentUserId, now);
 
+                    // 유저별 활성 스토리 총 개수 조회
+                    int totalCount =
+                            (int) storyRepository.countByUserIdAndIsDeletedFalseAndExpiredAtAfter(user.getId(), now);
+
+                    // 유저별 가장 최근 스토리 생성 시간 조회
+                    // -> 스토리 바에 유저 프로필을 시간 기준으로 정렬하려고
+                    LocalDateTime lastTime = storyRepository.findLastStoryCreatedAt(user.getId(), now);
+
+                    // 작성자의 프로필 이미지 URL 가져오기
+                    String profileImg =
+                            (user.getUserInfo() != null) ? user.getUserInfo().getProfileImageUrl() : null;
+                    // TODO: 유저 도메인에 유저 프로필 관련 로직 추가
+
+                    // 파일명만 있는 경우 서버 경로를 붙여 완전한 URL로 변환
+                    if (profileImg != null && !profileImg.startsWith("http")) {
+                        profileImg = "/uploads/" + profileImg;
+                    }
+
                     return StoryFeedResponse.builder()
                             .userId(user.getId())
                             .nickname(user.getNickname())
+                            .profileImageUrl(profileImg)
                             .isUnread(unread)
+                            .totalStoryCount(totalCount)
+                            .lastUpdatedAt(lastTime)
                             .build();
                 })
                 .sorted(Comparator
@@ -290,17 +311,25 @@ public class StoryService {
                     .toList();
         }
 
+        // 미디어 파일명에 서버 경로를 붙여 완전한 URL 생성
+        String fullMediaUrl = story.getStoryMedia().getSourceUrl();
+        if (fullMediaUrl != null && !fullMediaUrl.startsWith("http")) {
+            fullMediaUrl = "/uploads/" + fullMediaUrl;
+        }
+
         return StoryDetailResponse.builder()
                 .storyId(story.getId())
                 .userId(story.getUser().getId())
                 .content(story.getContent())
+                .mediaUrl(fullMediaUrl)
+                .mediaType(story.getStoryMedia().getMediaType())
                 .createdAt(story.getCreatedAt())
                 .expiredAt(story.getExpiredAt())
                 .totalLikeCount(isAuthor ? story.getLikeCount() : -1)
                 // ㄴ 현재 조회자가 작성자면 정상 갯수 반환, 작성자가 아니면 무조건 좋아요 갯수 -1 반환
 
                 .isLiked(isLiked) // 좋아요 눌렀는지 여부
-                .tagedUserIds(story.getTags().stream()
+                .taggedUserIds(story.getTags().stream()
                         .map(tag -> tag.getTarget().getId())
                         .toList())
                 .viewers(viewers)
