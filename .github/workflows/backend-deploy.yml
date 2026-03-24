@@ -70,6 +70,7 @@ jobs:
             echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
             echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
             echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
+            echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
             
             # [Step 1] 현재 실행 중인 컨테이너 확인 (8081 포트가 살아있으면 Blue가 떠있는 것)
             EXIST_BLUE=$(sudo docker ps | grep backend-blue)
