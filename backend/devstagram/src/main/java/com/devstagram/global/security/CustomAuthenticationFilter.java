@@ -37,7 +37,10 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
 
-        if (!uri.startsWith("/api/")) return true;
+        if (!uri.startsWith("/api/")) {
+            if (uri.startsWith("/actuator")) return true;
+            return true;
+        }
 
         // 로그인& 회원가입 뿐만 아니라 이메일&닉네임 중복 체크도 허용해줌
         if (uri.equals("/api/auth/login")

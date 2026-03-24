@@ -92,21 +92,22 @@ jobs:
             sudo docker compose pull backend-$TARGET_COLOR
             sudo docker compose up -d backend-$TARGET_COLOR
 
-            # [Step 3] 새로운 컨테이너 헬스체크 (정상 구동될 때까지 최대 60초 대기)
-            echo "새 컨테이너($TARGET_COLOR) 헬스체크 시작..."
+            # [Step 3] 새로운 컨테이너 헬스체크 (Actuator 정석 방식)
+            echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
             for retry in {1..12}
             do
-                # 8081 또는 8082 포트 응답 확인
-                HEALTH=$(curl -s http://localhost:$TARGET_PORT/v3/api-docs || echo "fail")
+                # /actuator/health 호출 결과에 "UP"이 포함되어 있는지 확인
+                HEALTH=$(curl -s http://localhost:$TARGET_PORT/actuator/health | grep "UP" || echo "fail")
+            
                 if [ "$HEALTH" != "fail" ]; then
-                    echo "--- 애플리케이션 구동 확인 완료! ---"
+                    echo "--- 애플리케이션 건강 상태 확인 완료 (UP)! ---"
                     break
                 fi
-                echo "대기 중... ($retry/12)"
+                echo "서버가 완전히 준비될 때까지 대기 중... ($retry/12)"
                 sleep 5
             
                 if [ $retry -eq 12 ]; then
-                  echo "배포 실패: 새 컨테이너가 정상적으로 구동되지 않았습니다."
+                  echo "배포 실패: 애플리케이션이 정상 상태(UP)가 아니거나 DB 연결에 실패했습니다."
                   exit 1
                 fi
             done

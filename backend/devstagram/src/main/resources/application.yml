@@ -11,6 +11,15 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health # 웹에서 /actuator/health를 볼 수 있게 노출함
+  endpoint:
+    health:
+      show-details: always # 상세 정보(DB 연결 상태 등)를 포함함
+
 server:
   port: 8080
 
