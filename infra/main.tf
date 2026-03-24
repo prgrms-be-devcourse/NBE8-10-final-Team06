@@ -186,12 +186,20 @@ locals {
   ec2_bootstrap = <<-EOF
 #!/bin/bash
 timedatectl set-timezone Asia/Seoul
-# 1. Docker 및 필요한 도구 설치
+
+# 1. Docker 설치
 dnf update -y && dnf install -y git docker
-# 2. Docker Compose 플러그인 설치 (이게 핵심!)
-dnf install -y docker-compose-plugin
 systemctl enable --now docker
-# 3. 스왑 파일 설정
+
+# 2. Docker Compose 바이너리 직접 설치 (아까 성공한 방식)
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# 3. Docker CLI 플러그인으로 등록
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo ln -s /usr/local/bin/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+
+# 4. 스왑 파일 및 기타 설정
 dd if=/dev/zero of=/swapfile bs=128M count=32 && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 docker network create common
