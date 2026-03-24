@@ -222,12 +222,23 @@ public class StoryService {
     public List<StoryFeedResponse> getFollowingStoriesFeed(Long currentUserId) {
         LocalDateTime now = LocalDateTime.now();
 
+        // 본인 유저 정보 조회 (피드 최상단 스토리바 노출용)
+        User currentUser =
+                userRepository.findById(currentUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
+
         // 팔로잉 중이고 & 활성화된 스토리 가진 유저들 조회
         List<User> followedUsers = storyRepository.findFolloweesWithActiveStories(currentUserId, now);
 
-        return followedUsers.stream()
+        // 수정: 본인을 피드 목록에 포함시키기 위해 리스트 합치기
+        List<User> allUsers = new java.util.ArrayList<>();
+        allUsers.add(currentUser);
+        allUsers.addAll(followedUsers);
+
+        return allUsers.stream()
                 // 유저 리스트 순회 돌면서 처리
                 .map(user -> {
+                    boolean isMe = user.getId().equals(currentUserId); // 본인 여부 판별
+
                     // 이 유저의 스토리 중 내가 안 본 게 있는지
                     boolean unread = storyRepository.existsUnreadStory(user.getId(), currentUserId, now);
 
@@ -258,14 +269,18 @@ public class StoryService {
                             .isUnread(unread)
                             .totalStoryCount(totalCount)
                             .lastUpdatedAt(lastTime)
+                            .isMe(isMe) // 본인 여부 설정
                             .build();
                 })
                 .sorted(Comparator
-                        // 안 읽은 스토리들 isUnread=true 우선 앞으로
-                        .comparing(StoryFeedResponse::isUnread)
+                        // 인스타 스토리 바와 같이, 내 정보가 항상 맨 앞으로 오도록
+                        .<StoryFeedResponse, Boolean>comparing(StoryFeedResponse::isMe)
                         .reversed()
+                        // 안 읽은 스토리들 isUnread=true 우선 앞으로
+                        .thenComparing(StoryFeedResponse::isUnread, Comparator.reverseOrder())
                         // 그 안에선 최신순으로 정렬
-                        .thenComparing(StoryFeedResponse::lastUpdatedAt, Comparator.reverseOrder()))
+                        .thenComparing(
+                                StoryFeedResponse::lastUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
     }
 
@@ -319,9 +334,15 @@ public class StoryService {
             fullMediaUrl = "/uploads/" + fullMediaUrl;
         }
 
+        // 수정: 작성자 프로필 이미지 URL - 임의로 설정(추후 수정)
+        String profileImg =
+                "https://plus.unsplash.com/premium_photo-1677159325329-4691ee959a02?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+
         return StoryDetailResponse.builder()
                 .storyId(story.getId())
                 .userId(story.getUser().getId())
+                .nickname(story.getUser().getNickname())
+                .profileImageUrl(profileImg)
                 .content(story.getContent())
                 .mediaUrl(fullMediaUrl)
                 .mediaType(story.getStoryMedia().getMediaType())
