@@ -77,7 +77,7 @@ public class PostController {
         return RsData.success("피드 조회 성공", feed);
     }
 
-    @PostMapping("/{postId}")
+    @PostMapping("/{postId}/like")
     public RsData<Void> toggleLike(@PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) {
         boolean isLiked = postService.togglePostLike(postId, securityUser.getId());
 
@@ -96,11 +96,14 @@ public class PostController {
     }
 
     @PostMapping("/{postId}/scrap")
-    public ResponseEntity<Boolean> toggleScrap(
+    public RsData<Void> toggleScrap(
             @PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) { // 현재 로그인 유저 정보
 
         boolean isScrapped = postService.toggleScrap(postId, securityUser.getId());
-        return ResponseEntity.ok(isScrapped);
+
+        String message = isScrapped ? "스크랩 성공" : "스크랩 취소 성공";
+
+        return RsData.success(message, null);
     }
 
     @GetMapping("/scraps")

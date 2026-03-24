@@ -266,7 +266,7 @@ class PostControllerTest {
         given(postService.togglePostLike(eq(postId), anyLong())).willReturn(true);
 
         // when & then
-        mockMvc.perform(post("/api/posts/{postId}", postId).with(csrf()))
+        mockMvc.perform(post("/api/posts/{postId}/like", postId).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("좋아요 성공"));
     }
