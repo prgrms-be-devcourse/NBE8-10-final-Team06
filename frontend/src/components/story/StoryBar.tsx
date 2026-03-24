@@ -74,7 +74,15 @@ const StoryBar: React.FC = () => {
                 overflow: 'hidden',
                 backgroundColor: '#efefef'
               }}>
-                {item.nickname[0].toUpperCase()}
+                {item.profileImageUrl ? (
+                  <img 
+                    src={item.profileImageUrl} 
+                    alt={item.nickname} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  item.nickname[0].toUpperCase()
+                )}
               </div>
             </div>
             

@@ -1,6 +1,6 @@
 import { CommentInfoResponse } from './comment';
 
-export type MediaType = 'IMAGE' | 'VIDEO';
+export type MediaType = 'jpg' | 'jpeg' | 'gif' | 'png' | 'webp' | 'mp4' | 'webm' | 'mov';
 
 export interface PostMediaResponse {
   id: number;
