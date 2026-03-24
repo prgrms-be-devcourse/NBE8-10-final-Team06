@@ -4,16 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.entity.PostScrap;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
@@ -27,7 +30,12 @@ class PostRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PostScrapRepository postScrapRepository;
+
     private User testUser;
+
+    private Post testPost;
 
     @BeforeEach
     void setUp() {
@@ -39,6 +47,14 @@ class PostRepositoryTest {
                 .gender(Gender.MALE)
                 .build();
         userRepository.save(testUser);
+
+        testPost = Post.builder()
+                .title("스크랩 대상 글")
+                .content("내용")
+                .user(testUser)
+                .isDeleted(false)
+                .build();
+        postRepository.save(testPost);
     }
 
     @Test
@@ -161,5 +177,58 @@ class PostRepositoryTest {
         // then
         boolean exists = postRepository.existsById(savedPost.getId());
         assertThat(exists).isFalse();
+    }
+
+    @Test
+    @DisplayName("[스크랩 저장]")
+    void saveScrapTest() {
+        // given
+        PostScrap scrap = PostScrap.builder().user(testUser).post(testPost).build();
+
+        // when
+        PostScrap savedScrap = postScrapRepository.save(scrap);
+
+        // then
+        assertThat(savedScrap.getId()).isNotNull();
+        assertThat(savedScrap.getUser().getId()).isEqualTo(testUser.getId());
+        assertThat(savedScrap.getPost().getId()).isEqualTo(testPost.getId());
+    }
+
+    @Test
+    @DisplayName("[유저별 스크랩한 게시글 목록 조회] - Post 객체 직접 추출")
+    void findActivePostsByUserIdTest() {
+        // given: 2개의 게시글을 스크랩함
+        Post post2 = postRepository.save(
+                Post.builder().title("두번째 글").content("내용2").user(testUser).build());
+
+        postScrapRepository.save(
+                PostScrap.builder().user(testUser).post(testPost).build());
+        postScrapRepository.save(PostScrap.builder().user(testUser).post(post2).build());
+
+        PageRequest pageRequest = PageRequest.of(0, 10);
+
+        // when: PostScrap 엔티티가 아닌 내부의 Post 객체들을 Slice/Page로 가져옴
+        Page<Post> result = postScrapRepository.findActivePostsByUserId(testUser.getId(), pageRequest);
+
+        // then
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent().get(0).getTitle()).contains("두번째 글");
+        assertThat(result.getContent().get(0)).isInstanceOf(Post.class);
+    }
+
+    @Test
+    @DisplayName("[스크랩 삭제/취소]")
+    void deleteScrapTest() {
+        // given
+        PostScrap scrap = postScrapRepository.save(
+                PostScrap.builder().user(testUser).post(testPost).build());
+
+        // when
+        postScrapRepository.delete(scrap);
+        postScrapRepository.flush();
+
+        // then
+        Optional<PostScrap> found = postScrapRepository.findByUserIdAndPostId(testUser.getId(), testPost.getId());
+        assertThat(found).isEmpty();
     }
 }
