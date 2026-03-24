@@ -3,13 +3,12 @@ package com.devstagram.domain.user.controller;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
@@ -19,7 +18,6 @@ import com.devstagram.global.security.SecurityUser;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -46,8 +44,7 @@ public class UserController {
     public RsData<Void> updateProfile(
             @AuthenticationPrincipal SecurityUser loginUser,
             @Valid @RequestPart("request") ProfileUpdateRequest request,
-            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage
-    ) {
+            @RequestPart(value = "profileImage", required = false) MultipartFile profileImage) {
         // Service에 파일까지 같이 넘겨줌
         userService.updateProfile(loginUser.getId(), request, profileImage);
         return RsData.success("프로필이 수정되었습니다.", null);

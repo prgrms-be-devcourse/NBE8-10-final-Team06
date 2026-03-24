@@ -14,5 +14,4 @@ public record ProfileUpdateRequest(
         String githubUrl,
         @NotNull Resume resume,
         @NotNull LocalDate birthDate,
-        @NotNull Gender gender
-) {}
+        @NotNull Gender gender) {}

@@ -1,9 +1,8 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.global.storage.StorageService;
-import com.devstagram.global.util.FileValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
@@ -11,9 +10,10 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -54,8 +54,8 @@ public class UserService {
      */
     @Transactional
     public void updateProfile(Long userId, ProfileUpdateRequest request, MultipartFile profileImage) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         // 1. 이미지 파일 처리
         String imageUrl = user.getProfileImageUrl(); // 기본값: 기존 이미지 유지

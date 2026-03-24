@@ -3,10 +3,6 @@ package com.devstagram.domain.user.controller;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
-import com.devstagram.domain.user.service.FollowService;
-import com.devstagram.domain.user.service.UserService;
-import com.devstagram.global.storage.StorageService;
-import com.devstagram.global.util.FileValidator;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -23,7 +19,11 @@ import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.domain.user.service.FollowService;
+import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -38,7 +38,7 @@ class UserServiceTest {
     private StorageService storageService; // 추가 필수!
 
     @Mock
-    private FileValidator fileValidator;   // 추가 필수!
+    private FileValidator fileValidator; // 추가 필수!
 
     @InjectMocks
     private UserService userService;
@@ -56,11 +56,7 @@ class UserServiceTest {
                 .build();
 
         ProfileUpdateRequest request = new ProfileUpdateRequest(
-                "newNickname",
-                "https://github.com/dev",
-                Resume.JUNIOR,
-                LocalDate.of(1995, 5, 5),
-                Gender.FEMALE);
+                "newNickname", "https://github.com/dev", Resume.JUNIOR, LocalDate.of(1995, 5, 5), Gender.FEMALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("newNickname")).willReturn(false);
@@ -104,8 +100,8 @@ class UserServiceTest {
         Long userId = 1L;
         User user = User.builder().nickname("myOldName").build();
 
-        ProfileUpdateRequest request = new ProfileUpdateRequest(
-                "otherUserNickname", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
+        ProfileUpdateRequest request =
+                new ProfileUpdateRequest("otherUserNickname", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("otherUserNickname")).willReturn(true);
