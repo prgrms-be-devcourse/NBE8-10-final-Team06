@@ -1,3 +1,4 @@
+// src/api/story.ts
 import client from './client';
 import { 
   StoryFeedResponse, 
@@ -40,7 +41,6 @@ export const storyApi = {
     if (data.content) formData.append('content', data.content);
     formData.append('mediaType', data.mediaType);
     
-    // 백엔드 List<Long> 대응: 같은 키로 여러 번 append
     if (data.taggedUserIds && data.taggedUserIds.length > 0) {
       data.taggedUserIds.forEach(id => formData.append('taggedUserIds', id.toString()));
     }
@@ -54,6 +54,18 @@ export const storyApi = {
   // 내 아카이브(만료된 스토리) 조회
   getArchive: async (): Promise<RsData<StoryDetailResponse[]>> => {
     const res = await client.get<RsData<StoryDetailResponse[]>>('/story/archive');
+    return res.data;
+  },
+
+  // 스토리 소프트 삭제 (PATCH /api/story/{storyId}/soft-delete)
+  softDelete: async (storyId: number): Promise<RsData<void>> => {
+    const res = await client.patch<RsData<void>>(`/story/${storyId}/soft-delete`);
+    return res.data;
+  },
+
+  // 스토리 하드 삭제 (DELETE /api/story/{storyId}/hard-delete)
+  hardDelete: async (storyId: number): Promise<RsData<void>> => {
+    const res = await client.delete<RsData<void>>(`/story/${storyId}/hard-delete`);
     return res.data;
   },
 };

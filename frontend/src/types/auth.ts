@@ -23,5 +23,5 @@ export interface LoginRequest {
   password: string;
 }
 
-// 백엔드 AuthController.login이 RsData<String>을 반환하므로, data는 string입니다.
-export type LoginResponse = string; 
+// 백엔드 AuthController.login 롤백에 맞춰 다시 string(accessToken)으로 변경
+export type LoginResponse = string;
