@@ -19,8 +19,8 @@ server:
   port: 8080
 
 storage:
-  location: ${STORAGE_PATH:./uploads}
-  # .env에 본인의 로컬 프로젝트 파일 경로 STORAGE_PATH 설정
+  location: ${STORY_MEDIA_STORAGE_PATH:./uploads}
+  # .env에 본인의 로컬 프로젝트 파일 경로 STORY_MEDIA_STORAGE_PATH 설정
 
 custom:
   jwt:

@@ -239,9 +239,11 @@ public class StoryService {
                     // -> 스토리 바에 유저 프로필을 시간 기준으로 정렬하려고
                     LocalDateTime lastTime = storyRepository.findLastStoryCreatedAt(user.getId(), now);
 
-                    // 작성자의 프로필 이미지 URL 가져오기
+                    // 작성자의 프로필 이미지 URL 가져오기 - 일단 임의로 설정
                     String profileImg =
-                            (user.getUserInfo() != null) ? user.getUserInfo().getProfileImageUrl() : null;
+                            "https://plus.unsplash.com/premium_photo-1677159325329-4691ee959a02?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+                    // String profileImg = (user.getUserInfo() != null) ? user.getUserInfo().getProfileImageUrl() :
+                    // null;
                     // TODO: 유저 도메인에 유저 프로필 관련 로직 추가
 
                     // 파일명만 있는 경우 서버 경로를 붙여 완전한 URL로 변환
