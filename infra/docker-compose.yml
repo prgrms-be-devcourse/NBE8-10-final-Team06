@@ -12,7 +12,7 @@ services:
       - SPRING_DATASOURCE_URL
       - SPRING_DATASOURCE_USERNAME
       - SPRING_DATASOURCE_PASSWORD
-      - JWT_SECRET
+      - JWT_SECRET_KEY
       - JWT_EXPIRE
 
   # 2. Nginx 서비스
