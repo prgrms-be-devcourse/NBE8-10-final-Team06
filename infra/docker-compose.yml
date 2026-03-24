@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # 1. Spring Boot 서비스
+  app:
+    # 이미지 주소는 실제 본인의 주소로 직접 적어주시는 게 가장 확실합니다.
+    image: ghcr.io/prgms-be-devcourse/nbe8-10-final-team06/devstagram:latest
+    container_name: devstagram-app
+    network_mode: host
+    restart: always
+    environment:
+      # DB 정보는 GitHub Secrets를 통해 주입받거나 직접 적어주세요.
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_HOST}:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+
+  # 2. Nginx 서비스
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    network_mode: host
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app

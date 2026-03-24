@@ -94,11 +94,27 @@ resource "aws_security_group" "sg_ec2" {
   name   = "${var.prefix}-sg-ec2"
   vpc_id = aws_vpc.vpc_1.id
 
+  # HTTP (Nginx용 80포트)
   ingress {
-    from_port   = 0
-    to_port     = 0
-    # protocol "-1"은 모든 프로토콜을 의미합니다.
-    protocol    = "-1"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Spring Boot (테스트용 8080포트 - 나중에 Nginx가 완벽해지면 빼셔도 됩니다)
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # SSH (터미널 접속용 22포트)
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
