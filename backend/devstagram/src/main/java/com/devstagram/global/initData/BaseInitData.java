@@ -26,7 +26,9 @@ import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.domain.story.entity.Story;
 import com.devstagram.domain.story.entity.StoryMedia;
+import com.devstagram.domain.story.entity.StoryTag;
 import com.devstagram.domain.story.repository.StoryRepository;
+import com.devstagram.domain.story.repository.StoryTagRepository;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
@@ -38,8 +40,11 @@ import com.devstagram.global.enumtype.MediaType;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * 프론트엔드 개발 및 DM/스토리 공유 테스트를 위해 정교화된 데이터를 생성하는 클래스입니다.
+ */
 @Configuration
-@Profile("!prod")
+@Profile("dev")
 @RequiredArgsConstructor
 public class BaseInitData implements ApplicationRunner {
 
@@ -48,6 +53,7 @@ public class BaseInitData implements ApplicationRunner {
     private final PostRepository postRepository;
     private final PostMediaRepository postMediaRepository;
     private final StoryRepository storyRepository;
+    private final StoryTagRepository storyTagRepository;
     private final FollowService followService;
     private final PostService postService;
     private final CommentService commentService;
@@ -110,8 +116,15 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createPosts() {
-        String[] titles = {"aaaaaa", "bbbbb", "ccccc", "ddddd", "eeeee", "fffff"};
-        String[] contents = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF"};
+        String[] titles = {"안녕하세요!", "스프링 부트 공부 중", "오늘의 날씨", "맛있는 점심", "코딩은 즐거워", "퇴근하고 싶다"};
+        String[] contents = {
+            "반갑습니다. 데브스타그램입니다.",
+            "JPA 연관관계 매핑이 어렵네요.",
+            "구름 한 점 없는 맑은 날씨입니다.",
+            "오늘은 돈까스를 먹었습니다.",
+            "버그 잡는 맛에 코딩하죠.",
+            "월요일 아침부터 퇴근 생각뿐..."
+        };
         String[] imageUrls = {
             "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
             "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800",
@@ -154,6 +167,9 @@ public class BaseInitData implements ApplicationRunner {
 
     private void createStories() {
         List<User> users = userRepository.findAll();
+        User admin = userRepository.findByEmail("admin@test.com").get();
+        User user1 = userRepository.findByEmail("user1@test.com").get();
+
         String[] storyUrls = {
             "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400",
             "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400",
@@ -170,9 +186,16 @@ public class BaseInitData implements ApplicationRunner {
             Story story = Story.builder()
                     .user(user)
                     .content("스토리 " + (i + 1))
+                    .thumbnailUrl(storyUrls[i]) // 썸네일도 동일하게 설정
                     .storyMedia(media)
                     .build();
             storyRepository.save(story);
+
+            // 첫 번째 스토리에 admin이 user1을 태그함
+            if (i == 0 && user.equals(admin)) {
+                storyTagRepository.save(
+                        StoryTag.builder().story(story).target(user1).build());
+            }
         }
     }
 
@@ -188,12 +211,12 @@ public class BaseInitData implements ApplicationRunner {
 
         for (int i = 0; i < posts.size(); i++) {
             Post post = posts.get(i);
-            Long commentId =
-                    commentService.createComment(post.getId(), users.get(0).getId(), new CommentCreateReq("지예아", null));
-            commentService.createComment(post.getId(), users.get(1).getId(), new CommentCreateReq("나는", commentId));
+            Long commentId = commentService.createComment(
+                    post.getId(), users.get(0).getId(), new CommentCreateReq("정말 멋지네요!", null));
+            commentService.createComment(post.getId(), users.get(1).getId(), new CommentCreateReq("동감합니다!", commentId));
 
             if (i == 0) {
-                commentService.createComment(post.getId(), users.get(2).getId(), new CommentCreateReq("다채로운", null));
+                commentService.createComment(post.getId(), users.get(2).getId(), new CommentCreateReq("와우!", null));
             }
         }
     }
@@ -203,25 +226,44 @@ public class BaseInitData implements ApplicationRunner {
         User user1 = userRepository.findByEmail("user1@test.com").get();
         User user2 = userRepository.findByEmail("user2@test.com").get();
 
+        Post samplePost = postRepository.findAll().get(0);
+        Story sampleStory = storyRepository.findAll().get(0);
+
         // 1. 1:1 DM 방 (admin <-> user1)
         DmRoom room1v1 = DmRoom.create1v1Room(user1.getNickname());
         dmRoomRepository.save(room1v1);
         dmRoomUserRepository.save(DmRoomUser.create(room1v1, admin, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(room1v1, user1, new Date()));
 
-        dmRepository.save(Dm.create(room1v1, admin, MessageType.TEXT, "아무도 내 맘을 모르죠", null, true));
-        dmRepository.save(Dm.create(room1v1, user1, MessageType.TEXT, "LOVE LOVE LOVE", null, true));
-        dmRepository.save(Dm.create(room1v1, admin, MessageType.TEXT, "또 다시 보여줘야되", null, true));
+        dmRepository.save(Dm.create(room1v1, admin, MessageType.TEXT, "안녕하세요 user1님!", null, true));
+        dmRepository.save(Dm.create(room1v1, user1, MessageType.TEXT, "네 안녕하세요 admin님!", null, true));
+
+        // 게시글 공유 메시지 추가
+        dmRepository.save(Dm.create(
+                room1v1,
+                admin,
+                MessageType.POST,
+                "devstagram://post?id=" + samplePost.getId(),
+                "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=200",
+                true));
+
+        // 스토리 공유 메시지 추가 (v 파라미터는 현재 시간 밀리초)
+        dmRepository.save(Dm.create(
+                room1v1,
+                user1,
+                MessageType.STORY,
+                "devstagram://story?id=" + sampleStory.getId() + "&v=" + System.currentTimeMillis(),
+                "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200",
+                true));
 
         // 2. 그룹 DM 방 (admin, user1, user2)
-        DmRoom groupRoom = DmRoom.createGroupRoom("단체방");
+        DmRoom groupRoom = DmRoom.createGroupRoom("데브스타그램 개발팀");
         dmRoomRepository.save(groupRoom);
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, admin, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, user1, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, user2, new Date()));
 
-        dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "11111111", null, true));
-        dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "22222222", null, true));
-        dmRepository.save(Dm.create(groupRoom, user2, MessageType.TEXT, "33333333", null, true));
+        dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "팀원 여러분 반갑습니다!", null, true));
+        dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "공유해주신 게시글 잘 봤습니다!", null, true));
     }
 }

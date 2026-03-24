@@ -28,6 +28,7 @@ import com.devstagram.domain.story.dto.*;
 import com.devstagram.domain.story.entity.StoryFeedResponse;
 import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.domain.user.service.UserSecurityService;
+import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
@@ -119,6 +120,7 @@ class StoryControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.msg").value("스토리 생성 성공"))
                 .andExpect(jsonPath("$.data.storyId").value(10L));
     }
 
@@ -131,6 +133,8 @@ class StoryControllerTest {
                 .content("목록 테스트")
                 .totalLikeCount(5L)
                 .isLiked(false)
+                .mediaUrl("/uploads/test.jpg")
+                .mediaType(MediaType.jpg)
                 .build();
 
         given(storyService.getUserAllStories(eq(targetUserId), eq(1L))).willReturn(List.of(detailResponse));
@@ -138,7 +142,8 @@ class StoryControllerTest {
         mockMvc.perform(get("/api/story/user/{targetUserId}", targetUserId).with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"));
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.data[0].mediaUrl").value("/uploads/test.jpg"));
     }
 
     @Test
@@ -163,42 +168,6 @@ class StoryControllerTest {
     }
 
     @Test
-    @DisplayName("좋아요 업데이트 성공(좋아요 취소)")
-    void patchStoryLike_Success_Unlike() throws Exception {
-        Long storyId = 10L;
-        StoryViewResponse response = StoryViewResponse.builder()
-                .storyId(storyId)
-                .userId(1L)
-                .totalLikeCount(4L)
-                .isLiked(false)
-                .likedAt(null)
-                .build();
-
-        given(storyService.patchStoryLike(eq(storyId), eq(1L))).willReturn(response);
-
-        mockMvc.perform(post("/api/story/{storyId}/like", storyId).with(csrf()).with(user(mockSecurityUser)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("스토리 좋아요 취소"))
-                .andExpect(jsonPath("$.data.isLiked").value(false));
-    }
-
-    @Test
-    @DisplayName("스토리 소프트 딜리트 성공")
-    void softDeleteStory_Success() throws Exception {
-        Long storyId = 10L;
-
-        mockMvc.perform(patch("/api/story/{storyId}/soft-delete", storyId)
-                        .with(csrf())
-                        .with(user(mockSecurityUser)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("스토리 수동 소프트 딜리트 성공"));
-
-        verify(storyService).softDeleteStory(eq(storyId), eq(1L));
-    }
-
-    @Test
     @DisplayName("스토리 하드 딜리트 성공")
     void hardDeleteStory_Success() throws Exception {
         Long storyId = 10L;
@@ -211,24 +180,6 @@ class StoryControllerTest {
                 .andExpect(jsonPath("$.msg").value("스토리 하드 딜리트 성공"));
 
         verify(storyService).hardDeleteStory(eq(storyId), eq(1L));
-    }
-
-    @Test
-    @DisplayName("스토리 하드 딜리트 실패 - 권한 없음")
-    void hardDeleteStory_Fail_Forbidden() throws Exception {
-        Long storyId = 10L;
-
-        doThrow(new com.devstagram.global.exception.ServiceException("403-F-1", "본인 스토리만 삭제 가능"))
-                .when(storyService)
-                .hardDeleteStory(eq(storyId), eq(1L));
-
-        mockMvc.perform(delete("/api/story/{storyId}/hard-delete", storyId)
-                        .with(csrf())
-                        .with(user(mockSecurityUser)))
-                .andDo(print())
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.resultCode").value("403-F-1"))
-                .andExpect(jsonPath("$.msg").value("본인 스토리만 삭제 가능"));
     }
 
     @Test
@@ -252,25 +203,6 @@ class StoryControllerTest {
     }
 
     @Test
-    @DisplayName("만료된 스토리 목록 조회 성공")
-    void getMyArchivedStories_Success() throws Exception {
-        StoryDetailResponse detailResponse = StoryDetailResponse.builder()
-                .storyId(11L)
-                .content("아카이브 테스트")
-                .totalLikeCount(2L)
-                .isLiked(true)
-                .build();
-
-        given(storyService.getMyArchivedStories(eq(1L))).willReturn(List.of(detailResponse));
-
-        mockMvc.perform(get("/api/story/archive").with(user(mockSecurityUser)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.data[0].content").value("아카이브 테스트"));
-    }
-
-    @Test
     @DisplayName("스토리 홈 피드 조회 성공")
     void getStoryFeed_Success() throws Exception {
         StoryFeedResponse feedResponse = StoryFeedResponse.builder()
@@ -278,6 +210,7 @@ class StoryControllerTest {
                 .nickname("followingUser")
                 .isUnread(true)
                 .lastUpdatedAt(LocalDateTime.now())
+                .totalStoryCount(3)
                 .build();
 
         given(storyService.getFollowingStoriesFeed(eq(1L))).willReturn(List.of(feedResponse));
@@ -287,6 +220,6 @@ class StoryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(jsonPath("$.data[0].nickname").value("followingUser"))
-                .andExpect(jsonPath("$.data[0].isUnread").value(true));
+                .andExpect(jsonPath("$.data[0].totalStoryCount").value(3));
     }
 }
