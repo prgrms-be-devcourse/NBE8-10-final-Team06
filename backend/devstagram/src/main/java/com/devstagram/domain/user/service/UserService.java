@@ -1,5 +1,7 @@
 package com.devstagram.domain.user.service;
 
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +13,7 @@ import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -18,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final FollowService followService; // 이미 잘 만들어두신 서비스를 주입받습니다!
+    private final FollowService followService;
+    private final StorageService storageService;
+    private final FileValidator fileValidator;
 
     /**
      * 특정 사용자의 프로필 정보 조회
@@ -48,25 +53,41 @@ public class UserService {
      * 사용자의 프로필 정보 수정
      */
     @Transactional
-    public void updateProfile(Long userId, ProfileUpdateRequest request) {
-        User user =
-                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+    public void updateProfile(Long userId, ProfileUpdateRequest request, MultipartFile profileImage) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
-        // 1. 닉네임 중복 체크 (기존 닉네임과 다를 경우에만)
+        // 1. 이미지 파일 처리
+        String imageUrl = user.getProfileImageUrl(); // 기본값: 기존 이미지 유지
+
+        if (profileImage != null && !profileImage.isEmpty()) {
+            // 이미지 형식 검증
+            fileValidator.validateImage(profileImage);
+
+            // 기존 파일이 서버에 저장되어 있다면 삭제 (파일 중복 방지)
+            if (imageUrl != null && !imageUrl.isBlank()) {
+                storageService.delete(imageUrl);
+            }
+
+            // 새로운 파일 저장 후 파일명(URL) 반환
+            imageUrl = storageService.store(profileImage);
+        }
+
+        // 2. 닉네임 중복 체크 (기존 닉네임과 다를 경우에만 수행)
         if (!user.getNickname().equals(request.nickname())) {
             if (userRepository.existsByNickname(request.nickname())) {
                 throw new ServiceException("409-U-2", "이미 사용 중인 닉네임입니다.");
             }
         }
 
-        // 2. 기본 정보 수정
-        user.updateProfile(request.nickname(), request.profileImageUrl(), request.birthDate(), request.gender());
+        // 3. 기본 정보 수정 (업데이트된 imageUrl 반영)
+        user.updateProfile(request.nickname(), imageUrl, request.birthDate(), request.gender());
 
-        // 3. 상세 정보(UserInfo) 수정
+        // 4. 상세 정보(UserInfo) 수정
         if (user.getUserInfo() != null) {
             user.getUserInfo().updateInfo(request.githubUrl(), request.resume());
         } else {
-            // 혹시라도 UserInfo가 없다면 새로 생성해서 연결 (방어 코드)
+            // 방어 코드: UserInfo가 없는 경우 새로 생성하여 연결
             user.setUserInfo(UserInfo.builder()
                     .githubUrl(request.githubUrl())
                     .resume(request.resume())

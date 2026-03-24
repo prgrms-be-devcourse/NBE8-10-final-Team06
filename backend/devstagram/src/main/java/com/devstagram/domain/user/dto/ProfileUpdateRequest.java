@@ -11,8 +11,8 @@ import jakarta.validation.constraints.Size;
 
 public record ProfileUpdateRequest(
         @NotBlank @Size(max = 50) String nickname,
-        String profileImageUrl,
         String githubUrl,
         @NotNull Resume resume,
         @NotNull LocalDate birthDate,
-        @NotNull Gender gender) {}
+        @NotNull Gender gender
+) {}

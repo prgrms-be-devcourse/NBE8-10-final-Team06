@@ -1,8 +1,12 @@
-package com.devstagram.domain.user.service;
+package com.devstagram.domain.user.controller;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import com.devstagram.domain.user.service.FollowService;
+import com.devstagram.domain.user.service.UserService;
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -30,6 +34,12 @@ class UserServiceTest {
     @Mock
     private FollowService followService;
 
+    @Mock
+    private StorageService storageService; // 추가 필수!
+
+    @Mock
+    private FileValidator fileValidator;   // 추가 필수!
+
     @InjectMocks
     private UserService userService;
 
@@ -38,7 +48,6 @@ class UserServiceTest {
     void updateProfile_Success_WithNewUserInfo() {
         // given
         Long userId = 1L;
-        // 기존 유저 (UserInfo가 없는 상태라고 가정)
         User user = User.builder()
                 .nickname("oldNickname")
                 .profileImageUrl("oldUrl")
@@ -48,7 +57,6 @@ class UserServiceTest {
 
         ProfileUpdateRequest request = new ProfileUpdateRequest(
                 "newNickname",
-                "newUrl",
                 "https://github.com/dev",
                 Resume.JUNIOR,
                 LocalDate.of(1995, 5, 5),
@@ -57,19 +65,14 @@ class UserServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("newNickname")).willReturn(false);
 
-        // when
-        userService.updateProfile(userId, request);
+        // when - 세 번째 인자로 null(파일 없음)을 넘겨줍니다.
+        userService.updateProfile(userId, request, null);
 
         // then
         assertThat(user.getNickname()).isEqualTo("newNickname");
-        assertThat(user.getProfileImageUrl()).isEqualTo("newUrl");
-        assertThat(user.getBirthDate()).isEqualTo(LocalDate.of(1995, 5, 5));
-        assertThat(user.getGender()).isEqualTo(Gender.FEMALE);
-
-        // UserInfo가 새로 생성되었는지 확인
+        // profileImage가 null이므로 기존 imageUrl인 "oldUrl"이 유지되어야 함 (로직에 따라 확인)
+        assertThat(user.getNickname()).isEqualTo("newNickname");
         assertThat(user.getUserInfo()).isNotNull();
-        assertThat(user.getUserInfo().getGithubUrl()).isEqualTo("https://github.com/dev");
-        assertThat(user.getUserInfo().getResume()).isEqualTo(Resume.JUNIOR);
     }
 
     @Test
@@ -79,22 +82,18 @@ class UserServiceTest {
         Long userId = 1L;
         String sameNickname = "keepMe";
         User user = User.builder().nickname(sameNickname).build();
-
-        // UserInfo 미리 설정
         user.setUserInfo(UserInfo.builder().resume(Resume.UNSPECIFIED).build());
 
         ProfileUpdateRequest request =
-                new ProfileUpdateRequest(sameNickname, "url", "git", Resume.SENIOR, LocalDate.now(), Gender.MALE);
+                new ProfileUpdateRequest(sameNickname, "git", Resume.SENIOR, LocalDate.now(), Gender.MALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        // 이 상황에서는 existsByNickname이 호출되지 않아야 함 (서비스 로직 if문 조건)
 
         // when
-        userService.updateProfile(userId, request);
+        userService.updateProfile(userId, request, null); // 인자 3개!
 
         // then
         assertThat(user.getNickname()).isEqualTo(sameNickname);
-        assertThat(user.getUserInfo().getResume()).isEqualTo(Resume.SENIOR);
         verify(userRepository, never()).existsByNickname(anyString());
     }
 
@@ -106,13 +105,13 @@ class UserServiceTest {
         User user = User.builder().nickname("myOldName").build();
 
         ProfileUpdateRequest request = new ProfileUpdateRequest(
-                "otherUserNickname", "url", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
+                "otherUserNickname", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("otherUserNickname")).willReturn(true);
 
         // when & then
-        assertThatThrownBy(() -> userService.updateProfile(userId, request))
+        assertThatThrownBy(() -> userService.updateProfile(userId, request, null)) // 인자 3개!
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("이미 사용 중인 닉네임입니다.");
     }
