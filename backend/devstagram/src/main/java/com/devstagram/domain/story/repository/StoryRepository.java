@@ -19,6 +19,8 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
     // 만료된 스토리 조회
     List<Story> findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(Long userId);
 
+    long countByUserIdAndIsDeletedFalseAndExpiredAtAfter(Long userId, LocalDateTime now);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Story s SET s.isDeleted = true " + "WHERE s.expiredAt <= :now AND s.isDeleted = false")
     void softDeleteAllExpiredStories(@Param("now") LocalDateTime now);
@@ -57,4 +59,14 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
             @Param("targetUserId") Long targetUserId,
             @Param("currentUserId") Long currentUserId,
             @Param("now") LocalDateTime now);
+
+    // 특정 유저의 스토리 중에 가장 최근의 생성 시간 가져옴
+    @Query("""
+        SELECT MAX(s.createdAt)
+        FROM Story s
+        WHERE s.user.id = :userId
+        AND s.isDeleted = false
+        AND s.expiredAt > :now
+    """)
+    LocalDateTime findLastStoryCreatedAt(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 }
