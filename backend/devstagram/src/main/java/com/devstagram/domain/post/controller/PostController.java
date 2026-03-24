@@ -3,6 +3,7 @@ package com.devstagram.domain.post.controller;
 import java.net.URI;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
@@ -92,5 +93,22 @@ public class PostController {
         Slice<PostLikerRes> likers = postService.getPostLikers(postId, pageable);
 
         return RsData.success("좋아요 목록 조회 성공", likers);
+    }
+
+    @PostMapping("/{postId}/scrap")
+    public ResponseEntity<Boolean> toggleScrap(
+            @PathVariable Long postId,
+            @AuthenticationPrincipal SecurityUser securityUser) { // 현재 로그인 유저 정보
+
+        boolean isScrapped = postService.toggleScrap(postId, securityUser.getId());
+        return ResponseEntity.ok(isScrapped);
+    }
+
+    @GetMapping("/scraps")
+    public ResponseEntity<Page<PostFeedRes>> getMyScraps(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            Pageable pageable) {
+
+        return ResponseEntity.ok(postService.getUserScrappedPosts(securityUser.getId(), pageable));
     }
 }

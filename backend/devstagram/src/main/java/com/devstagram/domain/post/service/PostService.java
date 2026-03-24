@@ -3,10 +3,10 @@ package com.devstagram.domain.post.service;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.Sort;
+import com.devstagram.domain.post.entity.PostScrap;
+import com.devstagram.domain.post.repository.PostScrapRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +41,7 @@ public class PostService {
     private final StorageService storageService;
     private final PostMediaRepository postMediaRepository;
     private final FileValidator fileValidator;
+    private final PostScrapRepository postScrapRepository;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
@@ -219,5 +220,40 @@ public class PostService {
         }
 
         return postLikeRepository.findLikersByPostId(postId, pageable);
+    }
+
+    @Transactional
+    public boolean toggleScrap(Long postId, Long memberId) {
+
+        User user = userRepository.getReferenceById(memberId);
+
+        Post post = postRepository
+                .findByIdWithLock(postId)
+                .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
+
+        if (post.isDeleted()) {
+            throw new ServiceException("404-P-2", "삭제된 게시글은 스크랩할 수 없습니다.");
+        }
+
+        Optional<PostScrap> scrapOpt = postScrapRepository.findByUserIdAndPostId(memberId, postId);
+
+        if (scrapOpt.isPresent()) {
+            postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
+            return false; // 스크랩 취소
+        } else {
+            postScrapRepository.save(PostScrap.builder()
+                    .user(user)
+                    .post(post)
+                    .build());
+            return true; // 스크랩 성공
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PostFeedRes> getUserScrappedPosts(Long userId, Pageable pageable) {
+
+        Page<Post> scrappedPosts = postScrapRepository.findActivePostsByUserId(userId, pageable);
+
+        return scrappedPosts.map(PostFeedRes::from);
     }
 }
