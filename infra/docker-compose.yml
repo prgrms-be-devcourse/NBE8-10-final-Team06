@@ -3,7 +3,6 @@ version: '3.8'
 services:
   # 1. Spring Boot 서비스
   app:
-    # 이미지 주소는 실제 본인의 주소로 직접 적어주시는 게 가장 확실합니다.
     image: ghcr.io/prgrms-be-devcourse/devstagram-backend:latest
     container_name: devstagram-app
     network_mode: host
@@ -23,5 +22,16 @@ services:
     restart: always
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certbot/conf:/etc/letsencrypt  # 인증서 파일 공유용
+      - ./data/certbot/www:/var/www/certbot    # 인증 시 챌린지 파일 공유용
     depends_on:
       - app
+
+  # 3. Certbot 서비스 (nginx와 같은 줄에 위치해야 함!)
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
