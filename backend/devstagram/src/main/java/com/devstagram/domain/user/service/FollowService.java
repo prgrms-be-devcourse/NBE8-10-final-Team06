@@ -39,6 +39,9 @@ public class FollowService {
         Follow follow = Follow.builder().fromUser(fromUser).toUser(toUser).build();
         followRepository.save(follow);
 
+        userRepository.increaseFollowerCount(toUserId);
+        userRepository.increaseFollowingCount(fromUserId);
+
         return createFollowResponse(toUserId, fromUserId, true);
     }
 
@@ -54,6 +57,9 @@ public class FollowService {
 
         followRepository.delete(follow);
 
+        userRepository.decreaseFollowerCount(toUserId);
+        userRepository.decreaseFollowingCount(fromUserId);
+
         return createFollowResponse(toUserId, fromUserId, false);
     }
 
@@ -68,14 +74,14 @@ public class FollowService {
      * 특정 유저의 팔로잉 수 조회
      */
     public long getFollowingCount(Long userId) {
-        return followRepository.countByFromUserId(userId);
+        return getUserById(userId).getFollowingCount();
     }
 
     /**
      * 특정 유저의 팔로워 수 조회
      */
     public long getFollowerCount(Long userId) {
-        return followRepository.countByToUserId(userId);
+        return getUserById(userId).getFollowerCount();
     }
 
     // 특정 유저가 팔로잉하는 사람들 목록
@@ -100,12 +106,10 @@ public class FollowService {
 
     // UI 갱신을 위한 최신 카운트 정보 조회 및 DTO 생성
     private FollowResponse createFollowResponse(Long toUserId, Long fromUserId, boolean isFollowing) {
-        // 상대방(toUser)의 팔로워 수 - 상대 프로필 UI용
-        long followerCount = followRepository.countByToUserId(toUserId);
+        // @Modifying(clearAutomatically = true) 덕분에 findById 시 최신 DB 값이 객체에 반영됨
+        User toUser = getUserById(toUserId);
+        User fromUser = getUserById(fromUserId);
 
-        // 나의(fromUser) 팔로잉 수 - 내 프로필 UI용
-        long followingCount = followRepository.countByFromUserId(fromUserId);
-
-        return FollowResponse.of(toUserId, isFollowing, followerCount, followingCount);
+        return FollowResponse.of(toUserId, isFollowing, toUser.getFollowerCount(), fromUser.getFollowingCount());
     }
 }

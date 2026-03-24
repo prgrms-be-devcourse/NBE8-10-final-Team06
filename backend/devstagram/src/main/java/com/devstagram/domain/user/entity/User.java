@@ -28,6 +28,9 @@ public class User extends BaseEntity {
     @Column(unique = true, nullable = false, length = 50)
     private String email;
 
+    @Column(length = 255)
+    private String profileImageUrl;
+
     @Column(nullable = false, length = 255)
     private String password;
 
@@ -41,6 +44,18 @@ public class User extends BaseEntity {
     @Column(unique = true)
     private String apiKey;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private long followerCount = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private long followingCount = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private long postCount = 0;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserInfo userInfo;
 
@@ -52,5 +67,12 @@ public class User extends BaseEntity {
         if (userInfo != null) {
             userInfo.setUser(this);
         }
+    }
+
+    public void updateProfile(String nickname, String profileImageUrl, LocalDate birthDate, Gender gender) {
+        this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
+        this.birthDate = birthDate;
+        this.gender = gender;
     }
 }

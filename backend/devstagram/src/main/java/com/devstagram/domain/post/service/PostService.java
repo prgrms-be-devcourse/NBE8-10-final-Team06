@@ -100,6 +100,7 @@ public class PostService {
                 postMediaRepository.save(postMedia);
             }
         }
+        userRepository.increasePostCount(userId);
 
         return post.getId();
     }
@@ -181,6 +182,8 @@ public class PostService {
                 post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
         post.softDelete();
+
+        userRepository.decreasePostCount(userId);
 
         fileNames.forEach(storageService::delete);
     }

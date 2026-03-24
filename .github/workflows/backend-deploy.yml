@@ -1,0 +1,74 @@
+name: Backend Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # 1. 빌드 (Gradle)
+      - name: Build with Gradle
+        run: |
+          cd backend/devstagram
+          chmod +x gradlew
+          ./gradlew build -x test
+
+      # 2. 도커 로그인 (GHCR)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      # 3. 도커 이미지 빌드 & 푸시
+      - name: Build and Push Docker Image
+        run: |
+          # 이미지 이름을 docker-compose.yml과 일치시킵니다.
+          docker build -t ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest ./backend/devstagram
+          docker push ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+
+      # 4. 설정 파일(infra 폴더)을 EC2로 전송 (SCP 사용)
+      - name: Copy infra files to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "infra/docker-compose.yml,infra/nginx/nginx.conf"
+          target: "/home/ec2-user/"
+          strip_components: 1 # infra/ 폴더 구조를 떼고 내용물만 보냅니다.
+
+      # 5. EC2 서버에서 Docker Compose 실행
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ec2-user
+            # .env 파일 생성
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" > .env
+            echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
+            echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
+            echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" > .env
+            echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
+            
+            # 최신 이미지 가져오기 및 실행 (띄어쓰기 방식 사용)
+            sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+            sudo docker compose up -d --remove-orphans
