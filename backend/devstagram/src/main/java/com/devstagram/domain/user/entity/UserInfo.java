@@ -42,4 +42,9 @@ public class UserInfo {
     public void setUser(User user) {
         this.user = user;
     }
+
+    public void updateInfo(String githubUrl, Resume resume) {
+        this.githubUrl = githubUrl;
+        this.resume = resume;
+    }
 }

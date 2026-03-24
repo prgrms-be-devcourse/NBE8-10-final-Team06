@@ -48,4 +48,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE User u SET u.postCount = CASE WHEN u.postCount > 0 THEN u.postCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreasePostCount(@Param("id") Long id);
+
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo WHERE u.nickname = :nickname")
+    Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
 }
