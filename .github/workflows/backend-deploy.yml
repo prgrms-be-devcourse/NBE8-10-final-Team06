@@ -68,7 +68,7 @@ jobs:
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
             echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
             echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" > .env
-            echo "JWT_EXPIRE=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
+            echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
             
             # 최신 이미지 가져오기 및 실행 (띄어쓰기 방식 사용)
             sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
