@@ -28,6 +28,7 @@ import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.post.repository.PostScrapRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.storage.StorageService;
@@ -54,12 +55,16 @@ class PostServiceTest {
     @Mock
     private PostLikeRepository postLikeRepository;
 
+    @Mock
+    private PostScrapRepository postScrapRepository;
+
     @Test
     @DisplayName("[게시글 작성 성공]")
     void createPost_Success() {
         // 1. given
         Long userId = 1L;
         PostCreateReq req = new PostCreateReq("테스트 제목", "테스트 내용");
+
         List<org.springframework.web.multipart.MultipartFile> files = new java.util.ArrayList<>();
 
         User mockUser = mock(User.class);
@@ -246,5 +251,37 @@ class PostServiceTest {
         // 4. Verify
         verify(postRepository).findPostWithDetails(postId); // findById -> findPostWithDetails
         verify(commentRepository).findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("[스크랩 조회 성공] - 사용자가 스크랩한 게시글 목록을 Post 객체로 반환")
+    void getUserScrappedPosts_Success() {
+        // 1. given
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt").descending());
+
+        User writer = mock(User.class);
+        given(writer.getNickname()).willReturn("원작자");
+
+        Post scrappedPost1 = Post.builder().title("스크랩한 글 1").user(writer).build();
+        Post scrappedPost2 = Post.builder().title("스크랩한 글 2").user(writer).build();
+        ReflectionTestUtils.setField(scrappedPost1, "id", 101L);
+        ReflectionTestUtils.setField(scrappedPost2, "id", 102L);
+
+        List<Post> scrappedPosts = List.of(scrappedPost1, scrappedPost2);
+        Page<Post> postPage = new PageImpl<>(scrappedPosts, pageable, scrappedPosts.size());
+
+        given(postScrapRepository.findActivePostsByUserId(eq(userId), any(Pageable.class)))
+                .willReturn(postPage);
+
+        // 2. when
+        Page<PostFeedRes> result = postService.getUserScrappedPosts(userId, pageable);
+
+        // 3. then
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent().get(0).title()).isEqualTo("스크랩한 글 1");
+        assertThat(result.getContent().get(0).nickname()).isEqualTo("원작자");
+
+        verify(postScrapRepository).findActivePostsByUserId(userId, pageable);
     }
 }

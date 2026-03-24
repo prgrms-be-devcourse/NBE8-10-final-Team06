@@ -107,9 +107,11 @@ public class PostController {
     }
 
     @GetMapping("/scraps")
-    public ResponseEntity<Page<PostFeedRes>> getMyScraps(
+    public RsData<Page<PostFeedRes>> getMyScraps(
             @AuthenticationPrincipal SecurityUser securityUser, Pageable pageable) {
 
-        return ResponseEntity.ok(postService.getUserScrappedPosts(securityUser.getId(), pageable));
+        Page<PostFeedRes> posts = postService.getUserScrappedPosts(securityUser.getId(), pageable);
+
+        return RsData.success("스크랩 게시글 조회 성공", posts);
     }
 }
