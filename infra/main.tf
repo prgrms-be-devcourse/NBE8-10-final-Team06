@@ -94,6 +94,14 @@ resource "aws_security_group" "sg_ec2" {
   name   = "${var.prefix}-sg-ec2"
   vpc_id = aws_vpc.vpc_1.id
 
+  # ✅ HTTPS (Nginx용 443포트 추가)
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # HTTP (Nginx용 80포트)
   ingress {
     from_port   = 80
@@ -102,7 +110,7 @@ resource "aws_security_group" "sg_ec2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Spring Boot (테스트용 8080포트 - 나중에 Nginx가 완벽해지면 빼셔도 됩니다)
+  # Spring Boot (테스트용 8080포트)
   ingress {
     from_port   = 8080
     to_port     = 8080
@@ -127,7 +135,6 @@ resource "aws_security_group" "sg_ec2" {
 
   tags = { Name = "${var.prefix}-sg-ec2" }
 }
-
 resource "aws_security_group" "sg_rds" {
   name   = "${var.prefix}-sg-rds"
   vpc_id = aws_vpc.vpc_1.id
