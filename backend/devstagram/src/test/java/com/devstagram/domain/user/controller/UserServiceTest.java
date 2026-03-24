@@ -52,8 +52,7 @@ class UserServiceTest {
                 "https://github.com/dev",
                 Resume.JUNIOR,
                 LocalDate.of(1995, 5, 5),
-                Gender.FEMALE
-        );
+                Gender.FEMALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("newNickname")).willReturn(false);
@@ -79,16 +78,13 @@ class UserServiceTest {
         // given
         Long userId = 1L;
         String sameNickname = "keepMe";
-        User user = User.builder()
-                .nickname(sameNickname)
-                .build();
+        User user = User.builder().nickname(sameNickname).build();
 
         // UserInfo 미리 설정
         user.setUserInfo(UserInfo.builder().resume(Resume.UNSPECIFIED).build());
 
-        ProfileUpdateRequest request = new ProfileUpdateRequest(
-                sameNickname, "url", "git", Resume.SENIOR, LocalDate.now(), Gender.MALE
-        );
+        ProfileUpdateRequest request =
+                new ProfileUpdateRequest(sameNickname, "url", "git", Resume.SENIOR, LocalDate.now(), Gender.MALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         // 이 상황에서는 existsByNickname이 호출되지 않아야 함 (서비스 로직 if문 조건)
@@ -110,8 +106,7 @@ class UserServiceTest {
         User user = User.builder().nickname("myOldName").build();
 
         ProfileUpdateRequest request = new ProfileUpdateRequest(
-                "otherUserNickname", "url", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE
-        );
+                "otherUserNickname", "url", "git", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("otherUserNickname")).willReturn(true);

@@ -1,12 +1,12 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.user.dto.ProfileUpdateRequest;
-import com.devstagram.domain.user.entity.UserInfo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.entity.UserInfo;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
@@ -25,7 +25,8 @@ public class UserService {
      */
     public UserProfileResponse getUserProfile(String nickname, Long currentUserId) {
         // 1. Fetch Join이 적용된 메서드로 변경 (성능 최적화)
-        User targetUser = userRepository.findByNicknameWithInfo(nickname)
+        User targetUser = userRepository
+                .findByNicknameWithInfo(nickname)
                 .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         // 2. 팔로우 여부 확인 (기존 followService 로직 재사용)
@@ -40,8 +41,7 @@ public class UserService {
                 targetUser.getPostCount(),
                 targetUser.getFollowerCount(),
                 targetUser.getFollowingCount(),
-                isFollowing
-        );
+                isFollowing);
     }
 
     /**
@@ -49,8 +49,8 @@ public class UserService {
      */
     @Transactional
     public void updateProfile(Long userId, ProfileUpdateRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         // 1. 닉네임 중복 체크 (기존 닉네임과 다를 경우에만)
         if (!user.getNickname().equals(request.nickname())) {
@@ -60,12 +60,7 @@ public class UserService {
         }
 
         // 2. 기본 정보 수정
-        user.updateProfile(
-                request.nickname(),
-                request.profileImageUrl(),
-                request.birthDate(),
-                request.gender()
-        );
+        user.updateProfile(request.nickname(), request.profileImageUrl(), request.birthDate(), request.gender());
 
         // 3. 상세 정보(UserInfo) 수정
         if (user.getUserInfo() != null) {

@@ -1,19 +1,21 @@
 package com.devstagram.domain.user.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody; // 추가 확인!
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
@@ -39,8 +41,7 @@ public class UserController {
     @PutMapping("/me/profile")
     public RsData<Void> updateProfile(
             @Valid @RequestBody ProfileUpdateRequest request, // @RequestBody 추가됨!
-            @AuthenticationPrincipal SecurityUser loginUser
-    ) {
+            @AuthenticationPrincipal SecurityUser loginUser) {
         userService.updateProfile(loginUser.getId(), request);
         return RsData.success("프로필이 수정되었습니다.", null);
     }
