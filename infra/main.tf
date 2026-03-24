@@ -230,3 +230,27 @@ resource "aws_db_instance" "rds_1" {
 
   tags = { Name = "${var.prefix}-rds" }
 }
+
+# [11] 탄력적 IP (고정 IP) 설정
+resource "aws_eip" "ec2_eip" {
+  instance = aws_instance.ec2_1.id
+  domain   = "vpc"
+  tags     = { Name = "${var.prefix}-eip" }
+}
+
+# [12] Route 53 도메인 연결 설정
+# 기존에 생성한 호스팅 영역의 정보를 가져옵니다.
+data "aws_route53_zone" "selected" {
+  name         = "devstagram.site" # 가비아에서 산 도메인 이름
+  private_zone = false
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "devstagram.site" # 접속할 도메인 주소
+  type    = "A"
+  ttl     = "300"
+
+  # 위에서 생성한 탄력적 IP 주소를 자동으로 참조합니다.
+  records = [aws_eip.ec2_eip.public_ip]
+}
