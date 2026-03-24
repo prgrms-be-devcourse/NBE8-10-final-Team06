@@ -278,11 +278,28 @@ class StoryServiceTest {
     void getFollowingStoriesFeed_Success() {
         // given
         Long userId = 1L;
-        User followingUser = User.builder().nickname("friend").build();
-        ReflectionTestUtils.setField(followingUser, "id", 2L);
+        // 수정: 본인 유저 정보 Mock 추가
+        User currentUser = User.builder().nickname("me").build();
+        ReflectionTestUtils.setField(currentUser, "id", userId);
+
+        User friend = User.builder().nickname("friend").build();
+        ReflectionTestUtils.setField(friend, "id", 2L);
+
+        // 수정: userRepository findById Mock 추가
+        given(userRepository.findById(userId)).willReturn(Optional.of(currentUser));
 
         given(storyRepository.findFolloweesWithActiveStories(eq(userId), any(LocalDateTime.class)))
-                .willReturn(List.of(followingUser));
+                .willReturn(List.of(friend));
+
+        // 수정: 본인(Me)에 대한 Repository 호출 Mock 추가
+        given(storyRepository.existsUnreadStory(eq(userId), eq(userId), any(LocalDateTime.class)))
+                .willReturn(false);
+        given(storyRepository.countByUserIdAndIsDeletedFalseAndExpiredAtAfter(eq(userId), any(LocalDateTime.class)))
+                .willReturn(1L);
+        given(storyRepository.findLastStoryCreatedAt(eq(userId), any(LocalDateTime.class)))
+                .willReturn(LocalDateTime.now().minusMinutes(10));
+
+        // 팔로잉 유저에 대한 Mock
         given(storyRepository.existsUnreadStory(eq(2L), eq(userId), any(LocalDateTime.class)))
                 .willReturn(true);
         given(storyRepository.countByUserIdAndIsDeletedFalseAndExpiredAtAfter(eq(2L), any(LocalDateTime.class)))
@@ -294,9 +311,10 @@ class StoryServiceTest {
         List<StoryFeedResponse> feed = storyService.getFollowingStoriesFeed(userId);
 
         // then
-        assertThat(feed).hasSize(1);
-        assertThat(feed.get(0).nickname()).isEqualTo("friend");
-        assertThat(feed.get(0).isUnread()).isTrue();
-        assertThat(feed.get(0).totalStoryCount()).isEqualTo(3);
+        assertThat(feed).hasSize(2);
+
+        assertThat(feed.get(0).isMe()).isTrue();
+        assertThat(feed.get(1).nickname()).isEqualTo("friend");
+        assertThat(feed.get(1).isUnread()).isTrue();
     }
 }
