@@ -62,9 +62,17 @@ jobs:
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /home/ec2-user
             # 1. 최신 이미지 가져오기
             sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
             
-            # 2. 기존 컨테이너 중지 및 새 설정으로 실행 (docker-compose 하이픈 방식 사용)
-            sudo DB_NAME=devstagram RDS_HOST=${{ secrets.RDS_ENDPOINT }} DB_PASSWORD=${{ secrets.RDS_PASSWORD }} JWT_SECRET=${{ secrets.JWT_SECRET_KEY }} JWT_EXPIRE=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }} docker-compose up -d --remove-orphans
+            # 2. docker-compose가 없으면 docker compose를 대신 사용하도록 설정
+            # (명령어 가독성을 위해 환경변수를 파일로 잠시 뺍니다)
+            cd /home/ec2-user
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" > .env
+            echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
+            echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET_KEY }}" >> .env
+            echo "JWT_EXPIRE=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
+            
+            # 3. Docker Compose 실행 (명령어가 없으면 띄어쓰기 버전으로 시도)
+            sudo docker compose up -d --remove-orphans || sudo docker-compose up -d --remove-orphans
