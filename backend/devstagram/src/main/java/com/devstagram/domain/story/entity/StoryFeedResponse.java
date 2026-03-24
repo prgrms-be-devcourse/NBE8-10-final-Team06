@@ -12,5 +12,6 @@ public record StoryFeedResponse(
         String profileImageUrl,
         boolean isUnread, // 아직 안 읽은 스토리 있는지 여부
         int totalStoryCount, // 스토리 바에 띄울, 이 유저의 총 스토리 갯수 계산
-        LocalDateTime lastUpdatedAt // 가장 최근 스토리 생성 시간
+        LocalDateTime lastUpdatedAt, // 가장 최근 스토리 생성 시간
+        boolean isMe // 본인 여부 판별
         ) {}

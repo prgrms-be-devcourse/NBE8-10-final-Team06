@@ -11,6 +11,8 @@ import lombok.Builder;
 public record StoryDetailResponse(
         Long storyId,
         Long userId,
+        String nickname,
+        String profileImageUrl,
         LocalDateTime createdAt,
         LocalDateTime expiredAt,
         String content,
