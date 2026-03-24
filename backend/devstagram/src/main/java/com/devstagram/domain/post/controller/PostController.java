@@ -97,8 +97,7 @@ public class PostController {
 
     @PostMapping("/{postId}/scrap")
     public ResponseEntity<Boolean> toggleScrap(
-            @PathVariable Long postId,
-            @AuthenticationPrincipal SecurityUser securityUser) { // 현재 로그인 유저 정보
+            @PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) { // 현재 로그인 유저 정보
 
         boolean isScrapped = postService.toggleScrap(postId, securityUser.getId());
         return ResponseEntity.ok(isScrapped);
@@ -106,8 +105,7 @@ public class PostController {
 
     @GetMapping("/scraps")
     public ResponseEntity<Page<PostFeedRes>> getMyScraps(
-            @AuthenticationPrincipal SecurityUser securityUser,
-            Pageable pageable) {
+            @AuthenticationPrincipal SecurityUser securityUser, Pageable pageable) {
 
         return ResponseEntity.ok(postService.getUserScrappedPosts(securityUser.getId(), pageable));
     }

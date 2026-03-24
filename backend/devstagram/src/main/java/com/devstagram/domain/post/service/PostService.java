@@ -3,9 +3,6 @@ package com.devstagram.domain.post.service;
 import java.util.List;
 import java.util.Optional;
 
-import com.devstagram.domain.post.entity.PostScrap;
-import com.devstagram.domain.post.repository.PostScrapRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +15,12 @@ import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostLike;
+import com.devstagram.domain.post.entity.PostScrap;
 import com.devstagram.domain.post.entity.PostMedia;
 import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.post.repository.PostScrapRepository;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.enumtype.MediaType;
@@ -241,10 +240,7 @@ public class PostService {
             postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
             return false; // 스크랩 취소
         } else {
-            postScrapRepository.save(PostScrap.builder()
-                    .user(user)
-                    .post(post)
-                    .build());
+            postScrapRepository.save(PostScrap.builder().user(user).post(post).build());
             return true; // 스크랩 성공
         }
     }

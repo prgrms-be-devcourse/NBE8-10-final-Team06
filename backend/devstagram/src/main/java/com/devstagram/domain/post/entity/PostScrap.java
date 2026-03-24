@@ -2,6 +2,7 @@ package com.devstagram.domain.post.entity;
 
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.entity.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -9,9 +10,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "post_scrap", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "post_id"})
-})
+@Table(
+        name = "post_scrap",
+        uniqueConstraints = {@UniqueConstraint(columnNames = {"user_id", "post_id"})})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PostScrap extends BaseEntity {
