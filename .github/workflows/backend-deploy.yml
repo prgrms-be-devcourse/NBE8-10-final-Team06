@@ -63,15 +63,13 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ec2-user
-            # 1. 최신 이미지 가져오기
-            sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
-            
-            # 2. .env 파일 생성 (변수들을 파일로 격리)
+            # .env 파일 생성
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" > .env
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
             echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
             echo "JWT_SECRET=${{ secrets.JWT_SECRET_KEY }}" >> .env
             echo "JWT_EXPIRE=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
             
-            # 3. Docker Compose 실행 (명령어가 짧아서 절대 안 깨짐)
-            sudo docker compose up -d --remove-orphans || sudo docker-compose up -d --remove-orphans
+            # 최신 이미지 가져오기 및 실행 (띄어쓰기 방식 사용)
+            sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+            sudo docker compose up -d --remove-orphans

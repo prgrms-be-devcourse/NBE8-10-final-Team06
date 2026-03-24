@@ -186,8 +186,12 @@ locals {
   ec2_bootstrap = <<-EOF
 #!/bin/bash
 timedatectl set-timezone Asia/Seoul
+# 1. Docker 및 필요한 도구 설치
 dnf update -y && dnf install -y git docker
+# 2. Docker Compose 플러그인 설치 (이게 핵심!)
+dnf install -y docker-compose-plugin
 systemctl enable --now docker
+# 3. 스왑 파일 설정
 dd if=/dev/zero of=/swapfile bs=128M count=32 && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
 docker network create common
