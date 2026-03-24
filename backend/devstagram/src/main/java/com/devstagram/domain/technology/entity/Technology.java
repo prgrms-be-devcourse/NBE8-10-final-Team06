@@ -3,9 +3,7 @@ package com.devstagram.domain.technology.entity;
 import com.devstagram.global.entity.BaseEntity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 /**
  * 시스템에서 관리하는 기술 스택(Java, Spring Boot, React 등)의 마스터 데이터를 정의합니다.
@@ -14,6 +12,8 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "technology")
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Technology extends BaseEntity {
 

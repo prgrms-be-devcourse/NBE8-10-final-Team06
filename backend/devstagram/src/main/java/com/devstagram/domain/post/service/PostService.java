@@ -264,6 +264,7 @@ public class PostService {
             // 기술 점수 차감
             post.getTechTags()
                     .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+
             return false;
         } else {
 
@@ -275,6 +276,7 @@ public class PostService {
             // 기술 점수 부여
             post.getTechTags()
                     .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+
             return true;
         }
     }
@@ -306,9 +308,17 @@ public class PostService {
 
         if (scrapOpt.isPresent()) {
             postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
+
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+
             return false; // 스크랩 취소
         } else {
             postScrapRepository.save(PostScrap.builder().user(user).post(post).build());
+
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+
             return true; // 스크랩 성공
         }
     }
