@@ -65,8 +65,9 @@ jobs:
             # 1. 최신 이미지 가져오기
             sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
             
-            # 2. 컨테이너 재시작 (환경변수 주입)
-            # -f 옵션으로 복사된 docker-compose.yml 위치 지정
+            # 2. 컨테이너 재시작 (docker-compose.yml이 있는 위치로 이동 후 실행)
+            cd /home/ec2-user
+            
             sudo DB_NAME=devstagram \
                  RDS_HOST=${{ secrets.RDS_ENDPOINT }} \
                  DB_PASSWORD=${{ secrets.RDS_PASSWORD }} \
