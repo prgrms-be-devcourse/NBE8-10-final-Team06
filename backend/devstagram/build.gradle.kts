@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.implementation
 import org.gradle.kotlin.dsl.runtimeOnly
 
 plugins {
@@ -68,6 +69,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
+	implementation ("org.springframework.boot:spring-boot-starter-actuator")
 
 	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")

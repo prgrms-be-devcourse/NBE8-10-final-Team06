@@ -1,33 +1,54 @@
 version: '3.8'
 
 services:
-  # 1. Spring Boot 서비스
-  app:
-    image: ghcr.io/prgrms-be-devcourse/devstagram-backend:latest
-    container_name: devstagram-app
-    network_mode: host
+  # [1] Blue 서비스 (포트 8081)
+  backend-blue:
+    image: ghcr.io/${GITHUB_OWNER}/devstagram-backend:latest
+    container_name: backend-blue
     restart: always
-    environment:
-      - SPRING_DATASOURCE_URL
-      - SPRING_DATASOURCE_USERNAME
-      - SPRING_DATASOURCE_PASSWORD
-      - JWT_SECRET_KEY
-      - JWT_ACCESS_TOKEN_EXPIRE_SECONDS
+    env_file: .env
+    ports:
+      - "8081:8080"
+    networks:
+      - devstagram-net
 
-  # 2. Nginx 서비스
+  # [2] Green 서비스 (포트 8082)
+  backend-green:
+    image: ghcr.io/${GITHUB_OWNER}/devstagram-backend:latest
+    container_name: backend-green
+    restart: always
+    env_file: .env
+    ports:
+      - "8082:8080"
+    networks:
+      - devstagram-net
+
+  # [3] Nginx (관리소장: 80/443 포트 담당)
   nginx:
     image: nginx:latest
     container_name: nginx
-    network_mode: host
     restart: always
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
+      # 1. 전체 설정 파일 매핑
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./data/certbot/conf:/etc/letsencrypt  # 인증서 파일 공유용
-      - ./data/certbot/www:/var/www/certbot    # 인증 시 챌린지 파일 공유용
-    depends_on:
-      - app
 
-  # 3. Certbot 서비스 (nginx와 같은 줄에 위치해야 함!)
+      # ⭐ 2. 바로 이 줄! (conf.d 폴더 전체를 매핑)
+      # 내 컴퓨터의 ./nginx/conf.d 폴더를 컨테이너의 /etc/nginx/conf.d로 연결해라!
+      - ./nginx/conf.d:/etc/nginx/conf.d
+
+      # 3. 인증서 관련 매핑 (기존 도화님 설정)
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    depends_on:
+      - backend-blue
+      - backend-green
+    networks:
+      - devstagram-net
+
+  # [4] Certbot (인증서 자동 갱신)
   certbot:
     image: certbot/certbot
     container_name: certbot
@@ -35,3 +56,9 @@ services:
       - ./data/certbot/conf:/etc/letsencrypt
       - ./data/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - devstagram-net
+
+networks:
+  devstagram-net:
+    driver: bridge

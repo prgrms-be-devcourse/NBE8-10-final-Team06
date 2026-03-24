@@ -1,0 +1,1 @@
+set $service_url http://backend-blue:8080;
