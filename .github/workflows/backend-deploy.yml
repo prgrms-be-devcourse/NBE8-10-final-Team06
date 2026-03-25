@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
 
 jobs:
   # 1. 다음 버전 번호를 미리 계산 (Dry Run 방식)
