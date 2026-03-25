@@ -63,9 +63,9 @@ class CommentRepositoryTest {
         Slice<Comment> result =
                 commentRepository.findCommentsWithUserAndImageByPostId(post.getId(), PageRequest.of(0, 10));
 
-        // then
+        // then (createdAt이 동일 시각이면 desc 정렬 순서가 비결정적일 수 있음)
         assertThat(result.getContent()).hasSize(2);
-        assertThat(result.getContent().get(0).getContent()).isEqualTo("댓글2");
+        assertThat(result.getContent()).extracting(Comment::getContent).containsExactlyInAnyOrder("댓글1", "댓글2");
     }
 
     @Test
