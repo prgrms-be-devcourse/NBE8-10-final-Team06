@@ -114,7 +114,8 @@ jobs:
 
             # [Step 4] Nginx 트래픽 전환 (동적 설정 파일 변경)
             echo "Nginx 트래픽 전환: $BEFORE_COLOR -> $TARGET_COLOR"
-            echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee ./nginx/conf.d/service-env.inc
+            sudo mkdir -p /home/ec2-user/nginx/conf.d
+            echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
             sudo docker exec nginx nginx -s reload
 
             # [Step 5] 이전 컨테이너 종료 및 정리
