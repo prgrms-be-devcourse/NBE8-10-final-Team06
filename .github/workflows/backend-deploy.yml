@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - develop
-      - Feat/migrate-to-ghcr  # 테스트를 위해 유지 (머지 후 삭제 권장)
 
 jobs:
   # 1. 다음 버전 번호를 미리 계산 (Dry Run 방식)
