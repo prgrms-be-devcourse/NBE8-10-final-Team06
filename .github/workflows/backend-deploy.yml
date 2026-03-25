@@ -65,7 +65,8 @@ jobs:
             cd /home/ec2-user
             
             # [Step 0] .env 파일 생성 (비밀값 주입)
-            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" > .env
+            echo "SPRING_PROFILES_ACTIVE=prod" > .env
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" >> .env
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
             echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
             echo "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver" >> .env
