@@ -7,6 +7,11 @@ spring:
     import:
     - optional:file:.env[.properties]
     - optional:file:./backend/devstagram/.env[.properties]
+  data:
+    redis:
+      host: localhost
+      port: 6373
+    import: optional:file:.env[.properties]
   servlet:
     multipart:
       enabled: true
