@@ -1,17 +1,19 @@
 package com.devstagram.domain.feed.service;
 
-import com.devstagram.domain.post.entity.Post;
-import com.devstagram.domain.user.entity.User;
-import lombok.RequiredArgsConstructor;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.user.entity.User;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -31,8 +33,6 @@ public class FeedService {
      */
     @Async("feedTaskExecutor") // Commit 2에서 만든 스레드 풀 사용
     public void deliverPostToFeeds(Post post, List<User> followers, List<User> techInterestedUsers) {
-
-
 
         // 1. 배달 대상 선정 (팔로워 + 기술 관심 유저)
         // 중복 배달을 막기 위해 로직 내에서 처리하거나 호출부에서 Set으로 넘겨받는 것이 좋습니다.
@@ -97,4 +97,3 @@ public class FeedService {
         // (본인 글도 피드에 보이게 설계했다면 필요함)
     }
 }
-

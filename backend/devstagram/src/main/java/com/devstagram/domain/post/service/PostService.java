@@ -6,9 +6,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import com.devstagram.domain.feed.service.FeedService;
-import com.devstagram.domain.user.entity.Follow;
-import com.devstagram.domain.user.repository.FollowRepository;
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +20,7 @@ import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostLike;
@@ -32,11 +30,13 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
+import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.exception.ServiceException;
@@ -70,8 +70,7 @@ public class PostService {
 
         // 2. 만약 Redis에 데이터가 없다면? (신규 유저 등) -> 기존처럼 최신순으로 대응(Fallback)
         if (rankedIds.isEmpty()) {
-            return postRepository.findAllByOrderByCreatedAtDesc(pageable)
-                    .map(PostFeedRes::from);
+            return postRepository.findAllByOrderByCreatedAtDesc(pageable).map(PostFeedRes::from);
         }
 
         // 3. 확보한 ID들로 DB에서 실제 게시글 상세 데이터 조회
@@ -195,9 +194,7 @@ public class PostService {
         List<Follow> followRelations = followRepository.findAllByToUserId(userId);
 
         // 2. Follow 객체에서 실제 User(fromUser)들만 추출
-        List<User> followers = followRelations.stream()
-                .map(Follow::getFromUser)
-                .toList();
+        List<User> followers = followRelations.stream().map(Follow::getFromUser).toList();
 
         // 3. 기술 관심 유저 (아직 로직 전이라면 빈 리스트 전달)
         List<User> techInterestedUsers = List.of();
