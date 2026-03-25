@@ -17,10 +17,13 @@ public record PostFeedRes(
         String content,
         List<PostMediaRes> medias,
         List<TechTagRes> techStacks,
+        boolean isLiked,
+        boolean isMine,
+        String profileImageUrl,
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt) {
-    public static PostFeedRes from(Post post) {
+    public static PostFeedRes from(Post post, boolean isLiked, Long currentMemberId) {
         return PostFeedRes.builder()
                 .id(post.getId())
                 .authorId(post.getUser().getId())
@@ -29,6 +32,9 @@ public record PostFeedRes(
                 .content(post.getContent())
                 .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
                 .techStacks(post.getTechTags().stream().map(TechTagRes::from).toList())
+                .isLiked(isLiked)
+                .isMine(currentMemberId != null && post.getUser().getId().equals(currentMemberId))
+                .profileImageUrl(post.getUser().getProfileImageUrl())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())

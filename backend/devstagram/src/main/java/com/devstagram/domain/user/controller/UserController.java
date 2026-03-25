@@ -1,5 +1,8 @@
 package com.devstagram.domain.user.controller;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,9 +34,11 @@ public class UserController {
      */
     @GetMapping("/{nickname}/profile")
     public RsData<UserProfileResponse> getProfile(
-            @PathVariable String nickname, @AuthenticationPrincipal SecurityUser loginUser) {
+            @PathVariable String nickname,
+            @AuthenticationPrincipal SecurityUser loginUser,
+            @PageableDefault(size = 9, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Long currentUserId = (loginUser != null) ? loginUser.getId() : null;
-        UserProfileResponse response = userService.getUserProfile(nickname, currentUserId);
+        UserProfileResponse response = userService.getUserProfile(nickname, currentUserId, pageable);
         return RsData.success("프로필 조회 성공", response);
     }
 

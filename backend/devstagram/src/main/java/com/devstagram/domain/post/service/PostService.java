@@ -1,7 +1,9 @@
 package com.devstagram.domain.post.service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.devstagram.domain.comment.constant.CommentConstants;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
@@ -51,17 +54,31 @@ public class PostService {
     private final TechScoreService techScoreService;
     private final TechnologyRepository technologyRepository;
     private final PostScrapRepository postScrapRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
     @Transactional(readOnly = true)
-    public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
+    public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
 
         // TODO: 피드 정책 수립 후 반영.
 
-        return postRepository.findAllByOrderByCreatedAtDesc(pageable).map(PostFeedRes::from);
+        Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        Set<Long> likedPostIds = getLikedPostIds(memberId, posts.getContent());
+
+        return posts.map(post -> PostFeedRes.from(post, likedPostIds.contains(post.getId()), memberId));
+    }
+
+    private Set<Long> getLikedPostIds(Long memberId, List<Post> posts) {
+        if (memberId == null || posts.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        return postLikeRepository.findAllPostIdsByUserIdAndPostIds(memberId, postIds);
     }
 
     @Transactional(readOnly = true)
-    public PostDetailRes getPostDetail(Long postId, int pageNumber) {
+    public PostDetailRes getPostDetail(Long memberId, Long postId, int pageNumber) {
         Post post = postRepository
                 .findPostWithDetails(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
@@ -73,9 +90,22 @@ public class PostService {
 
         Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
 
-        Slice<CommentInfoRes> commentSlice = comments.map(CommentInfoRes::new);
+        Set<Long> likedCommentIds = getLikedCommentIds(memberId, comments.getContent());
 
-        return PostDetailRes.from(post, commentSlice);
+        Slice<CommentInfoRes> commentSlice = comments.map(
+                comment -> new CommentInfoRes(comment, likedCommentIds.contains(comment.getId()), memberId));
+
+        boolean isLiked = (memberId != null) && postLikeRepository.existsByPostIdAndUserId(postId, memberId);
+
+        return PostDetailRes.from(post, commentSlice, isLiked, memberId);
+    }
+
+    private Set<Long> getLikedCommentIds(Long memberId, List<Comment> comments) {
+        if (memberId == null || comments.isEmpty()) {
+            return Collections.emptySet();
+        }
+        List<Long> commentIds = comments.stream().map(Comment::getId).toList();
+        return commentLikeRepository.findAllCommentIdsByUserIdAndCommentIds(memberId, commentIds);
     }
 
     @Transactional
@@ -323,9 +353,16 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public Page<PostFeedRes> getUserScrappedPosts(Long userId, Pageable pageable) {
-
+        // 1. 스크랩한 게시글들 조회
         Page<Post> scrappedPosts = postScrapRepository.findActivePostsByUserId(userId, pageable);
 
-        return scrappedPosts.map(PostFeedRes::from);
+        // 2. 피드로 보여줄 게시글 ID 목록 추출
+        List<Long> postIds =
+                scrappedPosts.getContent().stream().map(Post::getId).toList();
+
+        // 3. 내가 좋아요 누른 게시글 명단 가져오기
+        Set<Long> likedPostIds = postLikeRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
+
+        return scrappedPosts.map(post -> PostFeedRes.from(post, likedPostIds.contains(post.getId()), userId));
     }
 }

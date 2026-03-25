@@ -2,10 +2,15 @@ package com.devstagram.domain.user.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.devstagram.domain.post.dto.PostFeedProfileRes;
+import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.technology.dto.TechScoreDto;
 import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
@@ -30,11 +35,12 @@ public class UserService {
     private final StorageService storageService;
     private final FileValidator fileValidator;
     private final UserTechScoreRepository userTechScoreRepository;
+    private final PostRepository postRepository;
 
     /**
      * 특정 사용자의 프로필 정보 조회
      */
-    public UserProfileResponse getUserProfile(String nickname, Long currentUserId) {
+    public UserProfileResponse getUserProfile(String nickname, Long currentUserId, Pageable pageable) {
         // 1. Fetch Join이 적용된 메서드로 변경 (성능 최적화)
         User targetUser = userRepository
                 .findByNicknameWithInfo(nickname)
@@ -50,6 +56,12 @@ public class UserService {
         List<TechScoreDto> topTechScores =
                 allTechScores.stream().limit(5).map(TechScoreDto::from).toList();
 
+        // 4. 게시글 목록 직접 조회 (최신순 정렬 적용)
+        Slice<Post> postEntities = postRepository.findAllByUserIdOrderByCreatedAtDesc(targetUser.getId(), pageable);
+
+        // 5. 프로필 전용 간소화 DTO(PostFeedProfileRes)로 변환
+        Slice<PostFeedProfileRes> posts = postEntities.map(PostFeedProfileRes::from);
+
         // 3. Entity 내부의 카운트 필드를 사용하여 응답 생성
         return UserProfileResponse.of(
                 targetUser,
@@ -57,7 +69,8 @@ public class UserService {
                 targetUser.getFollowerCount(),
                 targetUser.getFollowingCount(),
                 isFollowing,
-                topTechScores);
+                topTechScores,
+                posts);
     }
 
     /**

@@ -44,4 +44,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             + // 실제 기술 정보 (Technology)
             "where p.id = :id and p.isDeleted = false")
     Optional<Post> findPostWithDetails(@Param("id") Long id);
+
+    Slice<Post> findAllByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 }
