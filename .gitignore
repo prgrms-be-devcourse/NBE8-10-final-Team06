@@ -1,0 +1,5 @@
+.idea/
+*.iml
+.terraform/
+secrets.tf
+terraform.tfstate*

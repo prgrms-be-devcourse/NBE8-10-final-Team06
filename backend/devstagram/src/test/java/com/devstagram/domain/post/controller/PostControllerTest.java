@@ -266,8 +266,55 @@ class PostControllerTest {
         given(postService.togglePostLike(eq(postId), anyLong())).willReturn(true);
 
         // when & then
-        mockMvc.perform(post("/api/posts/{postId}", postId).with(csrf()))
+        mockMvc.perform(post("/api/posts/{postId}/like", postId).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("좋아요 성공"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("[스크랩 토글 성공]")
+    void toggleScrap_Success() throws Exception {
+        // given
+        Long postId = 1L;
+        given(postService.toggleScrap(eq(postId), anyLong())).willReturn(true);
+
+        // when & then
+        mockMvc.perform(post("/api/posts/{postId}/scrap", postId).with(csrf()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.msg").value("스크랩 성공"));
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("[스크랩 목록 조회 성공]")
+    void getScrappedPosts_Success() throws Exception {
+        // 1. given
+        LocalDateTime now = LocalDateTime.now();
+        List<PostFeedRes> scrapContent = List.of(PostFeedRes.builder()
+                .id(100L)
+                .nickname("원작자")
+                .title("스크랩한 게시글 제목")
+                .content("스크랩한 내용...")
+                .likeCount(5L)
+                .commentCount(2L)
+                .createdAt(now)
+                .build());
+
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("createdAt").descending());
+        Page<PostFeedRes> pageResponse = new PageImpl<>(scrapContent, pageable, 1);
+
+        given(postService.getUserScrappedPosts(anyLong(), any(Pageable.class))).willReturn(pageResponse);
+
+        // 2. when & then
+        mockMvc.perform(get("/api/posts/scraps").param("page", "0").param("size", "10"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.msg").value("스크랩 게시글 조회 성공"))
+                .andExpect(jsonPath("$.data.content[0].id").value(100L))
+                .andExpect(jsonPath("$.data.content[0].title").value("스크랩한 게시글 제목"))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.last").value(true));
     }
 }

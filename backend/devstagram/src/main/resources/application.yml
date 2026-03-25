@@ -1,19 +1,24 @@
 spring:
   profiles:
-    active: dev
+    # 1. 외부(Docker -e)에서 넣어주는 값이 없으면 기본적으로 dev를 사용합니다.
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   config:
-    import: optional:file:./backend/devstagram/.env[.properties]
+    import: optional:file:.env[.properties]
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 100MB
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
 
-
-    servlet:
-      multipart:
-        enabled: true
-        max-file-size: 50MB      # 파일 업로드 시 하나당 최대 용량
-        max-request-size: 50MB   # 전체 요청당 최대 용량
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health # 웹에서 /actuator/health를 볼 수 있게 노출함
+  endpoint:
+    health:
+      show-details: always # 상세 정보(DB 연결 상태 등)를 포함함
 
 server:
   port: 8080
@@ -29,3 +34,15 @@ custom:
 
 file:
   upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+  show-actuator: true
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json

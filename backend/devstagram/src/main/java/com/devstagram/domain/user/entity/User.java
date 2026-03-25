@@ -1,16 +1,13 @@
 package com.devstagram.domain.user.entity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
+import com.devstagram.domain.post.entity.PostScrap;
 import com.devstagram.global.entity.BaseEntity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,6 +28,9 @@ public class User extends BaseEntity {
     @Column(unique = true, nullable = false, length = 50)
     private String email;
 
+    @Column(length = 255)
+    private String profileImageUrl;
+
     @Column(nullable = false, length = 255)
     private String password;
 
@@ -44,13 +44,35 @@ public class User extends BaseEntity {
     @Column(unique = true)
     private String apiKey;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private long followerCount = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private long followingCount = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private long postCount = 0;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserInfo userInfo;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostScrap> scraps = new ArrayList<>();
 
     public void setUserInfo(UserInfo userInfo) {
         this.userInfo = userInfo;
         if (userInfo != null) {
             userInfo.setUser(this);
         }
+    }
+
+    public void updateProfile(String nickname, String profileImageUrl, LocalDate birthDate, Gender gender) {
+        this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
+        this.birthDate = birthDate;
+        this.gender = gender;
     }
 }

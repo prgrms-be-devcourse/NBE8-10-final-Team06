@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    # deploy.yml에서 넣어주는 SPRING_DATASOURCE_URL과 이름을 맞춥니다.
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # 운영 환경에서는 보통 update 또는 none을 사용합니다.
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+
+storage:
+  # EC2 내부 경로
+  location: ${STORAGE_PATH:/home/ec2-user/uploads}

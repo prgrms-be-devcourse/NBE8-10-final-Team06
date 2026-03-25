@@ -3,6 +3,7 @@ package com.devstagram.domain.post.controller;
 import java.net.URI;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
@@ -76,7 +77,7 @@ public class PostController {
         return RsData.success("피드 조회 성공", feed);
     }
 
-    @PostMapping("/{postId}")
+    @PostMapping("/{postId}/like")
     public RsData<Void> toggleLike(@PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) {
         boolean isLiked = postService.togglePostLike(postId, securityUser.getId());
 
@@ -92,5 +93,25 @@ public class PostController {
         Slice<PostLikerRes> likers = postService.getPostLikers(postId, pageable);
 
         return RsData.success("좋아요 목록 조회 성공", likers);
+    }
+
+    @PostMapping("/{postId}/scrap")
+    public RsData<Void> toggleScrap(
+            @PathVariable Long postId, @AuthenticationPrincipal SecurityUser securityUser) { // 현재 로그인 유저 정보
+
+        boolean isScrapped = postService.toggleScrap(postId, securityUser.getId());
+
+        String message = isScrapped ? "스크랩 성공" : "스크랩 취소 성공";
+
+        return RsData.success(message, null);
+    }
+
+    @GetMapping("/scraps")
+    public RsData<Page<PostFeedRes>> getMyScraps(
+            @AuthenticationPrincipal SecurityUser securityUser, Pageable pageable) {
+
+        Page<PostFeedRes> posts = postService.getUserScrappedPosts(securityUser.getId(), pageable);
+
+        return RsData.success("스크랩 게시글 조회 성공", posts);
     }
 }

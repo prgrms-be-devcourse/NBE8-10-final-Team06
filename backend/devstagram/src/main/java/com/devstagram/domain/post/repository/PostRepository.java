@@ -32,6 +32,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :postId")
     void decrementLikeCount(@Param("postId") Long postId);
 
+    long countByUserId(Long userId);
+
     @Query("select distinct p from Post p " + "join fetch p.user "
             + "left join fetch p.mediaList "
             + "where p.id = :id and p.isDeleted = false")
