@@ -1,0 +1,48 @@
+package com.devstagram.domain.dm.repository;
+
+import java.util.Collection;
+import java.util.List;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.devstagram.domain.dm.entity.Dm;
+
+@Repository
+public interface DmRepository extends JpaRepository<Dm, Long> {
+
+    Slice<Dm> findByDmRoom_IdOrderByIdDesc(Long dmRoomId, Pageable pageable);
+
+    Slice<Dm> findByDmRoom_IdAndIdLessThanOrderByIdDesc(Long dmRoomId, Long cursor, Pageable pageable);
+
+    Dm findTopByDmRoom_IdOrderByIdDesc(Long roomId);
+
+    /**
+     * 각 dmRoom 별 최신 메시지 1개를 배치로 조회합니다.
+     * (dmRoom.id IN + correlated subquery로 max(d2.id) 선택)
+     */
+    @Query("""
+            select d from Dm d
+            where d.dmRoom.id in :roomIds
+              and d.id = (
+                select max(d2.id) from Dm d2 where d2.dmRoom.id = d.dmRoom.id
+              )
+            """)
+    List<Dm> findLatestByDmRoom_IdIn(@Param("roomIds") Collection<Long> roomIds);
+
+    @Query("""
+            select d.dmRoom.id, count(d)
+            from Dm d
+            where d.dmRoom.id in :roomIds
+            group by d.dmRoom.id
+            """)
+    List<Object[]> countTotalByDmRoom_IdIn(@Param("roomIds") Collection<Long> roomIds);
+
+    long countByDmRoom_Id(Long roomId);
+
+    long countByDmRoom_IdAndIdGreaterThan(Long roomId, Long lastReadId);
+}

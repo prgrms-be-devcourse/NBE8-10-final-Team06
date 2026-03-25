@@ -25,6 +25,14 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+.env
+**/.env
+
+################
+**/.idea/
+**/*.iws
+**/*.iml
+**/*.ipr
 
 ### NetBeans ###
 /nbproject/private/
