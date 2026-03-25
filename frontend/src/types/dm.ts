@@ -1,5 +1,6 @@
 // src/types/dm.ts
-export type MessageType = 'TALK' | 'ENTER' | 'LEAVE';
+
+export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE';
 
 export interface DmMessageResponse {
   id: number;
@@ -7,13 +8,15 @@ export interface DmMessageResponse {
   content: string;
   thumbnail: string | null;
   valid: boolean;
-  createdAt: string; // LocalDateTime
-  senderId?: number; // 백엔드 DTO에 없으므로 옵셔널 처리 (추후 백엔드 수정 권고)
+  createdAt: string;
+  userId?: number;
+  isRead?: boolean; // 프론트엔드 관리용: 읽음 여부
 }
 
 export interface DmRoomParticipantSummary {
   userId: number;
   nickname: string;
+  profileImageUrl: string | null;
 }
 
 export interface DmRoomSummaryResponse {
@@ -26,19 +29,23 @@ export interface DmRoomSummaryResponse {
   unreadCount: number;
 }
 
-// 백엔드 DmWebSocketController 내의 각 record 구조와 100% 일치
-export type WebSocketEvent = 
-  | { type: 'message'; data: DmMessageResponse }
-  | { type: 'typing'; roomId: number; userId: number; status: 'start' | 'stop' }
-  | { type: 'read'; messageId: number }
-  | { type: 'join'; roomId: number; userId: number }
-  | { type: 'leave'; roomId: number; userId: number };
-
-export interface DmSendMessageRequest {
-  content: string;
+export interface DmMessageSliceResponse {
+  messages: DmMessageResponse[];
+  nextCursor: number | null;
+  hasNext: boolean;
 }
 
-export interface TypingEventDto {
-  userId: number;
-  status: 'start' | 'stop';
+export interface DmSendMessageRequest {
+  type: MessageType;
+  content: string;
+  thumbnail?: string;
+}
+
+export interface WebSocketEventPayload<T> {
+  type: 'message' | 'typing' | 'read' | 'join' | 'leave';
+  data?: T;
+  roomId?: number;
+  userId?: number;
+  status?: 'start' | 'stop';
+  messageId?: number; // 읽음 처리 시 전달되는 ID
 }

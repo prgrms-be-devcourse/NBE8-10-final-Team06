@@ -16,12 +16,16 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      // 백엔드의 모든 API는 /api로 시작합니다.
+      // 1. 일반 API 요청 프록시
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        // rewrite 옵션이 필요 없는지 확인하십시오. 
-        // 백엔드 컨트롤러가 /api로 시작하므로 필요 없습니다.
+      },
+      // 2. WebSocket/SockJS 프록시 추가
+      '/ws': {
+        target: 'http://localhost:8080',
+        ws: true,
+        changeOrigin: true,
       },
     },
   },

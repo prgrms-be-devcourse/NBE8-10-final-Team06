@@ -1,14 +1,13 @@
 // src/types/auth.ts
-import { Gender, Resume } from './common';
-
 export interface SignupRequest {
-  nickname: string;
   email: string;
-  password: string;
-  birthDate: string;
-  gender: Gender;
-  githubUrl: string;
-  resume: Resume;
+  nickname: string;
+  password?: string; // 회원가입 시 필수, 조회 시 불필요
+}
+
+export interface LoginRequest {
+  email: string;
+  password?: string;
 }
 
 export interface SignupResponse {
@@ -18,10 +17,10 @@ export interface SignupResponse {
   apiKey: string | null;
 }
 
-export interface LoginRequest {
+export interface LoginResponse {
+  accessToken: string;
+  apiKey: string;
+  id: number;
+  nickname: string;
   email: string;
-  password: string;
 }
-
-// 백엔드 AuthController.login 롤백에 맞춰 다시 string(accessToken)으로 변경
-export type LoginResponse = string;
