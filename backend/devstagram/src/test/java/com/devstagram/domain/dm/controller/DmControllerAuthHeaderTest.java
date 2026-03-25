@@ -11,6 +11,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -78,7 +79,8 @@ class DmControllerAuthHeaderTest {
     @Test
     void dmController_usesSecurityContextUserId() {
         DmService dmService = mock(DmService.class);
-        DmController dmController = new DmController(dmService);
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        DmController dmController = new DmController(dmService, messagingTemplate);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -96,7 +98,8 @@ class DmControllerAuthHeaderTest {
     @Test
     void dmController_getRooms_returnsRsDataSuccess() {
         DmService dmService = mock(DmService.class);
-        DmController dmController = new DmController(dmService);
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        DmController dmController = new DmController(dmService, messagingTemplate);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -111,6 +114,61 @@ class DmControllerAuthHeaderTest {
         assertThat(rs).isNotNull();
         assertThat(rs.isSuccess()).isTrue();
         assertThat(rs.data()).isEqualTo(List.<DmRoomSummaryResponse>of());
+    }
+
+    @Test
+    void leave1v1Room_success() {
+        DmService dmService = mock(DmService.class);
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        DmController dmController = new DmController(dmService, messagingTemplate);
+
+        SecurityUser securityUser = new SecurityUser(
+                1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(
+                        securityUser, securityUser.getPassword(), securityUser.getAuthorities()));
+
+        var rs = dmController.leave1v1Room(100L);
+
+        verify(dmService).leave1v1Room(1L, 100L);
+        assertThat(rs).isNotNull();
+        assertThat(rs.isSuccess()).isTrue();
+        assertThat(rs.data()).isEqualTo("1:1 채팅방을 나갔습니다.");
+    }
+
+    @Test
+    void leaveGroupRoom_success() {
+        DmService dmService = mock(DmService.class);
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        DmController dmController = new DmController(dmService, messagingTemplate);
+
+        SecurityUser securityUser = new SecurityUser(
+                1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(
+                        securityUser, securityUser.getPassword(), securityUser.getAuthorities()));
+
+        com.devstagram.domain.dm.dto.DmMessageResponse messageResponse =
+                new com.devstagram.domain.dm.dto.DmMessageResponse(
+                        10L,
+                        com.devstagram.domain.dm.entity.MessageType.SYSTEM,
+                        "나갔습니다.",
+                        null,
+                        true,
+                        java.time.LocalDateTime.now(),
+                        1L);
+        when(dmService.leaveGroupRoom(1L, 100L)).thenReturn(messageResponse);
+
+        var rs = dmController.leaveGroupRoom(100L);
+
+        verify(dmService).leaveGroupRoom(1L, 100L);
+        verify(messagingTemplate)
+                .convertAndSend(
+                        eq("/topic/dm.100"),
+                        org.mockito.ArgumentMatchers.any(com.devstagram.domain.dm.dto.WebSocketEventPayload.class));
+        assertThat(rs).isNotNull();
+        assertThat(rs.isSuccess()).isTrue();
+        assertThat(rs.data()).isEqualTo("그룹 채팅방을 나갔습니다.");
     }
 
     private CustomAuthenticationFilter newFilter(

@@ -448,7 +448,7 @@ public class DmService {
         return savedRoom.getId();
     }
 
-    // 1:1 채팅방 나가기
+    // 1:1 채팅방 나가기 - 한명이라도 나가면 채팅방 삭제
     @Transactional
     public void leave1v1Room(Long userId, Long roomId) {
         DmRoomUser roomUser = getValidRoomUser(userId, roomId);
@@ -458,15 +458,15 @@ public class DmService {
             throw new ServiceException("400-F-2", "1:1 채팅방이 아닙니다.");
         }
 
-        // 방의 Dm & 참여자 정보 & 채팅방 삭제
+        // 1:1 방은 퇴장시 예외 없이 삭제
         dmRepository.deleteByDmRoom_Id(roomId);
-        dmRoomUserRepository.deleteByDmRoom_Id(roomId);
+        dmRoomUserRepository.deleteByDmRoom_Id(roomId); // 해당 방의 모든 유저 관계 삭제
         dmRoomRepository.delete(room);
     }
 
-    // 그룹 채팅방 나가기
+    // 그룹 채팅방 퇴장 : 퇴장 메시지 보내고 나감
     @Transactional
-    public void leaveGroupRoom(Long userId, Long roomId) {
+    public DmMessageResponse leaveGroupRoom(Long userId, Long roomId) {
         DmRoomUser roomUser = getValidRoomUser(userId, roomId);
         DmRoom room = roomUser.getDmRoom();
 
@@ -474,22 +474,28 @@ public class DmService {
             throw new ServiceException("400-F-2", "그룹 채팅방이 아닙니다.");
         }
 
+        long currentUsers = dmRoomUserRepository.countByDmRoom_Id(roomId);
+        DmMessageResponse response = null;
+
+        // 다른 사람이 있다면 퇴장 메시지 먼저 생성 (내 권한이 살아있을 때)
+        if (currentUsers > 1) {
+            String systemMsg = roomUser.getUser().getNickname() + "님이 나갔습니다.";
+            DmSendMessageRequest request = new DmSendMessageRequest(MessageType.SYSTEM, systemMsg, null);
+
+            response = this.sendMessage(userId, roomId, request);
+        }
+
+        // 내 참여 정보 삭제
         dmRoomUserRepository.delete(roomUser);
         dmRoomUserRepository.flush();
 
-        // 방에 남은 인원 확인
-        long remainingUsers = dmRoomUserRepository.countByDmRoom_Id(roomId);
-
-        if (remainingUsers == 0) {
-            // 아무도 안 남았으면 DM, 채팅방 삭제
+        // 마지막 사람이 나간 거면 채팅방 삭제
+        if (currentUsers == 1) {
             dmRepository.deleteByDmRoom_Id(roomId);
             dmRoomRepository.delete(room);
-        } else {
-            // 퇴장 메시지 발송
-            String systemMsg = roomUser.getUser().getNickname() + "님이 나갔습니다.";
-            Dm systemDm = Dm.create(room, roomUser.getUser(), MessageType.TEXT, systemMsg, null, true);
-            dmRepository.save(systemDm);
         }
+
+        return response;
     }
 
     // 채팅방 참여 여부 검증
