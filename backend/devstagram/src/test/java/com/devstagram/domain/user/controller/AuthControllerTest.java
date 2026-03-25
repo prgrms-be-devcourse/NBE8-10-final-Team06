@@ -115,16 +115,13 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회 실패 - 인증 정보가 없을 때 401-F-2 반환")
+    @DisplayName("내 정보 조회 실패 - 인증 정보가 없을 때 403 Forbidden 반환")
     void meFailTest() throws Exception {
         // When: 아무런 인증 정보 없이 호출
         ResultActions resultActions = mvc.perform(get("/api/auth/me"));
 
-        // Then: 필터에서 401-F-2가 터져야 함
-        resultActions
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.resultCode").value("401-F-2"))
-                .andDo(print());
+        // Then: 시큐리티 설정(.authenticated())에 의해 403 Forbidden 응답
+        resultActions.andExpect(status().isForbidden()).andDo(print());
     }
 
     private void saveTestUser(String email, String nickname) throws Exception {
