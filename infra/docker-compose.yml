@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # [1] Blue 서비스 (포트 8081)
   backend-blue:
-    image: ghcr.io/dohwa-owner/nbe8-10-final-team06-backend:latest
+    image: ghcr.io/prgrms-be-devcourse/nbe8-10-final-team06-backend:latest
     container_name: backend-blue
     restart: always
     env_file: .env
@@ -14,7 +14,7 @@ services:
 
   # [2] Green 서비스 (포트 8082)
   backend-green:
-    image: ghcr.io/dohwa-owner/nbe8-10-final-team06-backend:latest
+    image: ghcr.io/prgrms-be-devcourse/nbe8-10-final-team06-backend:latest
     container_name: backend-green
     restart: always
     env_file: .env
