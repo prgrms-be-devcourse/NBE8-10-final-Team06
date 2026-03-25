@@ -1,0 +1,78 @@
+package com.devstagram.domain.technology.service;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.entity.UserTechScore;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
+import com.devstagram.domain.user.entity.User;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class TechScoreService {
+
+    private final UserTechScoreRepository userTechScoreRepository;
+
+    // 활동별 점수 가중치 (게시=20, 좋아요=5, 스크랩= 10)
+    private static final int SCORE_POST = 20;
+    private static final int SCORE_LIKE = 5;
+    private static final int SCORE_SCRAP = 10;
+
+    /**
+     * 특정 활동에 대한 사용자의 기술 점수를 증가시킵니다.
+     * 해당 기술에 대한 점수 기록이 없는 경우 새롭게 생성합니다.
+     * * @param user         점수를 획득하는 사용자
+     * @param tech         점수가 부여될 기술 태그
+     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     */
+    public void increaseScore(User user, Technology tech, String activityType) {
+        UserTechScore techScore = userTechScoreRepository
+                .findByUserAndTechnology(user, tech)
+                .orElseGet(() -> userTechScoreRepository.save(new UserTechScore(user, tech, tech.getCategory())));
+
+        switch (activityType) {
+            case "POST" -> {
+                techScore.increaseScore(SCORE_POST);
+                techScore.increasePostCount();
+            }
+            case "LIKE" -> {
+                techScore.increaseScore(SCORE_LIKE);
+                techScore.increaseLikeCount();
+            }
+            case "SCRAP" -> {
+                techScore.increaseScore(SCORE_SCRAP);
+                techScore.increaseScrapCount();
+            }
+        }
+    }
+
+    /**
+     * 특정 활동이 취소되었을 때(예: 게시글 삭제, 좋아요 취소) 점수를 차감합니다.
+     * 기록이 존재하는 경우에만 차감 로직을 수행합니다.
+     * * @param user         점수가 차감될 사용자
+     * @param tech         대상 기술 태그
+     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     */
+    public void decreaseScore(User user, Technology tech, String activityType) {
+        userTechScoreRepository.findByUserAndTechnology(user, tech).ifPresent(techScore -> {
+            switch (activityType) {
+                case "POST" -> {
+                    techScore.decreaseScore(SCORE_POST);
+                    techScore.decreasePostCount();
+                }
+                case "LIKE" -> {
+                    techScore.decreaseScore(SCORE_LIKE);
+                    techScore.decreaseLikeCount();
+                }
+                case "SCRAP" -> {
+                    techScore.decreaseScore(SCORE_SCRAP);
+                    techScore.decreaseScrapCount();
+                }
+            }
+        });
+    }
+}

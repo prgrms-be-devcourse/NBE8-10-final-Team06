@@ -1,9 +1,14 @@
 package com.devstagram.domain.user.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.devstagram.domain.technology.dto.TechScoreDto;
+import com.devstagram.domain.technology.entity.UserTechScore;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.entity.User;
@@ -24,6 +29,7 @@ public class UserService {
     private final FollowService followService;
     private final StorageService storageService;
     private final FileValidator fileValidator;
+    private final UserTechScoreRepository userTechScoreRepository;
 
     /**
      * 특정 사용자의 프로필 정보 조회
@@ -39,6 +45,10 @@ public class UserService {
         if (currentUserId != null) {
             isFollowing = followService.isFollowing(currentUserId, targetUser.getId());
         }
+        List<UserTechScore> allTechScores = userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser);
+
+        List<TechScoreDto> topTechScores =
+                allTechScores.stream().limit(5).map(TechScoreDto::from).toList();
 
         // 3. Entity 내부의 카운트 필드를 사용하여 응답 생성
         return UserProfileResponse.of(
@@ -46,7 +56,8 @@ public class UserService {
                 targetUser.getPostCount(),
                 targetUser.getFollowerCount(),
                 targetUser.getFollowingCount(),
-                isFollowing);
+                isFollowing,
+                topTechScores);
     }
 
     /**

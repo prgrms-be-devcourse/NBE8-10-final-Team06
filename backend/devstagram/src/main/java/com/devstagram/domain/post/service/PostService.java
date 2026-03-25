@@ -4,6 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.*;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +25,10 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
+import com.devstagram.domain.technology.entity.PostTechnology;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.enumtype.MediaType;
@@ -40,6 +48,8 @@ public class PostService {
     private final StorageService storageService;
     private final PostMediaRepository postMediaRepository;
     private final FileValidator fileValidator;
+    private final TechScoreService techScoreService;
+    private final TechnologyRepository technologyRepository;
     private final PostScrapRepository postScrapRepository;
 
     @Transactional(readOnly = true)
@@ -80,6 +90,19 @@ public class PostService {
                 .build();
 
         post = postRepository.save(post);
+
+        // 기술 태그 처리
+        if (req.techIds() != null && !req.techIds().isEmpty()) {
+            List<Technology> techs = technologyRepository.findAllById(req.techIds());
+
+            for (Technology tech : techs) {
+
+                post.addTechTag(tech); // Post 엔티티 내 리스트에 추가
+
+                // 3. 유저 기술 점수 업데이트 (POST 가중치 적용)
+                techScoreService.increaseScore(user, tech, "POST");
+            }
+        }
 
         if (files != null && !files.isEmpty()) {
 
@@ -131,6 +154,29 @@ public class PostService {
 
         post.update(req.title(), req.content());
 
+        // 2. 기술 태그 변경 및 점수 반영
+        if (req.techIds() != null) {
+            // [비교 로직] 기존에 등록된 기술 ID 추출
+            List<Technology> oldTechs = post.getTechTags().stream()
+                    .map(PostTechnology::getTechnology)
+                    .toList();
+
+            List<Technology> newTechs = technologyRepository.findAllById(req.techIds());
+
+            // A. 삭제된 기술들 -> 점수 차감 (기존엔 있었으나 새 리스트엔 없는 것)
+            oldTechs.stream()
+                    .filter(old -> !newTechs.contains(old))
+                    .forEach(old -> techScoreService.decreaseScore(post.getUser(), old, "POST"));
+
+            // B. 새로 추가된 기술들 -> 점수 부여 (새 리스트엔 있으나 기존엔 없던 것)
+            newTechs.stream()
+                    .filter(newT -> !oldTechs.contains(newT))
+                    .forEach(newT -> techScoreService.increaseScore(post.getUser(), newT, "POST"));
+
+            // 3. 엔티티 리스트 최종 교체
+            post.updateTechTags(newTechs);
+        }
+
         if (files != null && !files.isEmpty()) {
 
             fileValidator.validateImages(files);
@@ -176,8 +222,19 @@ public class PostService {
 
         commentRepository.deleteRepliesByPostId(postId);
         commentRepository.deleteParentsByPostId(postId);
-        // TODO: 기술태그 순차 삭제도 구현 예정
 
+        // 기술 태그 점수 차감 및 매핑 제거
+        if (!post.getTechTags().isEmpty()) {
+            // 점수 서비스 호출: 게시글로 얻은 점수들 모두 회수
+            post.getTechTags()
+                    .forEach(postTech ->
+                            techScoreService.decreaseScore(post.getUser(), postTech.getTechnology(), "POST"));
+
+            // orphanRemoval = true 설정에 의해, 리스트를 비우면 DB의 post_technology 레코드 자동 삭제
+            post.getTechTags().clear();
+        }
+
+        // 미디어 파일 삭제 준비 (스토리지 대응)
         List<String> fileNames =
                 post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
@@ -203,6 +260,10 @@ public class PostService {
 
             postLikeRepository.delete(existingLike.get());
             postRepository.decrementLikeCount(postId);
+
+            // 기술 점수 차감
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
             return false;
         } else {
 
@@ -210,6 +271,10 @@ public class PostService {
 
             postLikeRepository.save(newLike);
             postRepository.incrementLikeCount(postId);
+
+            // 기술 점수 부여
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
             return true;
         }
     }
