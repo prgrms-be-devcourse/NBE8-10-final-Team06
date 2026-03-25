@@ -42,14 +42,14 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
 
       # 4. 설정 파일(infra 폴더)을 EC2로 전송
-      # strip_components: 1 설정으로 인해 EC2의 /home/ec2-user/ 바로 아래에 nginx/ 폴더가 생성됩니다.
+      # ✅ prometheus.yml 추가됨
       - name: Copy infra files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "infra/docker-compose.yml,infra/nginx/nginx.conf,infra/nginx/conf.d/service-env.inc"
+          source: "infra/docker-compose.yml,infra/nginx/nginx.conf,infra/nginx/conf.d/service-env.inc,infra/prometheus/prometheus.yml"
           target: "/home/ec2-user/"
           strip_components: 1
 
@@ -62,7 +62,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ec2-user
-            
+
             # [Step 0] .env 파일 생성 (비밀값 주입)
             echo "SPRING_PROFILES_ACTIVE=prod" > .env
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" >> .env
@@ -72,10 +72,10 @@ jobs:
             echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
             echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
             echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
-            
+
             # [Step 1] 현재 실행 중인 컨테이너 확인 (8081 포트가 살아있으면 Blue가 떠있는 것)
             EXIST_BLUE=$(sudo docker ps | grep backend-blue)
-            
+
             if [ -z "$EXIST_BLUE" ]; then
                 echo "### 현재 GREEN 구동 중 -> BLUE로 배포를 시작합니다 ###"
                 TARGET_COLOR="blue"
@@ -87,31 +87,35 @@ jobs:
                 TARGET_PORT=8082
                 BEFORE_COLOR="blue"
             fi
-            
+
             # Nginx가 처음 뜰 때 파일이 없어서 죽는 것을 방지하는 "안전 장치"
             sudo mkdir -p /home/ec2-user/nginx/conf.d
             if [ ! -f /home/ec2-user/nginx/conf.d/service-env.inc ]; then
                 echo "set \$service_url http://backend-blue:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
             fi
-            
+
+            # ✅ prometheus.yml 디렉토리 생성 (없을 경우 대비)
+            sudo mkdir -p /home/ec2-user/prometheus
+
             # [Step 2] 새로운 컨테이너 이미지 풀링 및 구동
             sudo docker compose pull backend-$TARGET_COLOR
-            sudo docker compose up -d nginx backend-$TARGET_COLOR
+
+            # ✅ prometheus, grafana, node-exporter 함께 실행
+            sudo docker compose up -d nginx backend-$TARGET_COLOR prometheus grafana node-exporter
 
             # [Step 3] 새로운 컨테이너 헬스체크 (Actuator 정석 방식)
             echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
             for retry in {1..12}
             do
-                # /actuator/health 호출 결과에 "UP"이 포함되어 있는지 확인
                 HEALTH=$(curl -s http://localhost:$TARGET_PORT/actuator/health | grep "UP" || echo "fail")
-            
+
                 if [ "$HEALTH" != "fail" ]; then
                     echo "--- 애플리케이션 건강 상태 확인 완료 (UP)! ---"
                     break
                 fi
                 echo "서버가 완전히 준비될 때까지 대기 중... ($retry/12)"
                 sleep 5
-            
+
                 if [ $retry -eq 12 ]; then
                   echo "배포 실패: 애플리케이션이 정상 상태(UP)가 아니거나 DB 연결에 실패했습니다."
                   exit 1
