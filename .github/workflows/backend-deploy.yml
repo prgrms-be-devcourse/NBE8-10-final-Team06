@@ -20,14 +20,14 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 1. 빌드 (Gradle)
+      # 1. 빌드 (Gradle) - 테스트 제외하고 빌드 속도 향상
       - name: Build with Gradle
         run: |
           cd backend/devstagram
           chmod +x gradlew
           ./gradlew build -x test
 
-      # 2. 도커 로그인 (GHCR)
+      # 2. 도커 로그인 (GitHub Container Registry)
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -38,22 +38,22 @@ jobs:
       # 3. 도커 이미지 빌드 & 푸시
       - name: Build and Push Docker Image
         run: |
-          # 이미지 이름을 docker-compose.yml과 일치시킵니다.
           docker build -t ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest ./backend/devstagram
           docker push ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
 
-      # 4. 설정 파일(infra 폴더)을 EC2로 전송 (SCP 사용)
+      # 4. 설정 파일(infra 폴더)을 EC2로 전송
+      # strip_components: 1 설정으로 인해 EC2의 /home/ec2-user/ 바로 아래에 nginx/ 폴더가 생성됩니다.
       - name: Copy infra files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "infra/docker-compose.yml,infra/nginx/nginx.conf"
+          source: "infra/docker-compose.yml,infra/nginx/nginx.conf,infra/nginx/conf.d/service-env.inc"
           target: "/home/ec2-user/"
-          strip_components: 1 # infra/ 폴더 구조를 떼고 내용물만 보냅니다.
+          strip_components: 1
 
-      # 5. EC2 서버에서 Docker Compose 실행
+      # 5. EC2 서버에서 Blue-Green 전환 배포 실행
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -62,13 +62,70 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/ec2-user
-            # .env 파일 생성
-            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" > .env
+            
+            # [Step 0] .env 파일 생성 (비밀값 주입)
+            echo "SPRING_PROFILES_ACTIVE=prod" > .env
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" >> .env
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
             echo "SPRING_DATASOURCE_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
-            echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" > .env
+            echo "SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver" >> .env
+            echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
             echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
+            echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
             
-            # 최신 이미지 가져오기 및 실행 (띄어쓰기 방식 사용)
-            sudo docker pull ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
-            sudo docker compose up -d --remove-orphans
+            # [Step 1] 현재 실행 중인 컨테이너 확인 (8081 포트가 살아있으면 Blue가 떠있는 것)
+            EXIST_BLUE=$(sudo docker ps | grep backend-blue)
+            
+            if [ -z "$EXIST_BLUE" ]; then
+                echo "### 현재 GREEN 구동 중 -> BLUE로 배포를 시작합니다 ###"
+                TARGET_COLOR="blue"
+                TARGET_PORT=8081
+                BEFORE_COLOR="green"
+            else
+                echo "### 현재 BLUE 구동 중 -> GREEN으로 배포를 시작합니다 ###"
+                TARGET_COLOR="green"
+                TARGET_PORT=8082
+                BEFORE_COLOR="blue"
+            fi
+            
+            # Nginx가 처음 뜰 때 파일이 없어서 죽는 것을 방지하는 "안전 장치"
+            sudo mkdir -p /home/ec2-user/nginx/conf.d
+            if [ ! -f /home/ec2-user/nginx/conf.d/service-env.inc ]; then
+                echo "set \$service_url http://backend-blue:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
+            fi
+            
+            # [Step 2] 새로운 컨테이너 이미지 풀링 및 구동
+            sudo docker compose pull backend-$TARGET_COLOR
+            sudo docker compose up -d nginx backend-$TARGET_COLOR
+
+            # [Step 3] 새로운 컨테이너 헬스체크 (Actuator 정석 방식)
+            echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
+            for retry in {1..12}
+            do
+                # /actuator/health 호출 결과에 "UP"이 포함되어 있는지 확인
+                HEALTH=$(curl -s http://localhost:$TARGET_PORT/actuator/health | grep "UP" || echo "fail")
+            
+                if [ "$HEALTH" != "fail" ]; then
+                    echo "--- 애플리케이션 건강 상태 확인 완료 (UP)! ---"
+                    break
+                fi
+                echo "서버가 완전히 준비될 때까지 대기 중... ($retry/12)"
+                sleep 5
+            
+                if [ $retry -eq 12 ]; then
+                  echo "배포 실패: 애플리케이션이 정상 상태(UP)가 아니거나 DB 연결에 실패했습니다."
+                  exit 1
+                fi
+            done
+
+            # [Step 4] Nginx 트래픽 전환 (동적 설정 파일 변경)
+            echo "Nginx 트래픽 전환: $BEFORE_COLOR -> $TARGET_COLOR"
+            echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
+            sudo docker exec nginx nginx -s reload
+
+            # [Step 5] 이전 컨테이너 종료 및 정리
+            echo "5초 뒤 이전 버전($BEFORE_COLOR)을 종료합니다."
+            sleep 5
+            sudo docker compose stop backend-$BEFORE_COLOR
+            sudo docker compose rm -f backend-$BEFORE_COLOR
+            echo "### 무중단 배포 완료 ###"
