@@ -1,9 +1,9 @@
 spring:
   datasource:
-    # GitHub Actions에서 넘겨주는 변수명과 매칭
-    url: jdbc:postgresql://${RDS_HOSTNAME}:5432/${RDS_DB_NAME}
-    username: ${RDS_USERNAME}
-    password: ${RDS_PASSWORD}
+    # deploy.yml에서 넣어주는 SPRING_DATASOURCE_URL과 이름을 맞춥니다.
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
