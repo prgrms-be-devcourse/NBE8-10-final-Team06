@@ -87,7 +87,9 @@ public class DmService {
                         dm.getContent(),
                         dm.getThumbnailUrl(),
                         dm.isValid(),
-                        dm.getCreatedAt()))
+                        dm.getCreatedAt(),
+                        dm.getSender().getId() // 누가 보냈는지까지 같이 담아서
+                        ))
                 .collect(Collectors.toList());
 
         Long nextCursor = slice.hasNext() && !messages.isEmpty()
@@ -243,7 +245,8 @@ public class DmService {
                                 last.getContent(),
                                 last.getThumbnailUrl(),
                                 last.isValid(),
-                                last.getCreatedAt());
+                                last.getCreatedAt(),
+                                last.getSender().getId());
                     }
 
                     var participantDtos = participantsByRoomId.getOrDefault(roomId, List.of()).stream()
@@ -251,7 +254,10 @@ public class DmService {
                                     && ru.getUser().getId() != null
                                     && !ru.getUser().getId().equals(userId))
                             .map(ru -> new DmRoomParticipantSummary(
-                                    ru.getUser().getId(), ru.getUser().getEmail()))
+                                    ru.getUser().getId(),
+                                    ru.getUser().getEmail(),
+                                    ru.getUser().getNickname(), // 상대 닉네임, 프로필 추가
+                                    ru.getUser().getProfileImageUrl()))
                             .collect(Collectors.toList());
 
                     Long lastReadId = roomUser.getLastReadMessageCursor();
@@ -335,7 +341,8 @@ public class DmService {
                 saved.getContent(),
                 saved.getThumbnailUrl(),
                 saved.isValid(),
-                saved.getCreatedAt());
+                saved.getCreatedAt(),
+                saved.getSender().getId());
     }
 
     /**
