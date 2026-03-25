@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -45,4 +46,9 @@ public interface DmRepository extends JpaRepository<Dm, Long> {
     long countByDmRoom_Id(Long roomId);
 
     long countByDmRoom_IdAndIdGreaterThan(Long roomId, Long lastReadId);
+
+    // 채팅방 삭제 시, 해당 채팅방의 모든 메시지를 일괄 삭제
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Dm d WHERE d.dmRoom.id = :roomId")
+    void deleteByDmRoom_Id(@Param("roomId") Long roomId);
 }

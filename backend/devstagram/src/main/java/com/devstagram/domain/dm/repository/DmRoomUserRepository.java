@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -46,4 +47,9 @@ public interface DmRoomUserRepository extends JpaRepository<DmRoomUser, Long> {
                and count(ru) = 2
             """)
     Optional<Long> find1v1RoomId(@Param("userA") Long userA, @Param("userB") Long userB);
+
+    // 특정 채팅방의 모든 참여자 정보 일괄 삭제
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM DmRoomUser dru WHERE dru.dmRoom.id = :roomId")
+    void deleteByDmRoom_Id(@Param("roomId") Long roomId);
 }

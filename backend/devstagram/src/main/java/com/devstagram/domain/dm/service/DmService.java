@@ -31,6 +31,8 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class DmService {
 
@@ -444,5 +446,59 @@ public class DmService {
         dmRoomUserRepository.save(ru2);
 
         return savedRoom.getId();
+    }
+
+    // 1:1 채팅방 나가기
+    @Transactional
+    public void leave1v1Room(Long userId, Long roomId) {
+        DmRoomUser roomUser = getValidRoomUser(userId, roomId);
+        DmRoom room = roomUser.getDmRoom();
+
+        if (room.getIsGroup()) {
+            throw new ServiceException("400-F-2", "1:1 채팅방이 아닙니다.");
+        }
+
+        // 방의 Dm & 참여자 정보 & 채팅방 삭제
+        dmRepository.deleteByDmRoom_Id(roomId);
+        dmRoomUserRepository.deleteByDmRoom_Id(roomId);
+        dmRoomRepository.delete(room);
+    }
+
+    // 그룹 채팅방 나가기
+    @Transactional
+    public void leaveGroupRoom(Long userId, Long roomId) {
+        DmRoomUser roomUser = getValidRoomUser(userId, roomId);
+        DmRoom room = roomUser.getDmRoom();
+
+        if (!room.getIsGroup()) {
+            throw new ServiceException("400-F-2", "그룹 채팅방이 아닙니다.");
+        }
+
+        dmRoomUserRepository.delete(roomUser);
+        dmRoomUserRepository.flush();
+
+        // 방에 남은 인원 확인
+        long remainingUsers = dmRoomUserRepository.countByDmRoom_Id(roomId);
+
+        if (remainingUsers == 0) {
+            // 아무도 안 남았으면 DM, 채팅방 삭제
+            dmRepository.deleteByDmRoom_Id(roomId);
+            dmRoomRepository.delete(room);
+        } else {
+            // 퇴장 메시지 발송
+            String systemMsg = roomUser.getUser().getNickname() + "님이 나갔습니다.";
+            Dm systemDm = Dm.create(room, roomUser.getUser(), MessageType.TEXT, systemMsg, null, true);
+            dmRepository.save(systemDm);
+        }
+    }
+
+    // 채팅방 참여 여부 검증
+    private DmRoomUser getValidRoomUser(Long userId, Long roomId) {
+        if (userId == null || roomId == null) {
+            throw new ServiceException("400-F-1", "유저 또는 방 정보가 필요합니다.");
+        }
+        return dmRoomUserRepository
+                .findByDmRoom_IdAndUser_Id(roomId, userId)
+                .orElseThrow(() -> new ServiceException("404-F-1", "참여 중인 채팅방이 아닙니다."));
     }
 }

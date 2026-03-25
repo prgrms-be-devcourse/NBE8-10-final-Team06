@@ -2,13 +2,7 @@ package com.devstagram.domain.dm.controller;
 
 import java.util.List;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.dm.dto.DmCreate1v1WithRoomListResponse;
 import com.devstagram.domain.dm.dto.DmCreateGroupWithRoomListResponse;
@@ -79,5 +73,25 @@ public class DmController {
     public RsData<DmCreateGroupWithRoomListResponse> createGroupRoom(@RequestBody DmGroupRoomCreateRequest request) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         return RsData.success(dmService.createGroupRoomAndReturnRooms(currentUserId, request));
+    }
+
+    // 1:1 채팅방 나가기
+    @DeleteMapping("/rooms/1v1/{roomId}")
+    public RsData<String> leave1v1Room(@PathVariable("roomId") Long roomId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        dmService.leave1v1Room(currentUserId, roomId);
+
+        return RsData.success("1:1 채팅방을 나왔습니다.");
+    }
+
+    @DeleteMapping("/rooms/group/{roomId}")
+    public RsData<String> leaveGroupRoom(@PathVariable("roomId") Long roomId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        // 그룹 방 나가기 서비스 로직 호출
+        dmService.leaveGroupRoom(currentUserId, roomId);
+
+        return RsData.success("그룹 채팅방을 나왔습니다");
     }
 }
