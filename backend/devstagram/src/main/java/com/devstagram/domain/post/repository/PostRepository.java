@@ -34,11 +34,14 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     long countByUserId(Long userId);
 
-    @Query("select distinct p from Post p " +
-            "join fetch p.user " +                   // 게시글 작성자 정보
-            "left join fetch p.mediaList " +         // 게시글 이미지/영상 리스트
-            "left join fetch p.techTags pt " +       // 기술 매핑 테이블 (PostTechnology)
-            "left join fetch pt.technology " +       // 실제 기술 정보 (Technology)
+    @Query("select distinct p from Post p " + "join fetch p.user "
+            + // 게시글 작성자 정보
+            "left join fetch p.mediaList "
+            + // 게시글 이미지/영상 리스트
+            "left join fetch p.techTags pt "
+            + // 기술 매핑 테이블 (PostTechnology)
+            "left join fetch pt.technology "
+            + // 실제 기술 정보 (Technology)
             "where p.id = :id and p.isDeleted = false")
     Optional<Post> findPostWithDetails(@Param("id") Long id);
 }
