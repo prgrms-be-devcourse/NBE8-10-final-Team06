@@ -1,10 +1,14 @@
 package com.devstagram.domain.post.service;
 
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import com.devstagram.domain.feed.service.FeedService;
+import com.devstagram.domain.user.entity.Follow;
+import com.devstagram.domain.user.repository.FollowRepository;
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -54,12 +58,30 @@ public class PostService {
     private final TechScoreService techScoreService;
     private final TechnologyRepository technologyRepository;
     private final PostScrapRepository postScrapRepository;
+    private final FeedService feedService;
+    private final FollowRepository followRepository;
     private final CommentLikeRepository commentLikeRepository;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
 
-        // TODO: 피드 정책 수립 후 반영.
+        // 1. FeedService를 통해 정렬된 ID 목록을 먼저 확보 (Redis 조회)
+        List<Long> rankedIds = feedService.getRankedPostIds(memberId, pageable);
+
+        // 2. 만약 Redis에 데이터가 없다면? (신규 유저 등) -> 기존처럼 최신순으로 대응(Fallback)
+        if (rankedIds.isEmpty()) {
+            return postRepository.findAllByOrderByCreatedAtDesc(pageable)
+                    .map(PostFeedRes::from);
+        }
+
+        // 3. 확보한 ID들로 DB에서 실제 게시글 상세 데이터 조회
+        // IN 쿼리는 순서를 보장하지 않으므로 다시 정렬해줘야 합니다.
+        List<Post> posts = postRepository.findAllByIdIn(rankedIds);
+        posts.sort(Comparator.comparingInt(post -> rankedIds.indexOf(post.getId())));
+
+        // 4. 다음 페이지 존재 여부 확인 후 Slice 반환
+        boolean hasNext = rankedIds.size() >= pageable.getPageSize();
+        List<PostFeedRes> content = posts.stream().map(PostFeedRes::from).toList();
 
         Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
 
@@ -167,6 +189,21 @@ public class PostService {
             }
         }
         userRepository.increasePostCount(userId);
+
+        // 1. 나(작성자)를 팔로우하는 사람들 목록 가져오기
+        // findAllByToUserId를 쓰면 나를 타겟(toUser)으로 삼은 팔로우 객체들을 가져옵니다.
+        List<Follow> followRelations = followRepository.findAllByToUserId(userId);
+
+        // 2. Follow 객체에서 실제 User(fromUser)들만 추출
+        List<User> followers = followRelations.stream()
+                .map(Follow::getFromUser)
+                .toList();
+
+        // 3. 기술 관심 유저 (아직 로직 전이라면 빈 리스트 전달)
+        List<User> techInterestedUsers = List.of();
+
+        // 4. 비동기 피드 배달 시작!
+        feedService.deliverPostToFeeds(post, followers, techInterestedUsers);
 
         return post.getId();
     }
@@ -279,11 +316,15 @@ public class PostService {
         List<String> fileNames =
                 post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
+        List<Follow> followers = followRepository.findAllByToUserId(userId);
+        List<User> followerUsers = followers.stream().map(Follow::getFromUser).toList();
+
         post.softDelete();
 
         userRepository.decreasePostCount(userId);
 
         fileNames.forEach(storageService::delete);
+        feedService.removePostFromFeeds(postId, followerUsers);
     }
 
     @Transactional

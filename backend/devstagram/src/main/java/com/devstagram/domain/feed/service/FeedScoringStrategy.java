@@ -1,14 +1,15 @@
 package com.devstagram.domain.feed.service;
 
-import com.devstagram.domain.post.entity.Post;
 import org.springframework.stereotype.Component;
+
+import com.devstagram.domain.post.entity.Post;
 
 @Component
 public class FeedScoringStrategy {
 
     // 모든 기준을 밀리초(ms) 단위의 '시간'으로 통일합니다.
-    private static final double HOUR = 3_600_000.0;  // 1시간
-    private static final double DAY = 86_400_000.0;   // 24시간
+    private static final double HOUR = 3_600_000.0; // 1시간
+    private static final double DAY = 86_400_000.0; // 24시간
 
     /**
      * 게시글의 최종 피드 점수를 계산합니다.
