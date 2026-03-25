@@ -79,11 +79,12 @@ class StoryServiceTest {
         given(userRepository.findById(2L)).willReturn(Optional.of(taggedUser));
 
         given(storyRepository.save(any(Story.class))).willAnswer(invocation -> {
-            Story s = invocation.getArgument(0);
-            ReflectionTestUtils.setField(s, "id", 10L);
-            ReflectionTestUtils.setField(s, "createdAt", LocalDateTime.now());
-            ReflectionTestUtils.setField(s, "expiredAt", LocalDateTime.now().plusHours(24));
-            return s;
+            Story savedStory = invocation.getArgument(0);
+            ReflectionTestUtils.setField(savedStory, "id", 10L);
+            ReflectionTestUtils.setField(savedStory, "createdAt", LocalDateTime.now());
+            ReflectionTestUtils.setField(
+                    savedStory, "expiredAt", LocalDateTime.now().plusHours(24));
+            return savedStory;
         });
 
         // when

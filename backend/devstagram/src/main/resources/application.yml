@@ -15,10 +15,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health # 웹에서 /actuator/health를 볼 수 있게 노출함
+        include: health,prometheus
   endpoint:
     health:
-      show-details: always # 상세 정보(DB 연결 상태 등)를 포함함
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 server:
   port: 8080
@@ -31,15 +35,6 @@ custom:
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expire-seconds: ${JWT_ACCESS_TOKEN_EXPIRE_SECONDS}
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,prometheus
-  prometheus:
-    metrics:
-      export:
-        enabled: true
 
 file:
   upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}

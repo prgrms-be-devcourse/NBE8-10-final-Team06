@@ -1,5 +1,7 @@
 package com.devstagram;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -9,5 +11,7 @@ import org.springframework.test.context.ActiveProfiles;
 class DevstagramApplicationTests {
 
     @Test
-    void contextLoads() {}
+    void contextLoads() {
+        assertThat(SpringBootTest.class).isNotNull();
+    }
 }

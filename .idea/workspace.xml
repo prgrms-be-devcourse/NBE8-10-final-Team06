@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1331f575-25d8-435a-b295-7d41c55b53a0" name="변경" comment="Fix : 가독성 좋은 이름으로 수정">
-      <change afterPath="$PROJECT_DIR$/infra/prometheus/prometheus.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/devstagram/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/devstagram/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/infra/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/infra/docker-compose.yml" afterDir="false" />
-    </list>
+    <list default="true" id="1331f575-25d8-435a-b295-7d41c55b53a0" name="변경" comment="Fix : 가독성 좋은 이름으로 수정" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -94,6 +89,10 @@
     &quot;accountId&quot;: &quot;4bb08937-5733-416d-921e-00a012d47ef4&quot;
   }
 }</component>
+  <component name="KubernetesApiPersistence"><![CDATA[{}]]></component>
+  <component name="KubernetesApiProvider"><![CDATA[{
+  "isMigrated": true
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
 }</component>
@@ -254,7 +253,7 @@
       <workItem from="1773995268038" duration="410000" />
       <workItem from="1774400839277" duration="2630000" />
       <workItem from="1774403502350" duration="320000" />
-      <workItem from="1774403830823" duration="4765000" />
+      <workItem from="1774403830823" duration="5139000" />
     </task>
     <task id="LOCAL-00001" summary="Fix : 가독성 좋은 이름으로 수정">
       <option name="closed" value="true" />

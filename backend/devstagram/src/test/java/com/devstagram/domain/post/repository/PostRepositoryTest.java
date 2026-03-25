@@ -3,6 +3,7 @@ package com.devstagram.domain.post.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -95,13 +96,20 @@ class PostRepositoryTest {
 
         // when
         Slice<Post> result = postRepository.findAllByOrderByCreatedAtDesc(pageRequest);
+        Slice<Post> second = postRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(1, 2));
 
-        // then
+        // then: setUp의 testPost(스크랩 대상 글)까지 포함해 총 4개 게시글
+        // createdAt이 동일 시각이면 정렬 순서가 비결정적일 수 있음 → 제목 집합·페이지 크기로만 검증
         List<Post> content = result.getContent();
-        assertThat(result.getContent()).hasSize(2);
+        assertThat(content).hasSize(2);
         assertThat(result.hasNext()).isTrue();
-        assertThat(content.get(0).getTitle()).isEqualTo("제목3");
-        assertThat(content.get(1).getTitle()).isEqualTo("제목2");
+        assertThat(second.getContent()).hasSize(2);
+        assertThat(second.hasNext()).isFalse();
+
+        List<String> allTitles = new ArrayList<>();
+        content.forEach(p -> allTitles.add(p.getTitle()));
+        second.getContent().forEach(p -> allTitles.add(p.getTitle()));
+        assertThat(allTitles).containsExactlyInAnyOrder("스크랩 대상 글", "제목1", "제목2", "제목3");
     }
 
     @Test
@@ -210,10 +218,10 @@ class PostRepositoryTest {
         // when: PostScrap 엔티티가 아닌 내부의 Post 객체들을 Slice/Page로 가져옴
         Page<Post> result = postScrapRepository.findActivePostsByUserId(testUser.getId(), pageRequest);
 
-        // then
+        // then (ORDER BY s.createdAt DESC 이나 동일 시각 저장 시 순서가 비결정적일 수 있음)
         assertThat(result.getContent()).hasSize(2);
-        assertThat(result.getContent().get(0).getTitle()).contains("두번째 글");
-        assertThat(result.getContent().get(0)).isInstanceOf(Post.class);
+        assertThat(result.getContent()).extracting(Post::getTitle).containsExactlyInAnyOrder("스크랩 대상 글", "두번째 글");
+        assertThat(result.getContent()).allMatch(Post.class::isInstance);
     }
 
     @Test
