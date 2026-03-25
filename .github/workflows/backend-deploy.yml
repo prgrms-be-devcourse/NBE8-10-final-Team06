@@ -5,8 +5,10 @@ on:
     branches:
       - main
       - develop
+      - Feat/migrate-to-ghcr  # 테스트를 위해 유지 (머지 후 삭제 권장)
 
 jobs:
+  # 1. 다음 버전 번호를 미리 계산 (Dry Run 방식)
   calculate-tag:
     runs-on: ubuntu-latest
     outputs:
@@ -18,8 +20,9 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          dry_run: true
+          dry_run: true # 실제로 태그를 찍지 않고 번호만 계산합니다.
 
+  # 2. 빌드 및 배포 작업
   build-and-deploy:
     needs: calculate-tag
     runs-on: ubuntu-latest
@@ -39,12 +42,14 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # Gradle 빌드 (테스트는 제외하여 빌드 속도 향상)
       - name: Build with Gradle
         run: |
           cd backend/devstagram
           chmod +x gradlew
           ./gradlew build -x test
 
+      # GitHub Container Registry(GHCR) 로그인
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -52,6 +57,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 도커 이미지 빌드 및 GHCR 푸시 (계산된 버전 태그 사용)
       - name: Build and Push Docker Image
         run: |
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
@@ -62,6 +68,7 @@ jobs:
           docker push $BASE_NAME:latest
           docker push $BASE_NAME:${{ env.VERSION }}
 
+      # 설정 파일(infra 폴더 내 docker-compose, nginx, prometheus 등)을 EC2로 전송
       - name: Copy infra files to EC2
         uses: appleboy/scp-action@master
         with:
@@ -72,6 +79,7 @@ jobs:
           target: "/home/ec2-user/"
           strip_components: 1
 
+      # EC2 서버에서 Blue-Green 무중단 배포 실행
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@master
         with:
@@ -82,6 +90,7 @@ jobs:
           script: |
             cd /home/ec2-user
             
+            # [Step 0] 애플리케이션 실행을 위한 .env 환경 변수 생성
             echo "SPRING_PROFILES_ACTIVE=prod" > .env
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" >> .env
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
@@ -92,6 +101,7 @@ jobs:
             echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
             echo "IMAGE_VERSION=$VERSION" >> .env
 
+            # [Step 1] 현재 실행 중인 색상 확인 및 타겟 색상 결정
             EXIST_BLUE=$(sudo docker ps | grep backend-blue)
             if [ -z "$EXIST_BLUE" ]; then
                 TARGET_COLOR="blue"; TARGET_PORT=8081; BEFORE_COLOR="green"
@@ -99,13 +109,16 @@ jobs:
                 TARGET_COLOR="green"; TARGET_PORT=8082; BEFORE_COLOR="blue"
             fi
             
+            # 필요한 디렉토리 생성 (안전 장치)
             sudo mkdir -p /home/ec2-user/prometheus
             sudo mkdir -p /home/ec2-user/nginx/conf.d
 
+            # [Step 2] 새 버전 이미지 풀링 및 컨테이너 실행 (Nginx 및 모니터링 도구 포함)
             sudo docker compose pull backend-$TARGET_COLOR
             sudo docker compose up -d nginx backend-$TARGET_COLOR prometheus grafana node-exporter
 
-            echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
+            # [Step 3] 새 컨테이너가 정상적으로 떴는지 Actuator Health 체크
+            echo "새 컨테이너($TARGET_COLOR) 헬스체크 시작..."
             for retry in {1..12}
             do
                 HEALTH=$(curl -s http://localhost:$TARGET_PORT/actuator/health | grep "UP" || echo "fail")
@@ -118,15 +131,18 @@ jobs:
                 if [ $retry -eq 12 ]; then exit 1; fi
             done
 
+            # [Step 4] Nginx 트래픽을 새 컨테이너로 전환
             echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
             sudo docker exec nginx nginx -s reload
 
+            # [Step 5] 이전 버전 컨테이너 정리
             sleep 5
             sudo docker compose stop backend-$BEFORE_COLOR
             sudo docker compose rm -f backend-$BEFORE_COLOR
             sudo docker image prune -f
             echo "### 무중단 배포 완료 ###"
 
+  # 3. 배포 성공 시 GitHub 공식 릴리스 생성 (Main/Develop 브랜치만 해당)
   make-release:
     needs: [build-and-deploy, calculate-tag]
     runs-on: ubuntu-latest

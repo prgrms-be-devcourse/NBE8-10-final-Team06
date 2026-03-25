@@ -6,11 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="df503013-2181-4fb8-a536-1322ee4028dd" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.github/workflows/backend-deploy.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/backend-deploy.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules/devstagram.main.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/devstagram.main.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -113,7 +108,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "SHELLCHECK.PATH": "신경 쓰임",
     "Spring Boot.DevstagramApplication.executor": "Run",
-    "git-widget-placeholder": "Feat/migrate-to-ghcr 리베이스 중",
+    "git-widget-placeholder": "Feat/migrate-to-ghcr",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/dohwa/IdeaProjects/NBE8-10-final-Team06",
