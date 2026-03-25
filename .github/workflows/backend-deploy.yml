@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - main
+      - develop
+      - Feat/migrate-to-ghcr  # 테스트 브랜치
+  release:
+    types: [ published ]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout Repository
@@ -32,13 +39,26 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # 3. 도커 이미지 빌드 & 푸시
       - name: Build and Push Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest ./backend/devstagram
-          docker push ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION=${{ github.event.release.tag_name }}
+          else
+            VERSION="v${{ github.run_number }}"
+          fi
+          
+          BASE_NAME="ghcr.io/$REPO_OWNER/$REPO_NAME-backend"
+          
+          # 두 개의 태그로 빌드 및 푸시
+          docker build -t $BASE_NAME:latest -t $BASE_NAME:$VERSION ./backend/devstagram
+          docker push $BASE_NAME:latest
+          docker push $BASE_NAME:$VERSION
 
       # 4. 설정 파일(infra 폴더)을 EC2로 전송
       # ✅ prometheus.yml 추가됨
