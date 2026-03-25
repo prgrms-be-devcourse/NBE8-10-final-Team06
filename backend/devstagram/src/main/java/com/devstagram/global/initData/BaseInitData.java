@@ -3,6 +3,8 @@ package com.devstagram.global.initData;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -29,6 +31,11 @@ import com.devstagram.domain.story.entity.StoryMedia;
 import com.devstagram.domain.story.entity.StoryTag;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
+import com.devstagram.domain.technology.entity.PostTechnology;
+import com.devstagram.domain.technology.entity.TechCategory;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechCategoryRepository;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
@@ -57,6 +64,8 @@ public class BaseInitData implements ApplicationRunner {
     private final DmRoomRepository dmRoomRepository;
     private final DmRoomUserRepository dmRoomUserRepository;
     private final DmRepository dmRepository;
+    private final TechnologyRepository technologyRepository;
+    private final TechCategoryRepository techCategoryRepository;
 
     @Override
     @Transactional
@@ -67,12 +76,55 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void initData() {
+        createTechMasterData();
         createUsers();
         createFollows();
         createPosts();
         createStories();
         createInteractions();
         createDms();
+    }
+
+    private void createTechMasterData() {
+        // 1. 카테고리 생성 (빌더 활용)
+        TechCategory backend = techCategoryRepository.save(
+                TechCategory.builder().name("Backend").color("#3E52D5").build());
+        TechCategory frontend = techCategoryRepository.save(
+                TechCategory.builder().name("Frontend").color("#61DAFB").build());
+        TechCategory infra = techCategoryRepository.save(
+                TechCategory.builder().name("Infra").color("#FF9900").build());
+
+        // 2. 세부 기술 생성
+        technologyRepository.save(Technology.builder()
+                .category(backend)
+                .name("Java")
+                .color("#E76F00")
+                .iconUrl("https://icon.url/java")
+                .build());
+        technologyRepository.save(Technology.builder()
+                .category(backend)
+                .name("Spring Boot")
+                .color("#6DB33F")
+                .iconUrl("https://icon.url/spring")
+                .build());
+        technologyRepository.save(Technology.builder()
+                .category(frontend)
+                .name("React")
+                .color("#61DAFB")
+                .iconUrl("https://icon.url/react")
+                .build());
+        technologyRepository.save(Technology.builder()
+                .category(infra)
+                .name("AWS")
+                .color("#FF9900")
+                .iconUrl("https://icon.url/aws")
+                .build());
+        technologyRepository.save(Technology.builder()
+                .category(infra)
+                .name("Docker")
+                .color("#2496ED")
+                .iconUrl("https://icon.url/docker")
+                .build());
     }
 
     private void createUsers() {
@@ -112,7 +164,24 @@ public class BaseInitData implements ApplicationRunner {
         followService.follow(user2.getId(), user1.getId());
     }
 
+    private void addTagToPost(Post post, Technology tech) {
+        if (tech == null) return;
+
+        PostTechnology postTech = PostTechnology.builder()
+                .post(post)
+                .technology(tech)
+                .category(tech.getCategory())
+                .build();
+
+        post.getTechTags().add(postTech);
+    }
+
     private void createPosts() {
+
+        List<Technology> allTechs = technologyRepository.findAll();
+
+        Map<String, Technology> techMap = allTechs.stream().collect(Collectors.toMap(Technology::getName, t -> t));
+
         String[] titles = {"aaaaa", "bbbbb", "ccccc", "ddddd", "eeeee", "fffff"};
         String[] contents = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF"};
         String[] imageUrls = {
@@ -133,6 +202,15 @@ public class BaseInitData implements ApplicationRunner {
                     .title(titles[i])
                     .content(contents[i])
                     .build();
+
+            if (i % 2 == 0) {
+                addTagToPost(post, techMap.get("Java"));
+                addTagToPost(post, techMap.get("Spring Boot"));
+            } else {
+                addTagToPost(post, techMap.get("React"));
+            }
+            addTagToPost(post, techMap.get("AWS"));
+
             postRepository.save(post);
 
             PostMedia media = PostMedia.builder()

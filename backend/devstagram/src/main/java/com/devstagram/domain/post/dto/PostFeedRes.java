@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.technology.dto.TechTagRes;
 
 import lombok.Builder;
 
@@ -15,6 +16,7 @@ public record PostFeedRes(
         String title,
         String content,
         List<PostMediaRes> medias,
+        List<TechTagRes> techStacks,
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt) {
@@ -26,6 +28,7 @@ public record PostFeedRes(
                 .title(post.getTitle())
                 .content(post.getContent())
                 .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
+                .techStacks(post.getTechTags().stream().map(TechTagRes::from).toList())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())

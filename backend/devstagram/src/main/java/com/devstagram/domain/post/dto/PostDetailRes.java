@@ -7,6 +7,7 @@ import org.springframework.data.domain.Slice;
 
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.technology.dto.TechTagRes;
 
 import lombok.Builder;
 
@@ -21,6 +22,7 @@ public record PostDetailRes(
         Long commentCount,
         LocalDateTime createdAt,
         List<PostMediaRes> medias,
+        List<TechTagRes> techStacks,
         Slice<CommentInfoRes> comments) {
     public static PostDetailRes from(Post post, Slice<CommentInfoRes> comments) {
         return PostDetailRes.builder()
@@ -33,6 +35,7 @@ public record PostDetailRes(
                 .commentCount(post.getCommentCount())
                 .createdAt(post.getCreatedAt())
                 .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
+                .techStacks(post.getTechTags().stream().map(TechTagRes::from).toList())
                 .comments(comments)
                 .build();
     }

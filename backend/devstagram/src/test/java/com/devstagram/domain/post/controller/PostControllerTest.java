@@ -2,8 +2,7 @@ package com.devstagram.domain.post.controller;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -98,7 +97,8 @@ class PostControllerTest {
     @DisplayName("[게시글 생성 성공] - 201")
     void createPost_Success() throws Exception {
         // given
-        PostCreateReq req = new PostCreateReq("새 제목", "새 내용");
+        List<Long> expectedTechIds = List.of(1L, 2L);
+        PostCreateReq req = new PostCreateReq("새 제목", "새 내용", expectedTechIds);
         String requestJson = objectMapper.writeValueAsString(req);
 
         MockMultipartFile requestPart =
@@ -106,7 +106,8 @@ class PostControllerTest {
         MockMultipartFile filePart =
                 new MockMultipartFile("files", "test.jpg", "image/jpeg", "test image content".getBytes());
 
-        given(postService.createPost(anyLong(), any(PostCreateReq.class), anyList()))
+        given(postService.createPost(
+                        anyLong(), argThat(request -> request.techIds().equals(expectedTechIds)), anyList()))
                 .willReturn(1L);
 
         // when & then
@@ -125,14 +126,20 @@ class PostControllerTest {
     void updatePost_Success() throws Exception {
         // given
         Long postId = 1L;
-        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
+        List<Long> expectedTechIds = List.of(1L, 2L);
+        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", expectedTechIds);
         String updateJson = objectMapper.writeValueAsString(updateReq);
 
         MockMultipartFile requestPart =
                 new MockMultipartFile("request", "", "application/json", updateJson.getBytes(StandardCharsets.UTF_8));
 
-        doNothing().when(postService).updatePost(anyLong(), eq(postId), any(PostUpdateReq.class), any());
-
+        doNothing()
+                .when(postService)
+                .updatePost(
+                        anyLong(),
+                        eq(postId),
+                        argThat(req -> req.techIds().equals(expectedTechIds)), // 리스트 일치 확인
+                        any());
         // when & then
         mockMvc.perform(multipart(HttpMethod.PUT, "/api/posts/{postId}", postId)
                         .file(requestPart)
@@ -141,6 +148,9 @@ class PostControllerTest {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"));
+
+        verify(postService)
+                .updatePost(anyLong(), eq(postId), argThat(req -> req.techIds().equals(List.of(1L, 2L))), any());
     }
 
     @Test
