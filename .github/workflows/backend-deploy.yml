@@ -87,10 +87,16 @@ jobs:
                 TARGET_PORT=8082
                 BEFORE_COLOR="blue"
             fi
-
+            
+            # Nginx가 처음 뜰 때 파일이 없어서 죽는 것을 방지하는 "안전 장치"
+            sudo mkdir -p /home/ec2-user/nginx/conf.d
+            if [ ! -f /home/ec2-user/nginx/conf.d/service-env.inc ]; then
+                echo "set \$service_url http://backend-blue:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
+            fi
+            
             # [Step 2] 새로운 컨테이너 이미지 풀링 및 구동
             sudo docker compose pull backend-$TARGET_COLOR
-            sudo docker compose up -d backend-$TARGET_COLOR
+            sudo docker compose up -d nginx backend-$TARGET_COLOR
 
             # [Step 3] 새로운 컨테이너 헬스체크 (Actuator 정석 방식)
             echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
@@ -114,7 +120,6 @@ jobs:
 
             # [Step 4] Nginx 트래픽 전환 (동적 설정 파일 변경)
             echo "Nginx 트래픽 전환: $BEFORE_COLOR -> $TARGET_COLOR"
-            sudo mkdir -p /home/ec2-user/nginx/conf.d
             echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
             sudo docker exec nginx nginx -s reload
 
