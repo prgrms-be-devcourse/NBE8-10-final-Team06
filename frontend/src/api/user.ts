@@ -1,9 +1,14 @@
-// src/api/user.ts
 import client from './client';
 import { RsData } from '../types/common';
-import { FollowUserResponse, FollowResponse } from '../types/user';
+import { FollowUserResponse, FollowResponse, UserProfileResponse } from '../types/user';
 
 export const userApi = {
+  // 특정 사용자의 프로필 조회
+  getProfile: (nickname: string, page: number = 0) =>
+    client.get<RsData<UserProfileResponse>>(`/users/${nickname}/profile`, {
+      params: { page, size: 9, sort: 'createdAt,desc' }
+    }).then(res => res.data),
+
   // 팔로우 실행
   follow: (toUserId: number) => 
     client.post<RsData<FollowResponse>>(`/follows/${toUserId}`).then(res => res.data),

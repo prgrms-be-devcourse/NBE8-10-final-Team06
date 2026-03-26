@@ -1,4 +1,3 @@
-// src/pages/HomePage.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle } from 'lucide-react';
@@ -6,6 +5,7 @@ import { postApi } from '../api/post';
 import { PostFeedResponse } from '../types/post';
 import StoryBar from '../components/story/StoryBar';
 import BottomNav from '../components/layout/BottomNav';
+import { useAuthStore } from '../store/useAuthStore';
 
 const HomePage: React.FC = () => {
   const [posts, setPosts] = useState<PostFeedResponse[]>([]);
@@ -13,8 +13,11 @@ const HomePage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [isLast, setIsLast] = useState(false);
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuthStore();
 
   const fetchFeed = async (pageNumber: number) => {
+    if (!isLoggedIn) return; // 로그인 상태가 아니면 호출하지 않음
+
     try {
       const res = await postApi.getFeed(pageNumber);
       if (res.resultCode.includes('-S-')) {
@@ -33,8 +36,12 @@ const HomePage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchFeed(0);
-  }, []);
+    if (isLoggedIn) {
+      fetchFeed(0);
+    } else {
+      setIsLoading(false);
+    }
+  }, [isLoggedIn]);
 
   const handleLike = async (postId: number) => {
     try {
@@ -55,7 +62,6 @@ const HomePage: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '60px', backgroundColor: '#fafafa', minHeight: '100vh' }}>
-      {/* 상단 헤더 - 935px 기준으로 중앙 정렬 */}
       <header style={{
         position: 'sticky',
         top: 0,
@@ -79,7 +85,7 @@ const HomePage: React.FC = () => {
             letterSpacing: '-0.5px',
             cursor: 'pointer'
           }} onClick={() => navigate('/')}>Devstagram</h2>
-          <div style={{ width: '32px' }} /> {/* 밸런스를 위한 빈 공간 */}
+          <div style={{ width: '32px' }} />
         </div>
       </header>
 
@@ -90,26 +96,45 @@ const HomePage: React.FC = () => {
         justifyContent: 'center',
         paddingTop: '30px'
       }}>
-        {/* 중앙 피드 영역 (600px 고정) */}
         <div style={{ width: '100%', maxWidth: '600px' }}>
-          <StoryBar />
+          {isLoggedIn && <StoryBar />}
 
           {isLoading && <p style={{ textAlign: 'center', padding: '40px', color: '#8e8e8e' }}>로딩 중...</p>}
           
-          {!isLoading && posts.length === 0 && (
+          {!isLoggedIn && (
+            <div style={{ textAlign: 'center', padding: '100px 20px', color: '#8e8e8e', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '3px' }}>
+              <p style={{ marginBottom: '15px' }}>로그인 후 게시물을 확인해 보세요!</p>
+              <button 
+                onClick={() => navigate('/login')}
+                style={{ 
+                  padding: '8px 16px', 
+                  backgroundColor: '#0095f6', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer' 
+                }}
+              >
+                로그인하기
+              </button>
+            </div>
+          )}
+
+          {isLoggedIn && !isLoading && posts.length === 0 && (
             <div style={{ textAlign: 'center', padding: '100px 20px', color: '#8e8e8e', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '3px' }}>
               <p>표시할 게시물이 없습니다.</p>
             </div>
           )}
 
           <div className="feed-list">
-            {posts.map((post) => (
+            {isLoggedIn && posts.map((post) => (
               <article key={post.id} style={{ marginBottom: '15px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '3px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', padding: '12px' }}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#efefef', marginRight: '12px' }} />
                   <strong 
                     style={{ fontSize: '0.9rem', cursor: 'pointer' }}
-                    onClick={() => navigate(`/profile/${post.authorId}`)}
+                    onClick={() => navigate(`/profile/${post.nickname}`)}
                   >
                     {post.nickname}
                   </strong>
@@ -144,7 +169,7 @@ const HomePage: React.FC = () => {
             ))}
           </div>
 
-          {!isLast && posts.length > 0 && (
+          {isLoggedIn && !isLast && posts.length > 0 && (
             <button onClick={() => { setPage(page + 1); fetchFeed(page + 1); }} style={{ width: '100%', padding: '20px', border: 'none', backgroundColor: 'transparent', color: '#0095f6', fontWeight: 'bold', cursor: 'pointer' }}>
               이전 게시물 더 보기
             </button>

@@ -1,12 +1,39 @@
+import { Slice } from './common';
 import { CommentInfoResponse } from './comment';
 
+/**
+ * com.devstagram.global.enumtype.MediaType
+ */
 export type MediaType = 'jpg' | 'jpeg' | 'gif' | 'png' | 'webp' | 'mp4' | 'webm' | 'mov';
 
+/**
+ * com.devstagram.domain.post.dto.PostMediaRes
+ */
 export interface PostMediaResponse {
   id: number;
   sourceUrl: string;
   sequence: number;
   mediaType: MediaType;
+}
+
+/**
+ * com.devstagram.domain.technology.dto.TechTagRes
+ */
+export interface TechTagRes {
+  id: number;
+  name: string;
+  color: string;
+}
+
+/**
+ * com.devstagram.domain.post.dto.PostFeedProfileRes
+ */
+export interface PostFeedProfileRes {
+  id: number;
+  medias: PostMediaResponse[];
+  techStacks: TechTagRes[];
+  likeCount: number;
+  commentCount: number;
 }
 
 export interface PostFeedResponse {
@@ -32,36 +59,6 @@ export interface PostDetailResponse {
   createdAt: string;
   medias: PostMediaResponse[];
   comments: Slice<CommentInfoResponse>;
-}
-
-/**
- * Spring Data Slice 객체 구조
- */
-export interface Slice<T> {
-  content: T[];
-  pageable: {
-    pageNumber: number;
-    pageSize: number;
-    sort: {
-      empty: boolean;
-      sorted: boolean;
-      unsorted: boolean;
-    };
-    offset: number;
-    paged: boolean;
-    unpaged: boolean;
-  };
-  size: number;
-  number: number;
-  sort: {
-    empty: boolean;
-    sorted: boolean;
-    unsorted: boolean;
-  };
-  numberOfElements: number;
-  first: boolean;
-  last: boolean;
-  empty: boolean;
 }
 
 export interface PostCreateRequest {
