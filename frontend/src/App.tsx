@@ -11,6 +11,7 @@ import DmChatPage from './pages/dm/DmChatPage';
 import HomePage from './pages/HomePage';
 import PostDetailPage from './pages/PostDetailPage';
 import PostCreatePage from './pages/PostCreatePage';
+import PostEditPage from './pages/PostEditPage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileEditPage from './pages/ProfileEditPage';
 import { useAuthStore } from './store/useAuthStore';
@@ -33,6 +34,7 @@ function App() {
         {/* Post 도메인 */}
         <Route path="/post/create" element={<PrivateRoute><PostCreatePage /></PrivateRoute>} />
         <Route path="/post/:postId" element={<PrivateRoute><PostDetailPage /></PrivateRoute>} />
+        <Route path="/post/:postId/edit" element={<PrivateRoute><PostEditPage /></PrivateRoute>} />
         
         {/* Story 도메인 */}
         <Route path="/story/:userId" element={<PrivateRoute><StoryViewer /></PrivateRoute>} />
@@ -48,7 +50,6 @@ function App() {
         <Route path="/profile/:nickname" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/profile/edit" element={<PrivateRoute><ProfileEditPage /></PrivateRoute>} />
         
-        {/* 404 fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

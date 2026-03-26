@@ -2,30 +2,44 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { userApi } from '../../api/user';
-import { FollowUserResponse } from '../../types/user';
+import { postApi } from '../../api/post';
 
 interface UserListModalProps {
   title: string;
-  userId: number;
-  type: 'followers' | 'followings';
+  id?: number | null; // 선택적 필드로 변경 및 null 허용
+  type: 'followers' | 'followings' | 'likers';
   onClose: () => void;
 }
 
-const UserListModal: React.FC<UserListModalProps> = ({ title, userId, type, onClose }) => {
-  const [users, setUsers] = useState<FollowUserResponse[]>([]);
+const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose }) => {
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // ID가 없으면 호출하지 않음
+    if (id === undefined || id === null) {
+      console.error(`ID가 누락되어 ${title} 목록을 가져올 수 없습니다.`);
+      setLoading(false);
+      return;
+    }
+
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const res = type === 'followers' 
-          ? await userApi.getFollowers(userId)
-          : await userApi.getFollowings(userId);
+        let res;
+        if (type === 'followers') res = await userApi.getFollowers(id);
+        else if (type === 'followings') res = await userApi.getFollowings(id);
+        else res = await postApi.getLikers(id);
         
         if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-          setUsers(res.data || []);
+          const normalized = (res.data.content || res.data || []).map((u: any) => ({
+            id: u.userId || u.id,
+            nickname: u.nickname,
+            profileImageUrl: u.profileImageUrl || null,
+            email: u.email || ''
+          }));
+          setUsers(normalized);
         }
       } catch (err) {
         console.error(`${title} 로드 실패:`, err);
@@ -35,9 +49,8 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, userId, type, onCl
     };
 
     fetchUsers();
-  }, [userId, type, title]);
+  }, [id, type, title]);
 
-  // 배경 클릭 시 닫기
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -55,7 +68,6 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, userId, type, onCl
         width: '400px', maxHeight: '400px', backgroundColor: '#fff',
         borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden'
       }}>
-        {/* 헤더 */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 15px', borderBottom: '1px solid #dbdbdb'
@@ -65,9 +77,10 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, userId, type, onCl
           <X size={24} style={{ cursor: 'pointer' }} onClick={onClose} />
         </div>
 
-        {/* 리스트 */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
-          {loading ? (
+          {!id ? (
+            <p style={{ textAlign: 'center', padding: '20px', color: '#ed4956' }}>유효하지 않은 요청입니다.</p>
+          ) : loading ? (
             <p style={{ textAlign: 'center', padding: '20px', color: '#8e8e8e' }}>로딩 중...</p>
           ) : users.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '20px', color: '#8e8e8e' }}>목록이 비어있습니다.</p>
@@ -91,7 +104,7 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, userId, type, onCl
                 />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.nickname}</span>
-                  <span style={{ fontSize: '0.8rem', color: '#8e8e8e' }}>{user.email}</span>
+                  {user.email && <span style={{ fontSize: '0.8rem', color: '#8e8e8e' }}>{user.email}</span>}
                 </div>
               </div>
             ))
