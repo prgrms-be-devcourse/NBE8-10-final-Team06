@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -72,5 +73,15 @@ public class UserController {
         Slice<UserSearchResponse> result = userService.searchUsers(keyword, currentUserId, pageable);
 
         return RsData.success("유저 검색 성공", result);
+    }
+
+    /**
+     * 회원 탈퇴 (Soft Delete)
+     */
+    @DeleteMapping("/me")
+    public RsData<Void> withdraw(@AuthenticationPrincipal SecurityUser loginUser) {
+        userService.withdraw(loginUser.getId());
+
+        return RsData.success("회원 탈퇴가 완료되었습니다.", null);
     }
 }
