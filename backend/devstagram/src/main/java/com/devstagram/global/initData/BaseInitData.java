@@ -149,10 +149,14 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createFollows() {
-        User admin = userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 = userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
-        User user2 = userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
-        User user3 = userRepository.findByEmailAndIsDeletedFalse("user3@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
+        User user3 =
+                userRepository.findByEmailAndIsDeletedFalse("user3@test.com").get();
 
         followService.follow(admin.getId(), user1.getId());
         followService.follow(admin.getId(), user2.getId());
@@ -235,8 +239,10 @@ public class BaseInitData implements ApplicationRunner {
 
     private void createStories() {
         List<User> users = userRepository.findAll();
-        User admin = userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 = userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
 
         String[] storyUrls = {
             "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400",
@@ -292,9 +298,12 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createDms() {
-        User admin = userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 = userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
-        User user2 = userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
 
         Post samplePost = postRepository.findAll().get(0);
         Story sampleStory = storyRepository.findAll().get(0);

@@ -91,8 +91,8 @@ public class FollowService {
         return followRepository.findAllByFromUserId(targetUserId).stream()
                 .map(follow -> {
                     User targetUser = follow.getToUser();
-                    boolean isFollowing = (loginUserId != null) &&
-                            followRepository.existsByFromUserIdAndToUserId(loginUserId, targetUser.getId());
+                    boolean isFollowing = (loginUserId != null)
+                            && followRepository.existsByFromUserIdAndToUserId(loginUserId, targetUser.getId());
                     return FollowUserResponse.of(targetUser, isFollowing);
                 })
                 .toList();
@@ -105,8 +105,8 @@ public class FollowService {
         return followRepository.findAllByToUserId(targetUserId).stream()
                 .map(follow -> {
                     User follower = follow.getFromUser();
-                    boolean isFollowing = (loginUserId != null) &&
-                            followRepository.existsByFromUserIdAndToUserId(loginUserId, follower.getId());
+                    boolean isFollowing = (loginUserId != null)
+                            && followRepository.existsByFromUserIdAndToUserId(loginUserId, follower.getId());
                     return FollowUserResponse.of(follower, isFollowing);
                 })
                 .toList();

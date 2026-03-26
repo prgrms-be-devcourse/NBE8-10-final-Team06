@@ -57,8 +57,7 @@ public class FollowController {
     // 특정 유저의 팔로잉 목록 조회
     @GetMapping("/{userId}/followings")
     public RsData<List<FollowUserResponse>> getFollowings(
-            @PathVariable Long userId,
-            @AuthenticationPrincipal SecurityUser loginUser) {
+            @PathVariable Long userId, @AuthenticationPrincipal SecurityUser loginUser) {
         Long loginUserId = (loginUser != null) ? loginUser.getId() : null;
 
         List<FollowUserResponse> followings = followService.getFollowings(userId, loginUserId);
@@ -69,8 +68,7 @@ public class FollowController {
     // 특정 유저의 팔로워 목록 조회
     @GetMapping("/{userId}/followers")
     public RsData<List<FollowUserResponse>> getFollowers(
-            @PathVariable Long userId,
-            @AuthenticationPrincipal SecurityUser loginUser) {
+            @PathVariable Long userId, @AuthenticationPrincipal SecurityUser loginUser) {
 
         Long loginUserId = (loginUser != null) ? loginUser.getId() : null;
 

@@ -1,7 +1,5 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.user.dto.UserSearchResponse;
-import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import java.util.Collections;
 import java.util.List;
 
@@ -21,8 +19,10 @@ import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
+import com.devstagram.domain.user.dto.UserSearchResponse;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
+import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
@@ -143,8 +143,7 @@ public class UserService {
 
     @Transactional
     public void withdraw(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "유저 없음"));
+        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "유저 없음"));
 
         // 1. (User) 상태 변경
         user.softDelete();

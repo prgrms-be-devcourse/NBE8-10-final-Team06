@@ -3,11 +3,6 @@ package com.devstagram.domain.user.controller;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
-import com.devstagram.domain.post.repository.PostRepository;
-import com.devstagram.domain.technology.repository.UserTechScoreRepository;
-import com.devstagram.domain.user.dto.UserProfileResponse;
-import com.devstagram.domain.user.dto.UserSearchResponse;
-import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
@@ -20,25 +15,29 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
+import com.devstagram.domain.user.dto.UserProfileResponse;
+import com.devstagram.domain.user.dto.UserSearchResponse;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
+import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.domain.user.service.FollowService;
 import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 import com.devstagram.global.util.FileValidator;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
-import org.springframework.data.domain.SliceImpl;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -109,8 +108,8 @@ class UserServiceTest {
                 "newName", "https://github.com/dohwa", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
 
         // 가짜 이미지 파일 생성
-        org.springframework.mock.web.MockMultipartFile file =
-                new org.springframework.mock.web.MockMultipartFile("profileImage", "test.png", "image/png", "test".getBytes());
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "profileImage", "test.png", "image/png", "test".getBytes());
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(storageService.store(file)).willReturn("https://new-image-url.com");
@@ -184,21 +183,15 @@ class UserServiceTest {
                 .build();
         ReflectionTestUtils.setField(user1, "id", 1L);
 
-        User user2 = User.builder()
-                .nickname("dohwa_ai")
-                .build();
+        User user2 = User.builder().nickname("dohwa_ai").build();
         ReflectionTestUtils.setField(user2, "id", 2L);
 
         // 리포지토리 결과를 SliceImpl로 감싸서 준비
         List<User> userList = Arrays.asList(user1, user2);
         Slice<UserSearchResponse> sliceResponse = new SliceImpl<>(
-                Arrays.asList(
-                        UserSearchResponse.of(user1, false),
-                        UserSearchResponse.of(user2, false)
-                ),
+                Arrays.asList(UserSearchResponse.of(user1, false), UserSearchResponse.of(user2, false)),
                 pageable,
-                false
-        );
+                false);
 
         // 서비스 로직에서 리포지토리가 아닌 서비스 메서드 자체를 검증하거나
         // 서비스 내부에서 호출하는 userRepository.findByNicknameContaining 등을 모킹
@@ -231,7 +224,8 @@ class UserServiceTest {
 
         // then
         assertThat(results.getContent()).isEmpty();
-        verify(userRepository, never()).findByNicknameContaining(anyString(), any(org.springframework.data.domain.Pageable.class));
+        verify(userRepository, never())
+                .findByNicknameContaining(anyString(), any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test
@@ -277,8 +271,7 @@ class UserServiceTest {
         ReflectionTestUtils.setField(targetUser, "id", 2L);
 
         // 기술 스택 모킹
-        given(userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser))
-                .willReturn(Collections.emptyList());
+        given(userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser)).willReturn(Collections.emptyList());
 
         // 게시글 목록 모킹
         given(postRepository.findAllByUserIdOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class)))

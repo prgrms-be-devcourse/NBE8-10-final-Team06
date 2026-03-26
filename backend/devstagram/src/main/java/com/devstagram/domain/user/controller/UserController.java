@@ -1,6 +1,5 @@
 package com.devstagram.domain.user.controller;
 
-import com.devstagram.domain.user.dto.UserSearchResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
@@ -19,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
+import com.devstagram.domain.user.dto.UserSearchResponse;
 import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;

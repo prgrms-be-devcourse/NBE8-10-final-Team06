@@ -51,11 +51,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.postCount = CASE WHEN u.postCount > 0 THEN u.postCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreasePostCount(@Param("id") Long id);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo " +
-            "WHERE u.nickname = :nickname AND u.isDeleted = false")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo " + "WHERE u.nickname = :nickname AND u.isDeleted = false")
     Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
 
-    @Query("SELECT u FROM User u " +
-            "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
+    @Query("SELECT u FROM User u " + "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
     Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
 }
