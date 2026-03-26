@@ -1,9 +1,15 @@
 package com.devstagram.domain.post.service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.*;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.devstagram.domain.comment.constant.CommentConstants;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
@@ -21,6 +28,10 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
+import com.devstagram.domain.technology.entity.PostTechnology;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.enumtype.MediaType;
@@ -40,18 +51,45 @@ public class PostService {
     private final StorageService storageService;
     private final PostMediaRepository postMediaRepository;
     private final FileValidator fileValidator;
+    private final TechScoreService techScoreService;
+    private final TechnologyRepository technologyRepository;
     private final PostScrapRepository postScrapRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
     @Transactional(readOnly = true)
-    public Slice<PostFeedRes> getPostFeed(Pageable pageable) {
+    public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
 
         // TODO: 피드 정책 수립 후 반영.
 
-        return postRepository.findAllByOrderByCreatedAtDesc(pageable).map(PostFeedRes::from);
+        Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        Set<Long> likedPostIds = getLikedPostIds(memberId, posts.getContent());
+        Set<Long> ScrappedPostIds = getScrappedPostIds(memberId, posts.getContent());
+
+        return posts.map(post -> PostFeedRes.from(
+                post, likedPostIds.contains(post.getId()), ScrappedPostIds.contains(post.getId()), memberId));
+    }
+
+    private Set<Long> getLikedPostIds(Long memberId, List<Post> posts) {
+        if (memberId == null || posts.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        return postLikeRepository.findAllPostIdsByUserIdAndPostIds(memberId, postIds);
+    }
+
+    private Set<Long> getScrappedPostIds(Long memberId, List<Post> posts) {
+        if (memberId == null || posts.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        return postScrapRepository.findAllPostIdsByUserIdAndPostIds(memberId, postIds);
     }
 
     @Transactional(readOnly = true)
-    public PostDetailRes getPostDetail(Long postId, int pageNumber) {
+    public PostDetailRes getPostDetail(Long memberId, Long postId, int pageNumber) {
         Post post = postRepository
                 .findPostWithDetails(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
@@ -63,9 +101,24 @@ public class PostService {
 
         Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
 
-        Slice<CommentInfoRes> commentSlice = comments.map(CommentInfoRes::new);
+        Set<Long> likedCommentIds = getLikedCommentIds(memberId, comments.getContent());
 
-        return PostDetailRes.from(post, commentSlice);
+        Slice<CommentInfoRes> commentSlice = comments.map(
+                comment -> new CommentInfoRes(comment, likedCommentIds.contains(comment.getId()), memberId));
+
+        boolean isLiked = (memberId != null) && postLikeRepository.existsByPostIdAndUserId(postId, memberId);
+
+        boolean isScrapped = (memberId != null) && postScrapRepository.existsByPostIdAndUserId(postId, memberId);
+
+        return PostDetailRes.from(post, commentSlice, isLiked, isScrapped, memberId);
+    }
+
+    private Set<Long> getLikedCommentIds(Long memberId, List<Comment> comments) {
+        if (memberId == null || comments.isEmpty()) {
+            return Collections.emptySet();
+        }
+        List<Long> commentIds = comments.stream().map(Comment::getId).toList();
+        return commentLikeRepository.findAllCommentIdsByUserIdAndCommentIds(memberId, commentIds);
     }
 
     @Transactional
@@ -80,6 +133,19 @@ public class PostService {
                 .build();
 
         post = postRepository.save(post);
+
+        // 기술 태그 처리
+        if (req.techIds() != null && !req.techIds().isEmpty()) {
+            List<Technology> techs = technologyRepository.findAllById(req.techIds());
+
+            for (Technology tech : techs) {
+
+                post.addTechTag(tech); // Post 엔티티 내 리스트에 추가
+
+                // 3. 유저 기술 점수 업데이트 (POST 가중치 적용)
+                techScoreService.increaseScore(user, tech, "POST");
+            }
+        }
 
         if (files != null && !files.isEmpty()) {
 
@@ -131,6 +197,29 @@ public class PostService {
 
         post.update(req.title(), req.content());
 
+        // 기술 태그 변경 및 점수 반영
+        if (req.techIds() != null) {
+
+            List<Technology> oldTechs = post.getTechTags().stream()
+                    .map(PostTechnology::getTechnology)
+                    .toList();
+
+            List<Technology> newTechs = technologyRepository.findAllById(req.techIds());
+
+            // 삭제된 기술들 -> 점수 차감
+            oldTechs.stream()
+                    .filter(old -> !newTechs.contains(old))
+                    .forEach(old -> techScoreService.decreaseScore(post.getUser(), old, "POST"));
+
+            // 새로 추가된 기술들 -> 점수 부여
+            newTechs.stream()
+                    .filter(newT -> !oldTechs.contains(newT))
+                    .forEach(newT -> techScoreService.increaseScore(post.getUser(), newT, "POST"));
+
+            // 엔티티 리스트 최종 교체
+            post.updateTechTags(newTechs);
+        }
+
         if (files != null && !files.isEmpty()) {
 
             fileValidator.validateImages(files);
@@ -176,8 +265,17 @@ public class PostService {
 
         commentRepository.deleteRepliesByPostId(postId);
         commentRepository.deleteParentsByPostId(postId);
-        // TODO: 기술태그 순차 삭제도 구현 예정
 
+        // 기술 태그 점수 차감 및 매핑 제거
+        if (!post.getTechTags().isEmpty()) {
+            post.getTechTags()
+                    .forEach(postTech ->
+                            techScoreService.decreaseScore(post.getUser(), postTech.getTechnology(), "POST"));
+
+            post.getTechTags().clear();
+        }
+
+        // 미디어 파일 삭제 준비
         List<String> fileNames =
                 post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
@@ -203,6 +301,11 @@ public class PostService {
 
             postLikeRepository.delete(existingLike.get());
             postRepository.decrementLikeCount(postId);
+
+            // 기술 점수 차감
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+
             return false;
         } else {
 
@@ -210,6 +313,11 @@ public class PostService {
 
             postLikeRepository.save(newLike);
             postRepository.incrementLikeCount(postId);
+
+            // 기술 점수 부여
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+
             return true;
         }
     }
@@ -241,18 +349,37 @@ public class PostService {
 
         if (scrapOpt.isPresent()) {
             postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
+
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+
             return false; // 스크랩 취소
         } else {
             postScrapRepository.save(PostScrap.builder().user(user).post(post).build());
+
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+
             return true; // 스크랩 성공
         }
     }
 
     @Transactional(readOnly = true)
     public Page<PostFeedRes> getUserScrappedPosts(Long userId, Pageable pageable) {
-
+        // 스크랩한 게시글들 조회
         Page<Post> scrappedPosts = postScrapRepository.findActivePostsByUserId(userId, pageable);
 
-        return scrappedPosts.map(PostFeedRes::from);
+        // 피드로 보여줄 게시글 ID 목록 추출
+        List<Long> postIds =
+                scrappedPosts.getContent().stream().map(Post::getId).toList();
+
+        // 내가 좋아요 누른 게시글 명단 가져오기
+        Set<Long> likedPostIds = postLikeRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
+
+        // 내가 스크랩한 게시글 명단 가져오기
+        Set<Long> scrappedPostIds = postScrapRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
+
+        return scrappedPosts.map(post -> PostFeedRes.from(
+                post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), userId));
     }
 }

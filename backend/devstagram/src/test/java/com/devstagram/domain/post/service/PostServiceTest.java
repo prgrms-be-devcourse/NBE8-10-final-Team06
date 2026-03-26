@@ -20,6 +20,7 @@ import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.post.dto.PostCreateReq;
 import com.devstagram.domain.post.dto.PostDetailRes;
@@ -29,6 +30,9 @@ import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.storage.StorageService;
@@ -58,12 +62,22 @@ class PostServiceTest {
     @Mock
     private PostScrapRepository postScrapRepository;
 
+    @Mock
+    private TechnologyRepository technologyRepository;
+
+    @Mock
+    private TechScoreService techScoreService;
+
+    @Mock
+    private CommentLikeRepository commentLikeRepository;
+
     @Test
     @DisplayName("[게시글 작성 성공]")
     void createPost_Success() {
         // 1. given
         Long userId = 1L;
-        PostCreateReq req = new PostCreateReq("테스트 제목", "테스트 내용");
+        List<Long> techIds = List.of(1L);
+        PostCreateReq req = new PostCreateReq("테스트 제목", "테스트 내용", techIds);
 
         List<org.springframework.web.multipart.MultipartFile> files = new java.util.ArrayList<>();
 
@@ -71,6 +85,9 @@ class PostServiceTest {
         ReflectionTestUtils.setField(mockUser, "id", userId);
 
         given(userRepository.getReferenceById(userId)).willReturn(mockUser);
+
+        Technology mockTech = mock(Technology.class);
+        given(technologyRepository.findAllById(techIds)).willReturn(List.of(mockTech));
 
         Post savedPost = Post.builder()
                 .title(req.title())
@@ -89,6 +106,7 @@ class PostServiceTest {
         assertThat(postId).isEqualTo(1L);
         verify(userRepository).getReferenceById(userId);
         verify(postRepository, times(1)).save(any(Post.class));
+        verify(techScoreService, times(1)).increaseScore(eq(mockUser), eq(mockTech), eq("POST"));
     }
 
     @Test
@@ -109,7 +127,7 @@ class PostServiceTest {
         given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
 
         // 2. when
-        Slice<PostFeedRes> result = postService.getPostFeed(pageable);
+        Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
 
         // 3. then
         assertThat(result.getContent()).hasSize(2);
@@ -137,7 +155,7 @@ class PostServiceTest {
         given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
 
         // 2. when
-        Slice<PostFeedRes> result = postService.getPostFeed(pageable);
+        Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
 
         // 3. then
         assertThat(result.getContent()).hasSize(10);
@@ -153,7 +171,8 @@ class PostServiceTest {
         // given
         Long userId = 1L;
         Long postId = 100L;
-        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용");
+        List<Long> techIds = List.of(1L);
+        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", techIds);
         List<org.springframework.web.multipart.MultipartFile> files = null; // 파일이 없는 경우 테스트
 
         User writer = mock(User.class);
@@ -164,12 +183,17 @@ class PostServiceTest {
 
         given(postRepository.findById(postId)).willReturn(Optional.of(mockPost));
 
+        Technology mockTech = mock(Technology.class);
+        given(technologyRepository.findAllById(techIds)).willReturn(List.of(mockTech));
+
         // when
         postService.updatePost(userId, postId, updateReq, files);
 
         // then
         assertThat(mockPost.getTitle()).isEqualTo("수정된 제목");
         assertThat(mockPost.getContent()).isEqualTo("수정된 내용");
+        assertThat(mockPost.getTechTags()).hasSize(1);
+        verify(techScoreService).increaseScore(eq(writer), eq(mockTech), eq("POST"));
         verify(postRepository).findById(postId);
     }
 
@@ -240,7 +264,7 @@ class PostServiceTest {
                 .willReturn(commentEntitySlice);
 
         // 2. When
-        PostDetailRes result = postService.getPostDetail(postId, pageNumber);
+        PostDetailRes result = postService.getPostDetail(1L, postId, pageNumber);
 
         // 3. Then
         assertThat(result.nickname()).isEqualTo("작성자닉네임");

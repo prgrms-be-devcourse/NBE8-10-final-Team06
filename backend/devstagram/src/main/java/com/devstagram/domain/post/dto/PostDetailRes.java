@@ -7,6 +7,7 @@ import org.springframework.data.domain.Slice;
 
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.technology.dto.TechTagRes;
 
 import lombok.Builder;
 
@@ -19,10 +20,16 @@ public record PostDetailRes(
         String content,
         Long likeCount,
         Long commentCount,
+        boolean isLiked,
+        boolean isScrapped,
+        boolean isMine,
+        String profileImageUrl,
         LocalDateTime createdAt,
         List<PostMediaRes> medias,
+        List<TechTagRes> techStacks,
         Slice<CommentInfoRes> comments) {
-    public static PostDetailRes from(Post post, Slice<CommentInfoRes> comments) {
+    public static PostDetailRes from(
+            Post post, Slice<CommentInfoRes> comments, boolean isLiked, boolean isScrapped, Long currentMemberId) {
         return PostDetailRes.builder()
                 .id(post.getId())
                 .authorId(post.getUser().getId())
@@ -31,8 +38,13 @@ public record PostDetailRes(
                 .content(post.getContent())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
+                .isLiked(isLiked)
+                .isScrapped(isScrapped)
+                .isMine(currentMemberId != null && post.getUser().getId().equals(currentMemberId))
+                .profileImageUrl(post.getUser().getProfileImageUrl())
                 .createdAt(post.getCreatedAt())
                 .medias(post.getMediaList().stream().map(PostMediaRes::from).toList())
+                .techStacks(post.getTechTags().stream().map(TechTagRes::from).toList())
                 .comments(comments)
                 .build();
     }

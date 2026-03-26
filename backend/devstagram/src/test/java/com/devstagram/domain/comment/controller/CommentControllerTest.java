@@ -98,12 +98,13 @@ class CommentControllerTest {
     void getComments_Success() throws Exception {
         // given
         Long postId = 1L;
-        CommentInfoRes comment =
-                new CommentInfoRes(1L, 10L, "댓글 내용", "닉네임", LocalDateTime.now(), LocalDateTime.now(), 0L);
+        int pageNumber = 0;
+        CommentInfoRes comment = new CommentInfoRes(
+                1L, 10L, "댓글 내용", "닉네임", true, false, "url", LocalDateTime.now(), LocalDateTime.now(), 0L);
         Slice<CommentInfoRes> slice = new SliceImpl<>(List.of(comment));
 
-        given(commentService.getCommentsByPostId(eq(postId), anyInt())).willReturn(slice);
-
+        given(commentService.getCommentsByPostId(any(), eq(postId), eq(pageNumber)))
+                .willReturn(slice);
         // when & then
         mockMvc.perform(get("/api/posts/{postId}/comments", postId).param("pageNumber", "0"))
                 .andDo(print())

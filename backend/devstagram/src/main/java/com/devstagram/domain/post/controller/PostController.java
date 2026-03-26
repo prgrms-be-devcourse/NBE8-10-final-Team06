@@ -63,16 +63,20 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public RsData<PostDetailRes> getPost(
-            @PathVariable Long postId, @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber) {
-        PostDetailRes postDetail = postService.getPostDetail(postId, pageNumber);
+            @PathVariable Long postId,
+            @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+            @AuthenticationPrincipal SecurityUser user) {
+        PostDetailRes postDetail = postService.getPostDetail(user.getId(), postId, pageNumber);
 
         return RsData.success("게시물 조회 성공", postDetail);
     }
 
     @GetMapping
     public RsData<Slice<PostFeedRes>> getPosts(
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Slice<PostFeedRes> feed = postService.getPostFeed(pageable);
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal SecurityUser user) {
+
+        Slice<PostFeedRes> feed = postService.getPostFeed(user.getId(), pageable);
 
         return RsData.success("피드 조회 성공", feed);
     }

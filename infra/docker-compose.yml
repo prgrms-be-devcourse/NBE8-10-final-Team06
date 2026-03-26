@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # [1] Blue 서비스 (포트 8081)
   backend-blue:
-    image: ghcr.io/${GITHUB_OWNER}/devstagram-backend:latest
+    image: ghcr.io/prgrms-be-devcourse/nbe8-10-final-team06-backend:latest
     container_name: backend-blue
     restart: always
     env_file: .env
@@ -14,7 +14,7 @@ services:
 
   # [2] Green 서비스 (포트 8082)
   backend-green:
-    image: ghcr.io/${GITHUB_OWNER}/devstagram-backend:latest
+    image: ghcr.io/prgrms-be-devcourse/nbe8-10-final-team06-backend:latest
     container_name: backend-green
     restart: always
     env_file: .env
@@ -40,8 +40,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
 
       # 3. 인증서 관련 매핑 (기존 도화님 설정)
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       - backend-blue
       - backend-green
@@ -53,12 +53,36 @@ services:
     image: certbot/certbot
     container_name: certbot
     volumes:
-      - ./data/certbot/conf:/etc/letsencrypt
-      - ./data/certbot/www:/var/www/certbot
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - devstagram-net
+      
+# 4. 프로메테우스 서비스
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
 
+  # 5. 그라파나
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"
+
+  #6. Node expoter
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+      
 networks:
   devstagram-net:
     driver: bridge
+    

@@ -3,6 +3,8 @@ package com.devstagram.domain.post.entity;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.devstagram.domain.technology.entity.PostTechnology;
+import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.global.entity.BaseEntity;
 
@@ -40,16 +42,33 @@ public class Post extends BaseEntity {
     @Builder.Default
     private boolean isDeleted = false;
 
-    //    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
-    //    private List<PostMedia> postMedia;
-
-    //    @Column
-    //    private List<Comment> comment;
+    @Builder.Default
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PostTechnology> techTags = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
     private List<PostMedia> mediaList = new ArrayList<>();
+
+    // 현재 Post에 대한 PostTechnology 생성.
+    public void addTechTag(Technology technology) {
+        PostTechnology postTech = PostTechnology.builder()
+                .post(this)
+                .technology(technology)
+                .category(technology.getCategory())
+                .build();
+
+        this.techTags.add(postTech);
+    }
+
+    // 현재 Post에 대한 기존 PostTechnology 삭제 후, 새로 생성.
+    public void updateTechTags(List<Technology> newTechnologies) {
+
+        this.techTags.clear();
+
+        newTechnologies.forEach(this::addTechTag);
+    }
 
     @Builder
     public Post(String content, String title, User user) {

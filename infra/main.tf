@@ -126,6 +126,22 @@ resource "aws_security_group" "sg_ec2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # 프로메테우스
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # 그라파나
+  ingress {
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -239,14 +255,14 @@ EOF
 
 # [10] RDS DB 생성
 resource "aws_db_subnet_group" "rds_sub" {
-  name       = "${var.prefix}-rds-sub-group"
+  name       = "${var.prefix}-rds-sub"
   subnet_ids = [
     aws_subnet.subnet_1.id,
     aws_subnet.subnet_2.id,
     aws_subnet.subnet_3.id,
     aws_subnet.subnet_4.id
   ]
-  tags = { Name = "${var.prefix}-rds-sub-group" }
+  tags = { Name = "${var.prefix}-rds-sub" }
 }
 
 resource "aws_db_instance" "rds_1" {
