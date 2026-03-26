@@ -3,7 +3,11 @@ package com.devstagram.domain.feed.service;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import com.devstagram.domain.technology.service.TechScoreService;
+import com.devstagram.domain.user.repository.FollowRepository;
+import com.devstagram.domain.user.service.FollowService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -21,45 +25,43 @@ public class FeedService {
 
     private final StringRedisTemplate redisTemplate;
     private final FeedScoringStrategy scoringStrategy;
+    private final FollowRepository  followRepository;
+    private final TechScoreService techScoreService;
+
+    private static final double MINUTE = 60_000.0;
+    private static final double HOUR = 3_600_000.0;
+    private static final double DAY = 86_400_000.0;
+
+    private static final short MIN_SCORE= 50;
 
     private static final String FEED_KEY_PREFIX = "feed:user:";
     private static final int MAX_FEED_SIZE = 500; // 유저당 정예 멤버 500개 유지
 
     /**
-     * 비동기로 게시글을 관련 유저들의 피드(ZSet)에 배달합니다.
+     * 통합된 타겟 유저들에게 게시글 배달
      * @param post 작성된 게시글
-     * @param followers 작성자를 팔로우하는 유저 리스트
-     * @param techInterestedUsers 해당 기술 태그를 선호하는 유저 리스트
+     * @param targetUsers 배달 대상 (팔로워 + 기술 관심 유저 통합 리스트)
      */
-    @Async("feedTaskExecutor") // Commit 2에서 만든 스레드 풀 사용
-    public void deliverPostToFeeds(Post post, List<User> followers, List<User> techInterestedUsers) {
+    @Async("feedTaskExecutor")
+    public void deliverPostToFeeds(Post post, List<User> targetUsers) {
+        for (User user : targetUsers) {
+            // 개별 유저마다 '나와의 관계'에 따른 점수를 계산해야 하므로 체크 로직 필요
+            // Tip: 이 체크 로직은 Redis나 메모리 캐시를 활용하면 더 빠릅니다.
+            boolean isFollower = checkIfFollower(post.getUser(), user);
+            boolean isTechMatched = checkIfTechMatched(post, user);
 
-        // 1. 배달 대상 선정 (팔로워 + 기술 관심 유저)
-        // 중복 배달을 막기 위해 로직 내에서 처리하거나 호출부에서 Set으로 넘겨받는 것이 좋습니다.
-
-        // 2. 팔로워들에게 배달
-        for (User follower : followers) {
-            pushToZSet(post, follower, true, false);
-        }
-
-        // 3. 기술 관심 유저들에게 배달 (이미 팔로워라면 점수 재계산 필요할 수 있음)
-        for (User techUser : techInterestedUsers) {
-            pushToZSet(post, techUser, false, true);
+            double score = scoringStrategy.calculateScore(post, isFollower, isTechMatched);
+            pushToZSet(post, user, score);
         }
     }
 
-    private void pushToZSet(Post post, User user, boolean isFollower, boolean isTechMatched) {
+    private void pushToZSet(Post post, User user, double score) {
         String key = FEED_KEY_PREFIX + user.getId();
         String postId = String.valueOf(post.getId());
 
-        // 알고리즘 엔진을 통해 나만의 점수 계산
-        double score = scoringStrategy.calculateScore(post, isFollower, isTechMatched);
-
-        // Redis ZSet에 추가 (ZADD)
         redisTemplate.opsForZSet().add(key, postId, score);
 
-        // Capping: 500개가 넘어가면 점수가 가장 낮은(가장 오래된/관심없는) 데이터 삭제
-        // ZSet은 기본 오름차순이므로 0번 인덱스부터 (전체 - 501)까지 지우면 상위 500개만 남습니다.
+        // Capping 로직 유지
         Long size = redisTemplate.opsForZSet().size(key);
         if (size != null && size > MAX_FEED_SIZE) {
             redisTemplate.opsForZSet().removeRange(key, 0, size - MAX_FEED_SIZE - 1);
@@ -95,5 +97,54 @@ public class FeedService {
 
         // 작성자 본인의 피드에서도 지워줍니다.
         // (본인 글도 피드에 보이게 설계했다면 필요함)
+    }
+
+    /**
+     * [수정] 좋아요 발생 시 통합된 타겟 유저들의 점수 실시간 업데이트
+     * @param post 대상 게시글
+     * @param targetUsers 점수 수정 대상 (팔로워 + 기술 관심 유저 통합 리스트)
+     * @param isIncrement true(증가), false(감소)
+     */
+    @Async("feedTaskExecutor")
+    public void updatePostScoreInFeeds(Post post, List<User> targetUsers, boolean isIncrement) {
+        double delta = isIncrement ? MINUTE : -MINUTE;
+        String postId = String.valueOf(post.getId());
+
+        for (User user : targetUsers) {
+            String key = FEED_KEY_PREFIX + user.getId();
+            // ZINCRBY: 해당 postId가 ZSet에 있을 때만 점수가 변동됨
+            redisTemplate.opsForZSet().incrementScore(key, postId, delta);
+        }
+
+        // 작성자 본인의 피드 점수도 별도 처리 (targetUsers에 본인이 포함 안 되었을 경우)
+        String ownerKey = FEED_KEY_PREFIX + post.getUser().getId();
+        redisTemplate.opsForZSet().incrementScore(ownerKey, postId, delta);
+    }
+
+    /**
+     * 팔로우 여부 확인
+     * (성능을 위해 Redis에 팔로우 관계가 저장되어 있다면 Redis를 우선 조회하는 것이 좋습니다)
+     */
+    private boolean checkIfFollower(User author, User reader) {
+        if (author.getId().equals(reader.getId())) return false;
+        // FollowRepository를 통해 DB 조회 (또는 Redis Set 조회)
+        return followRepository.existsByFromUserIdAndToUserId(reader.getId(), author.getId());
+    }
+
+    /**
+     * 기술 태그 일치 여부 확인
+     * 게시글의 태그 중 하나라도 유저의 관심 태그(점수 보유 태그)에 포함되는지 확인
+     */
+    private boolean checkIfTechMatched(Post post, User reader) {
+        // 게시글의 기술 ID 목록
+        Set<Long> postTechIds = post.getTechTags().stream()
+                .map(pt -> pt.getTechnology().getId())
+                .collect(Collectors.toSet());
+
+        // 유저가 점수를 보유한(관심 있는) 기술 ID 목록 조회 (TechScoreService 이용)
+        Set<Long> userInterestedTechIds = techScoreService.getInterestedTechIds(reader.getId(), MIN_SCORE);
+
+        // 교집합이 있는지 확인
+        return !Collections.disjoint(postTechIds, userInterestedTechIds);
     }
 }

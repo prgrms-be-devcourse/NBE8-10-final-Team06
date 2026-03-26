@@ -10,7 +10,7 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6373
+      port: 6379
     import: optional:file:.env[.properties]
   servlet:
     multipart:

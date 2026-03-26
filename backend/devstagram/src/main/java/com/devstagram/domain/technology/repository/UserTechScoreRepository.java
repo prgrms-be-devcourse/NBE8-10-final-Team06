@@ -28,4 +28,7 @@ public interface UserTechScoreRepository extends JpaRepository<UserTechScore, Lo
     // 카테고리 점수 산정: 카테고리에 속한 기술들의 점수 총합
     @Query("SELECT SUM(uts.score) FROM UserTechScore uts " + "WHERE uts.user = :user AND uts.category = :category")
     Integer sumScoreByUserAndCategory(@Param("user") User user, @Param("category") TechCategory category);
+
+    // 특정 유저의 점수가 기준치(minScore) 이상인 모든 기술 기록 조회
+    List<UserTechScore> findAllByUserIdAndScoreGreaterThanEqual(Long userId, int minScore);
 }

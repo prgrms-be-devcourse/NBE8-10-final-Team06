@@ -9,6 +9,7 @@ public class FeedScoringStrategy {
 
     // 모든 기준을 밀리초(ms) 단위의 '시간'으로 통일합니다.
     private static final double HOUR = 3_600_000.0; // 1시간
+    private static final double MINUTE = 60_000.0; // 1분
     private static final double DAY = 86_400_000.0; // 24시간
 
     /**
@@ -38,7 +39,7 @@ public class FeedScoringStrategy {
         // 4. 인기도 가중치 (Hot 게시글)
         // 좋아요 1개당 1시간의 수명을 연장해 줍니다.
         // 좋아요가 24개 모이면 관심 태그가 없는 글도 내 취향 글을 추월할 수 있습니다.
-        score += (post.getLikeCount() * HOUR);
+        score += (post.getLikeCount() * MINUTE);
 
         return score;
     }

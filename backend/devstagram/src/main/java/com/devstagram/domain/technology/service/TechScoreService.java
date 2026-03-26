@@ -10,6 +10,9 @@ import com.devstagram.domain.user.entity.User;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -74,5 +77,17 @@ public class TechScoreService {
                 }
             }
         });
+    }
+
+    /**
+     * 사용자가 일정 점수 이상을 보유한 기술 ID 목록을 조회합니다.
+     * 피드 배달 시 '관심 기술 매칭' 여부를 판단하기 위해 사용됩니다.
+     */
+    @Transactional(readOnly = true)
+    public Set<Long> getInterestedTechIds(Long userId, int minScore) {
+        return userTechScoreRepository.findAllByUserIdAndScoreGreaterThanEqual(userId, minScore)
+                .stream()
+                .map(uts -> uts.getTechnology().getId())
+                .collect(Collectors.toSet());
     }
 }

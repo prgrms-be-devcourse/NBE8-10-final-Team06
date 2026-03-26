@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.devstagram.domain.feed.service.FeedService;
+import com.devstagram.domain.technology.service.TechScoreService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
@@ -66,6 +68,8 @@ public class BaseInitData implements ApplicationRunner {
     private final DmRepository dmRepository;
     private final TechnologyRepository technologyRepository;
     private final TechCategoryRepository techCategoryRepository;
+    private final FeedService feedService;
+    private final TechScoreService techScoreService;
 
     @Override
     @Transactional
@@ -83,6 +87,8 @@ public class BaseInitData implements ApplicationRunner {
         createStories();
         createInteractions();
         createDms();
+        createFeedScoringScenario();
+        createNormalPost();
     }
 
     private void createTechMasterData() {
@@ -344,5 +350,71 @@ public class BaseInitData implements ApplicationRunner {
 
         dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "5555555555555", null, true));
         dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "6666666666666", null, true));
+    }
+
+    private void createFeedScoringScenario() {
+        // 1. 유저 확보
+        User admin = userRepository.findByEmail("admin@test.com").get(); // 나 (피드 조회 주체)
+        User user4 = userRepository.findByEmail("user4@test.com").get(); // 팔로우 안 함, 기술 일치 안 함
+        User user5 = userRepository.findByEmail("user5@test.com").get(); // 팔로우 안 함, 기술 일치 안 함
+
+        Technology java = technologyRepository.findAll().stream()
+                .filter(t -> t.getName().equals("Java")).findFirst().get();
+
+        // 2. [조건 A: 기술 관심사] admin에게 Java 점수 부여 (60점 -> 기준 50점 초과)
+        // admin이 Java 글을 3번 썼다고 가정 (POST 가중치 20점 * 3)
+        for (int i = 0; i < 3; i++) {
+            techScoreService.increaseScore(admin, java, "POST");
+        }
+
+        // 3. 테스트용 게시글 3개 생성 (작성 시간은 거의 동일하게)
+
+        // [게시글 1] 일반인(user4)이 쓴 아무 관련 없는 글 -> 점수 보너스 없음 (Base Score만 가짐)
+        Post normalPost = postRepository.save(Post.builder()
+                .user(user4).title("점수 보너스 없는 일반글").content("조금 뒤에 밀려날 운명").build());
+
+        // [게시글 2] 내가 팔로우한 user1이 쓴 글 -> 팔로우 보너스 (+12시간)
+        User user1 = userRepository.findByEmail("user1@test.com").get();
+        Post followPost = postRepository.save(Post.builder()
+                .user(user1).title("팔로우 보너스 적용글").content("내 친구의 소식").build());
+
+        // [게시글 3] 팔로우 안 한 user5가 쓴 'Java' 관련 글 -> 기술 보너스 (+24시간)
+        Post techPost = Post.builder()
+                .user(user5).title("기술 보너스 적용글").content("Java 신기술 정보").build();
+        addTagToPost(techPost, java);
+        postRepository.save(techPost);
+
+        // 4. Redis 배달 강제 트리거 (테스트 환경에 따라 PostService.createPost를 거치지 않고 저장했다면 명시적 호출 필요)
+        // postService.createPost 로직을 사용했다면 자동 배달되겠지만,
+        // 직접 save했다면 feedService.deliverPostToFeeds를 여기서 호출해줍니다.
+        feedService.deliverPostToFeeds(normalPost, List.of(admin));
+        feedService.deliverPostToFeeds(followPost, List.of(admin));
+        feedService.deliverPostToFeeds(techPost, List.of(admin));
+    }
+
+    private void createNormalPost() {
+        // 1. 나와 관계없는 유저 선택 (user4는 admin이 팔로우 안 함)
+        User stranger = userRepository.findByEmail("user4@test.com").orElseThrow();
+
+        // 2. 태그가 아예 없는 '순수 일반글' 생성
+        Post normalPost = Post.builder()
+                .user(stranger)
+                .title("가중치 없는 일반 게시글")
+                .content("이 글은 팔로우 보너스도, 기술 보너스도 없습니다.")
+                .build();
+
+        postRepository.save(normalPost);
+
+        // 3. 미디어 추가 (선택사항)
+        postMediaRepository.save(PostMedia.builder()
+                .post(normalPost)
+                .sourceUrl("https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800")
+                .mediaType(MediaType.jpg)
+                .sequence((short) 1)
+                .build());
+
+        // 4. [중요] Redis 배달 (admin에게만 배달하여 테스트)
+        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
+        feedService.deliverPostToFeeds(normalPost, List.of(admin));
     }
 }
