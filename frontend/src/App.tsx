@@ -14,6 +14,7 @@ import PostCreatePage from './pages/PostCreatePage';
 import PostEditPage from './pages/PostEditPage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileEditPage from './pages/ProfileEditPage';
+import SearchPage from './pages/SearchPage';
 import { useAuthStore } from './store/useAuthStore';
 import './App.css';
 
@@ -30,6 +31,9 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         
         <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+        
+        {/* Search */}
+        <Route path="/search" element={<PrivateRoute><SearchPage /></PrivateRoute>} />
         
         {/* Post 도메인 */}
         <Route path="/post/create" element={<PrivateRoute><PostCreatePage /></PrivateRoute>} />

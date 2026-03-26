@@ -16,6 +16,16 @@ export interface FollowResponse {
 }
 
 /**
+ * com.devstagram.domain.user.dto.UserSearchResponse
+ */
+export interface UserSearchResponse {
+  userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
+  isFollowing: boolean;
+}
+
+/**
  * com.devstagram.domain.user.entity.Gender
  */
 export enum Gender {
@@ -59,4 +69,15 @@ export interface UserProfileResponse {
   isFollowing: boolean;
   topTechScores: TechScoreDto[];
   posts: Slice<PostFeedProfileRes>;
+}
+
+/**
+ * com.devstagram.domain.user.dto.ProfileUpdateRequest
+ */
+export interface ProfileUpdateRequest {
+  nickname: string;
+  githubUrl: string;
+  resume: Resume;
+  birthDate: string;
+  gender: Gender;
 }
