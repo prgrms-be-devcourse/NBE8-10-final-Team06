@@ -4,7 +4,9 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
   config:
-    import: optional:file:.env[.properties]
+    import:
+    - optional:file:.env[.properties]
+    - optional:file:./backend/devstagram/.env[.properties]
   servlet:
     multipart:
       enabled: true
@@ -23,14 +25,6 @@ management:
     metrics:
       export:
         enabled: true
-
-    import: optional:file:./backend/devstagram/.env[.properties]
-
-    servlet:
-      multipart:
-        enabled: true
-        max-file-size: 50MB      # 파일 업로드 시 하나당 최대 용량
-        max-request-size: 50MB   # 전체 요청당 최대 용량
 
 server:
   port: 8080

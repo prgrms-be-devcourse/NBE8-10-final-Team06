@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,6 +16,10 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
 
     @Query("select f from Follow f join fetch f.fromUser where f.toUser.id = :toUserId")
     List<Follow> findAllByToUserId(@Param("toUserId") Long toUserId);
+
+    @Modifying
+    @Query("DELETE FROM Follow f WHERE f.fromUser.id = :userId OR f.toUser.id = :userId")
+    void deleteByFromUserIdOrToUserId(@Param("userId") Long userId);
 
     // 내가 팔로우하는 사람 수 (팔로잉 카운트)
     long countByFromUserId(Long fromUserId);

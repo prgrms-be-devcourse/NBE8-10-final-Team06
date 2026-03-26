@@ -71,7 +71,7 @@ class FollowControllerTest {
         String body = signupResult.getResponse().getContentAsString();
         myApiKey = JsonPath.read(body, "$.data.apiKey");
 
-        me = userRepository.findByEmail("me@test.com").orElseThrow();
+        me = userRepository.findByEmailAndIsDeletedFalse("me@test.com").orElseThrow();
         authCookie = loginAndGetCookie("me@test.com", "password123!");
 
         // 2. 팔로우 대상 유저 생성
@@ -162,33 +162,39 @@ class FollowControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data[0].nickname").value("otherNickname"))
+                .andExpect(jsonPath("$.data[0].profileImageUrl").exists())
+                .andExpect(jsonPath("$.data[0].isFollowing").value(true))
                 .andDo(print());
     }
 
     @Test
     @DisplayName("팔로워 목록 조회 테스트")
     void getFollowersTest() throws Exception {
-        // 제3자가 나를 팔로우
         User thirdUser = saveUser("third@test.com", "thirdUser");
         Cookie thirdCookie = loginAndGetCookie("third@test.com", "password123!");
-
         mvc.perform(post("/api/follows/" + me.getId()).cookie(thirdCookie));
 
         mvc.perform(get("/api/follows/" + me.getId() + "/followers").cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].nickname").value("thirdUser"))
+                .andExpect(jsonPath("$.data[0].isFollowing").value(false))
                 .andDo(print());
     }
 
     @Test
     @DisplayName("팔로우 여부 확인 테스트")
     void isFollowingTest() throws Exception {
+        // 비팔로우 상태 확인
         mvc.perform(get("/api/follows/" + otherUser.getId() + "/status").cookie(authCookie))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(false));
 
+        // 팔로우 실행
         mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie));
 
+        // 팔로우 상태 확인
         mvc.perform(get("/api/follows/" + otherUser.getId() + "/status").cookie(authCookie))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
     }
 
@@ -208,7 +214,7 @@ class FollowControllerTest {
                 .content(objectMapper.writeValueAsString(request))
                 .contentType(MediaType.APPLICATION_JSON));
 
-        return userRepository.findByEmail(email).orElseThrow();
+        return userRepository.findByEmailAndIsDeletedFalse(email).orElseThrow();
     }
 
     private Cookie loginAndGetCookie(String email, String password) throws Exception {
