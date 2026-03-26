@@ -46,7 +46,7 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository
-                .findByEmail(request.email())
+                .findByEmailAndIsDeletedFalse(request.email())
                 .orElseThrow(() -> new ServiceException("401-U-1", "이메일 또는 비밀번호가 일치하지 않습니다."));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
