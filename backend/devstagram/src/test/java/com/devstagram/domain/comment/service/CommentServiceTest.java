@@ -214,7 +214,7 @@ class CommentServiceTest {
         given(postRepository.findById(nonExistentPostId)).willReturn(Optional.empty());
 
         // [when & then]
-        assertThatThrownBy(() -> commentService.getCommentsByPostId(nonExistentPostId, 0))
+        assertThatThrownBy(() -> commentService.getCommentsByPostId(1L, nonExistentPostId, 0))
                 .isInstanceOf(ServiceException.class);
     }
 
@@ -232,7 +232,7 @@ class CommentServiceTest {
                 .willReturn(new SliceImpl<>(List.of(parent)));
 
         // [When]
-        Slice<CommentInfoRes> result = commentService.getCommentsByPostId(postId, 0);
+        Slice<CommentInfoRes> result = commentService.getCommentsByPostId(1L, postId, 0);
 
         // [Then]
         assertThat(result.getContent()).isNotEmpty();
