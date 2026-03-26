@@ -2,6 +2,8 @@ package com.devstagram.domain.user.repository;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -51,4 +53,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo WHERE u.nickname = :nickname")
     Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
+
+    @Query("SELECT u FROM User u WHERE u.nickname LIKE %:keyword%")
+    Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
 }
