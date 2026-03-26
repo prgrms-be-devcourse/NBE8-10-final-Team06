@@ -20,7 +20,7 @@ const StoryBar: React.FC = () => {
         // 1. 전체 스토리 피드 조회
         const feedRes = await storyApi.getFeed();
         if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
-          setFeed(feedRes.data);
+          setFeed(feedRes.data || []);
         }
 
         // 2. 내 정보 확보
@@ -35,30 +35,27 @@ const StoryBar: React.FC = () => {
           }
         }
 
-        // 3. 내 스토리 목록 조회 (일시 중단)
-        // [이슈] 백엔드 /api/story/user/{id} 엔드포인트가 현재 서버 설정 문제(-parameters flag)로 고장 상태임.
-        // 콘솔 에러 방지를 위해 서버 수정 전까지 호출을 중단함.
-        /*
+        // 3. 내 스토리 목록 조회 (백엔드 수정 완료로 인한 복구)
         if (currentUserId) {
           try {
             const myStoryRes = await storyApi.getUserStories(currentUserId);
             if (myStoryRes.resultCode?.includes('-S-')) {
-              setMyStories(myStoryRes.data);
+              setMyStories(myStoryRes.data || []);
             }
           } catch (storyError: any) {
-            console.warn('내 스토리 로드 실패 (백엔드 엔드포인트 결함)');
+            console.warn('내 스토리 로드 실패:', storyError.message);
           }
         }
-        */
       } catch (error: any) {
         console.error('스토리 데이터 로드 중 오류 발생:', error.message);
       }
     };
 
     fetchData();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, userId, setLogin]);
 
   const hasActiveMyStory = myStories.length > 0;
+  // 다른 사용자들의 피드 (내 닉네임 중복 제거)
   const otherUsersFeed = feed.filter(item => item.nickname !== nickname);
 
   const handleMyStoryClick = () => {
@@ -79,6 +76,7 @@ const StoryBar: React.FC = () => {
         .story-container { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
       
+      {/* 내 스토리 섹션 */}
       <div style={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0, width: '74px' }} onClick={handleMyStoryClick}>
         <div style={{ 
           width: '70px', height: '70px', borderRadius: '50%', padding: '2.5px',
@@ -100,9 +98,10 @@ const StoryBar: React.FC = () => {
             </div>
           )}
         </div>
-        <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#8e8e8e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>내 스토리</div>
+        <div style={{ fontSize: '0.75rem', marginTop: '6px', color: hasActiveMyStory ? '#262626' : '#8e8e8e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>내 스토리</div>
       </div>
 
+      {/* 타인 스토리 섹션 */}
       {otherUsersFeed.map((item) => (
         <div key={item.userId} style={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0, width: '74px' }} onClick={() => navigate(`/story/${item.userId}`)}>
           <div style={{ 

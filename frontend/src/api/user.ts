@@ -1,21 +1,37 @@
 import client from './client';
 import { RsData } from '../types/common';
-import { FollowUserResponse, FollowResponse, UserProfileResponse } from '../types/user';
+import { FollowUserResponse, FollowResponse, UserProfileResponse, ProfileUpdateRequest } from '../types/user';
 
 export const userApi = {
   // 특정 사용자의 프로필 조회
   getProfile: (nickname: string, page: number = 0) =>
     client.get<RsData<UserProfileResponse>>(`/users/${nickname}/profile`, {
-      params: { page, size: 9, sort: 'createdAt,desc' }
+      params: { page, size: 9 }
     }).then(res => res.data),
 
+  // 내 프로필 정보 수정 (MultipartForm)
+  updateProfile: (req: ProfileUpdateRequest, profileImage?: File) => {
+    const formData = new FormData();
+    
+    // 핵심: JSON 데이터를 Blob으로 감싸고 type을 application/json으로 명시해야 백엔드 @RequestPart가 인식함
+    formData.append('request', new Blob([JSON.stringify(req)], { type: 'application/json' }));
+    
+    if (profileImage) {
+      formData.append('profileImage', profileImage);
+    }
+    
+    return client.put<RsData<void>>('/users/me/profile', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
+  },
+
   // 팔로우 실행
-  follow: (toUserId: number) => 
-    client.post<RsData<FollowResponse>>(`/follows/${toUserId}`).then(res => res.data),
+  follow: (nickname: string) => 
+    client.post<RsData<void>>(`/follows/${nickname}`).then(res => res.data),
 
   // 팔로우 취소
-  unfollow: (toUserId: number) => 
-    client.delete<RsData<FollowResponse>>(`/follows/${toUserId}`).then(res => res.data),
+  unfollow: (nickname: string) => 
+    client.delete<RsData<void>>(`/follows/${nickname}`).then(res => res.data),
 
   // 팔로워 수 조회
   getFollowerCount: (userId: number) => 

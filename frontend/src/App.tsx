@@ -5,12 +5,14 @@ import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import StoryViewer from './pages/story/StoryViewer';
 import StoryCreate from './pages/story/StoryCreate';
-import StoryArchive from './pages/story/StoryArchive'; // 추가
+import StoryArchive from './pages/story/StoryArchive';
 import DmListPage from './pages/dm/DmListPage';
 import DmChatPage from './pages/dm/DmChatPage';
 import HomePage from './pages/HomePage';
 import PostDetailPage from './pages/PostDetailPage';
+import PostCreatePage from './pages/PostCreatePage';
 import ProfilePage from './pages/ProfilePage';
+import ProfileEditPage from './pages/ProfileEditPage';
 import { useAuthStore } from './store/useAuthStore';
 import './App.css';
 
@@ -25,14 +27,29 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        
         <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+        
+        {/* Post 도메인 */}
+        <Route path="/post/create" element={<PrivateRoute><PostCreatePage /></PrivateRoute>} />
         <Route path="/post/:postId" element={<PrivateRoute><PostDetailPage /></PrivateRoute>} />
+        
+        {/* Story 도메인 */}
         <Route path="/story/:userId" element={<PrivateRoute><StoryViewer /></PrivateRoute>} />
         <Route path="/story/create" element={<PrivateRoute><StoryCreate /></PrivateRoute>} />
         <Route path="/story/archive" element={<PrivateRoute><StoryArchive /></PrivateRoute>} />
+        
+        {/* DM 도메인 */}
         <Route path="/dm" element={<PrivateRoute><DmListPage /></PrivateRoute>} />
         <Route path="/dm/:roomId" element={<PrivateRoute><DmChatPage /></PrivateRoute>} />
+        
+        {/* Profile 도메인 */}
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/profile/:nickname" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/profile/edit" element={<PrivateRoute><ProfileEditPage /></PrivateRoute>} />
+        
+        {/* 404 fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

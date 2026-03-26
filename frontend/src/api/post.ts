@@ -1,43 +1,53 @@
 import client from './client';
-import { PostFeedResponse, Slice, PostCreateRequest, PostDetailResponse } from '../types/post';
-import { RsData } from '../types/common';
+import { RsData, Slice } from '../types/common';
+import { 
+  PostFeedResponse, 
+  PostDetailResponse, 
+  PostCreateRequest, 
+  PostUpdateRequest 
+} from '../types/post';
 
 export const postApi = {
-  // 홈 피드 조회 (Slice 페이징)
-  getFeed: async (page = 0, size = 10): Promise<RsData<Slice<PostFeedResponse>>> => {
-    const res = await client.get<RsData<Slice<PostFeedResponse>>>(`/posts`, {
-      params: { page, size, sort: 'createdAt,desc' },
-    });
-    return res.data;
-  },
-
-  // 게시물 상세 조회
-  getPost: async (postId: number): Promise<RsData<PostDetailResponse>> => {
-    const res = await client.get<RsData<PostDetailResponse>>(`/posts/${postId}`);
-    return res.data;
-  },
-
-  // 게시물 생성 (MultipartForm)
-  createPost: async (data: PostCreateRequest, files: File[]): Promise<RsData<number>> => {
+  create: (req: PostCreateRequest, files: File[]) => {
     const formData = new FormData();
-    formData.append('request', new Blob([JSON.stringify(data)], { type: 'application/json' }));
-    files.forEach((file) => formData.append('files', file));
-
-    const res = await client.post<RsData<number>>(`/posts`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return res.data;
+    formData.append('request', new Blob([JSON.stringify(req)], { type: 'application/json' }));
+    files.forEach(file => formData.append('files', file));
+    return client.post<RsData<number>>('/posts', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
   },
 
-  // 좋아요 토글
-  toggleLike: async (postId: number): Promise<RsData<void>> => {
-    const res = await client.post<RsData<void>>(`/posts/${postId}`);
-    return res.data;
+  // sort 파라미터를 제거하여 백엔드 기본값 사용 유도
+  getFeed: (page: number = 0, size: number = 10) =>
+    client.get<RsData<Slice<PostFeedResponse>>>('/posts', {
+      params: { page, size }
+    }).then(res => res.data),
+
+  getDetail: (postId: number, pageNumber: number = 0) =>
+    client.get<RsData<PostDetailResponse>>(`/posts/${postId}`, {
+      params: { pageNumber }
+    }).then(res => res.data),
+
+  update: (postId: number, req: PostUpdateRequest, files?: File[]) => {
+    const formData = new FormData();
+    formData.append('request', new Blob([JSON.stringify(req)], { type: 'application/json' }));
+    if (files) files.forEach(file => formData.append('files', file));
+    return client.put<RsData<void>>(`/posts/${postId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).then(res => res.data);
   },
 
-  // 게시물 삭제
-  deletePost: async (postId: number): Promise<RsData<void>> => {
-    const res = await client.delete<RsData<void>>(`/posts/${postId}`);
-    return res.data;
-  },
+  delete: (postId: number) =>
+    client.delete<RsData<void>>(`/posts/${postId}`).then(res => res.data),
+
+  toggleLike: (postId: number) =>
+    client.post<RsData<void>>(`/posts/${postId}/like`).then(res => res.data),
+
+  toggleScrap: (postId: number) =>
+    client.post<RsData<void>>(`/posts/${postId}/scrap`).then(res => res.data),
+
+  getScraps: (page: number = 0) =>
+    client.get<RsData<Slice<PostFeedResponse>>>('/posts/scraps', {
+      params: { page, size: 10 }
+    }).then(res => res.data),
 };

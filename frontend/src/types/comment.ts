@@ -1,8 +1,14 @@
+/**
+ * com.devstagram.domain.comment.dto.CommentInfoRes
+ */
 export interface CommentInfoResponse {
   id: number;
   userId: number;
   content: string;
   nickname: string;
+  isLiked: boolean;
+  isMine: boolean;
+  profileImageUrl: string | null;
   createdAt: string;
   modifiedAt: string;
   replyCount: number;

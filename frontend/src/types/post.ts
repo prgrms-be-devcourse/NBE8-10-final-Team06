@@ -36,6 +36,9 @@ export interface PostFeedProfileRes {
   commentCount: number;
 }
 
+/**
+ * com.devstagram.domain.post.dto.PostFeedRes
+ */
 export interface PostFeedResponse {
   id: number;
   authorId: number;
@@ -43,11 +46,19 @@ export interface PostFeedResponse {
   title: string;
   content: string;
   medias: PostMediaResponse[];
+  techStacks: TechTagRes[];
+  isLiked: boolean;
+  isScrapped: boolean;
+  isMine: boolean;
+  profileImageUrl: string | null;
   likeCount: number;
   commentCount: number;
-  createdAt: string; // ISO 8601 string
+  createdAt: string;
 }
 
+/**
+ * com.devstagram.domain.post.dto.PostDetailRes
+ */
 export interface PostDetailResponse {
   id: number;
   authorId: number;
@@ -56,17 +67,30 @@ export interface PostDetailResponse {
   content: string;
   likeCount: number;
   commentCount: number;
+  isLiked: boolean;
+  isScrapped: boolean;
+  isMine: boolean;
+  profileImageUrl: string | null;
   createdAt: string;
   medias: PostMediaResponse[];
+  techStacks: TechTagRes[];
   comments: Slice<CommentInfoResponse>;
 }
 
+/**
+ * com.devstagram.domain.post.dto.PostCreateReq
+ */
 export interface PostCreateRequest {
   title: string;
   content: string;
+  techIds: number[];
 }
 
+/**
+ * com.devstagram.domain.post.dto.PostUpdateReq
+ */
 export interface PostUpdateRequest {
   title: string;
   content: string;
+  techIds: number[];
 }
