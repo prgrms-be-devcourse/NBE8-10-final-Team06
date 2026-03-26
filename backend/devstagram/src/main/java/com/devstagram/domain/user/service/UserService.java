@@ -1,9 +1,11 @@
 package com.devstagram.domain.user.service;
 
 import com.devstagram.domain.user.dto.UserSearchResponse;
+import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import java.util.Collections;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -39,6 +41,7 @@ public class UserService {
     private final FileValidator fileValidator;
     private final UserTechScoreRepository userTechScoreRepository;
     private final PostRepository postRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 특정 사용자의 프로필 정보 조회
@@ -121,7 +124,6 @@ public class UserService {
         }
     }
 
-    @Transactional(readOnly = true)
     public Slice<UserSearchResponse> searchUsers(String keyword, Long currentUserId, Pageable pageable) {
         if (keyword == null || keyword.trim().isEmpty()) {
             return new SliceImpl<>(Collections.emptyList(), pageable, false);
@@ -137,5 +139,17 @@ public class UserService {
             }
             return UserSearchResponse.of(user, isFollowing);
         });
+    }
+
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ServiceException("404-U-1", "유저 없음"));
+
+        // 1. (User) 상태 변경
+        user.softDelete();
+
+        // 이 코드가 실행되는 순간, 이 이벤트를 기다리던 리스너들이 동시에 동작합니다.
+        eventPublisher.publishEvent(new UserWithdrawnEvent(userId));
     }
 }

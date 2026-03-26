@@ -15,9 +15,9 @@ import com.devstagram.domain.user.entity.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByEmail(String email);
+    Optional<User> findByEmailAndIsDeletedFalse(String email);
 
-    Optional<User> findByNickname(String nickname);
+    Optional<User> findByNicknameAndIsDeletedFalse(String nickname);
 
     Optional<User> findByApiKey(String apiKey);
 
@@ -51,9 +51,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.postCount = CASE WHEN u.postCount > 0 THEN u.postCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreasePostCount(@Param("id") Long id);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo WHERE u.nickname = :nickname")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo " +
+            "WHERE u.nickname = :nickname AND u.isDeleted = false")
     Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
 
-    @Query("SELECT u FROM User u WHERE u.nickname LIKE %:keyword%")
+    @Query("SELECT u FROM User u " +
+            "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
     Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
 }

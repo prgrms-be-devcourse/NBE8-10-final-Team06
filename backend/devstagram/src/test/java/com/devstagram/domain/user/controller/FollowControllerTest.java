@@ -71,7 +71,7 @@ class FollowControllerTest {
         String body = signupResult.getResponse().getContentAsString();
         myApiKey = JsonPath.read(body, "$.data.apiKey");
 
-        me = userRepository.findByEmail("me@test.com").orElseThrow();
+        me = userRepository.findByEmailAndIsDeletedFalse("me@test.com").orElseThrow();
         authCookie = loginAndGetCookie("me@test.com", "password123!");
 
         // 2. 팔로우 대상 유저 생성
@@ -214,7 +214,7 @@ class FollowControllerTest {
                 .content(objectMapper.writeValueAsString(request))
                 .contentType(MediaType.APPLICATION_JSON));
 
-        return userRepository.findByEmail(email).orElseThrow();
+        return userRepository.findByEmailAndIsDeletedFalse(email).orElseThrow();
     }
 
     private Cookie loginAndGetCookie(String email, String password) throws Exception {

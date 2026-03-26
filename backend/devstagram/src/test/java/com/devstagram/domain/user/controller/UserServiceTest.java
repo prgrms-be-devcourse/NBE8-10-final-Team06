@@ -3,9 +3,14 @@ package com.devstagram.domain.user.controller;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
+import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.dto.UserSearchResponse;
+import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,10 +32,12 @@ import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 import com.devstagram.global.util.FileValidator;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +57,15 @@ class UserServiceTest {
 
     @InjectMocks
     private UserService userService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private UserTechScoreRepository userTechScoreRepository;
+
+    @Mock
+    private PostRepository postRepository;
 
     @Test
     @DisplayName("프로필 수정 성공 - 닉네임 변경 및 UserInfo가 자동 생성되어야 한다")
@@ -77,6 +93,39 @@ class UserServiceTest {
         // profileImage가 null이므로 기존 imageUrl인 "oldUrl"이 유지되어야 함 (로직에 따라 확인)
         assertThat(user.getNickname()).isEqualTo("newNickname");
         assertThat(user.getUserInfo()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("프로필 수정 성공 - 이미지가 있을 때 스토리지 서비스가 호출되어야 한다")
+    void updateProfile_WithImage() {
+        // 1. Given (데이터 준비)
+        Long userId = 1L;
+        User user = User.builder()
+                .nickname("oldName")
+                .profileImageUrl("old-image.png")
+                .build();
+
+        ProfileUpdateRequest request = new ProfileUpdateRequest(
+                "newName", "https://github.com/dohwa", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
+
+        // 가짜 이미지 파일 생성
+        org.springframework.mock.web.MockMultipartFile file =
+                new org.springframework.mock.web.MockMultipartFile("profileImage", "test.png", "image/png", "test".getBytes());
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(storageService.store(file)).willReturn("https://new-image-url.com");
+
+        // 2. When (실행)
+        userService.updateProfile(userId, request, file);
+
+        // 3. Then (검증)
+        verify(fileValidator).validateImage(file);
+        verify(storageService).store(file);
+        verify(storageService).delete("old-image.png");
+
+        // 최종적으로 유저의 이미지 URL이 바뀌었는지 확인
+        assertThat(user.getProfileImageUrl()).isEqualTo("https://new-image-url.com");
+        assertThat(user.getNickname()).isEqualTo("newName");
     }
 
     @Test
@@ -183,5 +232,73 @@ class UserServiceTest {
         // then
         assertThat(results.getContent()).isEmpty();
         verify(userRepository, never()).findByNicknameContaining(anyString(), any(org.springframework.data.domain.Pageable.class));
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 성공 - 유저 상태가 변경되고 이벤트가 발행되어야 한다")
+    void withdraw_Success() {
+        // given
+        Long userId = 1L;
+        User user = User.builder()
+                .nickname("dohwa")
+                .email("dohwa@test.com")
+                .isDeleted(false)
+                .build();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+
+        // when
+        userService.withdraw(userId);
+
+        // then
+        // 1. 유저의 상태값이 변경되었는지 확인
+        assertThat(user.isDeleted()).isTrue();
+        assertThat(user.getNickname()).contains("탈퇴한 사용자");
+
+        // 2. 이벤트가 실제로 발행되었는지 확인
+        verify(eventPublisher, times(1)).publishEvent(any(UserWithdrawnEvent.class));
+    }
+
+    @Test
+    @DisplayName("유저 프로필 조회 성공 - 기술 스택과 게시글 목록을 포함한 응답을 반환한다")
+    void getUserProfile_Success() {
+        // 1. Given (데이터 준비)
+        String nickname = "dohwa";
+        Long currentUserId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        User targetUser = User.builder()
+                .nickname(nickname)
+                .followerCount(10L)
+                .followingCount(20L)
+                .postCount(5L)
+                .build();
+        ReflectionTestUtils.setField(targetUser, "id", 2L);
+
+        // 기술 스택 모킹
+        given(userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser))
+                .willReturn(Collections.emptyList());
+
+        // 게시글 목록 모킹
+        given(postRepository.findAllByUserIdOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(Collections.emptyList(), pageable, false));
+
+        // 유저 조회 모킹 (Fetch Join 버전)
+        given(userRepository.findByNicknameWithInfo(nickname)).willReturn(Optional.of(targetUser));
+
+        // 팔로우 여부 모킹
+        given(followService.isFollowing(currentUserId, targetUser.getId())).willReturn(true);
+
+        // 2. When (실행)
+        UserProfileResponse response = userService.getUserProfile(nickname, currentUserId, pageable);
+
+        // 3. Then (검증)
+        assertThat(response.nickname()).isEqualTo(nickname);
+        assertThat(response.followerCount()).isEqualTo(10L);
+        assertThat(response.isFollowing()).isTrue(); // 팔로우 중인지 확인
+
+        verify(userRepository).findByNicknameWithInfo(nickname);
+        verify(postRepository).findAllByUserIdOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class));
     }
 }
