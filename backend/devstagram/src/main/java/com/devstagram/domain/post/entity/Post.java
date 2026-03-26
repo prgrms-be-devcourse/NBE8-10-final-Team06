@@ -1,7 +1,9 @@
 package com.devstagram.domain.post.entity;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
@@ -44,7 +46,7 @@ public class Post extends BaseEntity {
 
     @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<PostTechnology> techTags = new LinkedHashSet<>();
+    private Set<PostTechnology> techTags = new LinkedHashSet<>(); // 게시글 상세 페이지 진입시 오류 해결 위해 자료형 Set 으로 변경
 
     @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
