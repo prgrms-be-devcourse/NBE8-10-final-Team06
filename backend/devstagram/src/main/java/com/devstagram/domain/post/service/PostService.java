@@ -64,8 +64,10 @@ public class PostService {
         Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
 
         Set<Long> likedPostIds = getLikedPostIds(memberId, posts.getContent());
+        Set<Long> ScrappedPostIds = getScrappedPostIds(memberId, posts.getContent());
 
-        return posts.map(post -> PostFeedRes.from(post, likedPostIds.contains(post.getId()), memberId));
+        return posts.map(post -> PostFeedRes.from(
+                post, likedPostIds.contains(post.getId()), ScrappedPostIds.contains(post.getId()), memberId));
     }
 
     private Set<Long> getLikedPostIds(Long memberId, List<Post> posts) {
@@ -75,6 +77,15 @@ public class PostService {
 
         List<Long> postIds = posts.stream().map(Post::getId).toList();
         return postLikeRepository.findAllPostIdsByUserIdAndPostIds(memberId, postIds);
+    }
+
+    private Set<Long> getScrappedPostIds(Long memberId, List<Post> posts) {
+        if (memberId == null || posts.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        return postScrapRepository.findAllPostIdsByUserIdAndPostIds(memberId, postIds);
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +108,9 @@ public class PostService {
 
         boolean isLiked = (memberId != null) && postLikeRepository.existsByPostIdAndUserId(postId, memberId);
 
-        return PostDetailRes.from(post, commentSlice, isLiked, memberId);
+        boolean isScrapped = (memberId != null) && postScrapRepository.existsByPostIdAndUserId(postId, memberId);
+
+        return PostDetailRes.from(post, commentSlice, isLiked, isScrapped, memberId);
     }
 
     private Set<Long> getLikedCommentIds(Long memberId, List<Comment> comments) {
@@ -353,16 +366,20 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public Page<PostFeedRes> getUserScrappedPosts(Long userId, Pageable pageable) {
-        // 1. 스크랩한 게시글들 조회
+        // 스크랩한 게시글들 조회
         Page<Post> scrappedPosts = postScrapRepository.findActivePostsByUserId(userId, pageable);
 
-        // 2. 피드로 보여줄 게시글 ID 목록 추출
+        // 피드로 보여줄 게시글 ID 목록 추출
         List<Long> postIds =
                 scrappedPosts.getContent().stream().map(Post::getId).toList();
 
-        // 3. 내가 좋아요 누른 게시글 명단 가져오기
+        // 내가 좋아요 누른 게시글 명단 가져오기
         Set<Long> likedPostIds = postLikeRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
 
-        return scrappedPosts.map(post -> PostFeedRes.from(post, likedPostIds.contains(post.getId()), userId));
+        // 내가 스크랩한 게시글 명단 가져오기
+        Set<Long> scrappedPostIds = postScrapRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
+
+        return scrappedPosts.map(post -> PostFeedRes.from(
+                post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), userId));
     }
 }

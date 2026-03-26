@@ -191,6 +191,7 @@ class PostControllerTest {
                 .likeCount(10L)
                 .commentCount(5L)
                 .isLiked(false) // 추가
+                .isScrapped(false)
                 .isMine(false) // 추가
                 .createdAt(now)
                 .comments(commentSlice)
@@ -237,6 +238,7 @@ class PostControllerTest {
                         .likeCount(10L)
                         .commentCount(2L)
                         .isLiked(true)
+                        .isScrapped(false)
                         .isMine(false)
                         .createdAt(now)
                         .build(),
@@ -249,6 +251,7 @@ class PostControllerTest {
                         .likeCount(5L)
                         .commentCount(0L)
                         .isLiked(true)
+                        .isScrapped(false)
                         .isMine(false)
                         .createdAt(now)
                         .build());
