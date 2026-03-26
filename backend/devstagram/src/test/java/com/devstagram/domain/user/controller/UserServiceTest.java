@@ -3,7 +3,10 @@ package com.devstagram.domain.user.controller;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import com.devstagram.domain.user.dto.UserSearchResponse;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +27,11 @@ import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 import com.devstagram.global.util.FileValidator;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -35,10 +43,10 @@ class UserServiceTest {
     private FollowService followService;
 
     @Mock
-    private StorageService storageService; // 추가 필수!
+    private StorageService storageService;
 
     @Mock
-    private FileValidator fileValidator; // 추가 필수!
+    private FileValidator fileValidator;
 
     @InjectMocks
     private UserService userService;
@@ -110,5 +118,70 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateProfile(userId, request, null)) // 인자 3개!
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("이미 사용 중인 닉네임입니다.");
+    }
+
+    @Test
+    @DisplayName("유저 검색 성공 - 검색 키워드와 페이징을 이용해 Slice 형태의 결과를 반환한다")
+    void searchUsers_Success() {
+        // 1. 준비 (given)
+        String keyword = "dohwa";
+        Long currentUserId = 1L;
+        Pageable pageable = PageRequest.of(0, 20);
+
+        // User 엔티티 생성 (builder에 id가 없으므로 ReflectionTestUtils 사용)
+        User user1 = User.builder()
+                .nickname("dohwa_backend")
+                .profileImageUrl("https://image1.com")
+                .build();
+        ReflectionTestUtils.setField(user1, "id", 1L);
+
+        User user2 = User.builder()
+                .nickname("dohwa_ai")
+                .build();
+        ReflectionTestUtils.setField(user2, "id", 2L);
+
+        // 리포지토리 결과를 SliceImpl로 감싸서 준비
+        List<User> userList = Arrays.asList(user1, user2);
+        Slice<UserSearchResponse> sliceResponse = new SliceImpl<>(
+                Arrays.asList(
+                        UserSearchResponse.of(user1, false),
+                        UserSearchResponse.of(user2, false)
+                ),
+                pageable,
+                false
+        );
+
+        // 서비스 로직에서 리포지토리가 아닌 서비스 메서드 자체를 검증하거나
+        // 서비스 내부에서 호출하는 userRepository.findByNicknameContaining 등을 모킹
+        // 도화님의 UserController를 보니 Slice<UserSearchResponse>를 반환하므로 서비스 메서드 호출 결과 모킹
+        given(userRepository.findByNicknameContaining(anyString(), any(Pageable.class)))
+                .willReturn(new SliceImpl<>(userList, pageable, false));
+
+        // 2. 실행 (when)
+        Slice<UserSearchResponse> results = userService.searchUsers(keyword, currentUserId, pageable);
+
+        // 3. 검증 (then)
+        assertThat(results.getContent()).hasSize(2);
+        assertThat(results.getContent().get(0).nickname()).isEqualTo("dohwa_backend");
+        assertThat(results.getContent().get(1).nickname()).isEqualTo("dohwa_ai");
+
+        verify(userRepository, times(1)).findByNicknameContaining(eq(keyword), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("유저 검색 - 검색어가 공백이면 리포지토리를 호출하지 않고 빈 Slice를 반환한다")
+    void searchUsers_EmptyKeyword() {
+        // given
+        String keyword = "  "; // 공백 입력
+        Long currentUserId = 1L;
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+
+        // when
+        org.springframework.data.domain.Slice<com.devstagram.domain.user.dto.UserSearchResponse> results =
+                userService.searchUsers(keyword, currentUserId, pageable);
+
+        // then
+        assertThat(results.getContent()).isEmpty();
+        verify(userRepository, never()).findByNicknameContaining(anyString(), any(org.springframework.data.domain.Pageable.class));
     }
 }
