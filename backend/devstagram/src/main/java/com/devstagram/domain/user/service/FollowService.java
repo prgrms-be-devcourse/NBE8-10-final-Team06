@@ -84,19 +84,31 @@ public class FollowService {
         return getUserById(userId).getFollowerCount();
     }
 
-    // 특정 유저가 팔로잉하는 사람들 목록
-    public List<FollowUserResponse> getFollowings(Long userId) {
-        // 내가(fromUser) 팔로우한 사람들(toUser)을 가져와서 DTO로 변환
-        return followRepository.findAllByFromUserId(userId).stream()
-                .map(follow -> FollowUserResponse.from(follow.getToUser()))
+    /**
+     * 특정 유저가 팔로잉하는 사람들 목록
+     */
+    public List<FollowUserResponse> getFollowings(Long targetUserId, Long loginUserId) {
+        return followRepository.findAllByFromUserId(targetUserId).stream()
+                .map(follow -> {
+                    User targetUser = follow.getToUser();
+                    boolean isFollowing = (loginUserId != null) &&
+                            followRepository.existsByFromUserIdAndToUserId(loginUserId, targetUser.getId());
+                    return FollowUserResponse.of(targetUser, isFollowing);
+                })
                 .toList();
     }
 
-    // 특정 유저를 팔로우하는 사람들(팬) 목록
-    public List<FollowUserResponse> getFollowers(Long userId) {
-        // 나를(toUser) 팔로우한 사람들(fromUser)을 가져와서 DTO로 변환
-        return followRepository.findAllByToUserId(userId).stream()
-                .map(follow -> FollowUserResponse.from(follow.getFromUser()))
+    /**
+     * 특정 유저를 팔로우하는 사람들 목록
+     */
+    public List<FollowUserResponse> getFollowers(Long targetUserId, Long loginUserId) {
+        return followRepository.findAllByToUserId(targetUserId).stream()
+                .map(follow -> {
+                    User follower = follow.getFromUser();
+                    boolean isFollowing = (loginUserId != null) &&
+                            followRepository.existsByFromUserIdAndToUserId(loginUserId, follower.getId());
+                    return FollowUserResponse.of(follower, isFollowing);
+                })
                 .toList();
     }
 

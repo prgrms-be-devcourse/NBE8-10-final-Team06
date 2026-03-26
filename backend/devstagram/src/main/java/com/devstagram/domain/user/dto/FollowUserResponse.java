@@ -1,12 +1,20 @@
 package com.devstagram.domain.user.dto;
 
 import com.devstagram.domain.user.entity.User;
+import java.util.Optional;
 
-public record FollowUserResponse(Long id, String nickname, String profileImageUrl // 나중에 이미지가 추가되면 사용, 지금은 null 처리 가능
-        ) {
-    public static FollowUserResponse from(User user) {
+public record FollowUserResponse(
+        Long userId,
+        String nickname,
+        String profileImageUrl,
+        boolean isFollowing
+) {
+    public static FollowUserResponse of(User user, boolean isFollowing) {
         return new FollowUserResponse(
-                user.getId(), user.getNickname(), null // 현재 User 엔티티에 이미지 필드가 없다면 null로 두기
-                );
+                user.getId(),
+                user.getNickname(),
+                Optional.ofNullable(user.getProfileImageUrl()).orElse("/default-profile.png"),
+                isFollowing
+        );
     }
 }
