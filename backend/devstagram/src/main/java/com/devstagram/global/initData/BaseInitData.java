@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.devstagram.domain.feed.service.FeedService;
-import com.devstagram.domain.technology.service.TechScoreService;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +21,7 @@ import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostMedia;
 import com.devstagram.domain.post.repository.PostMediaRepository;
@@ -38,6 +37,7 @@ import com.devstagram.domain.technology.entity.TechCategory;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
@@ -359,7 +359,9 @@ public class BaseInitData implements ApplicationRunner {
         User user5 = userRepository.findByEmail("user5@test.com").get(); // 팔로우 안 함, 기술 일치 안 함
 
         Technology java = technologyRepository.findAll().stream()
-                .filter(t -> t.getName().equals("Java")).findFirst().get();
+                .filter(t -> t.getName().equals("Java"))
+                .findFirst()
+                .get();
 
         // 2. [조건 A: 기술 관심사] admin에게 Java 점수 부여 (60점 -> 기준 50점 초과)
         // admin이 Java 글을 3번 썼다고 가정 (POST 가중치 20점 * 3)
@@ -371,16 +373,25 @@ public class BaseInitData implements ApplicationRunner {
 
         // [게시글 1] 일반인(user4)이 쓴 아무 관련 없는 글 -> 점수 보너스 없음 (Base Score만 가짐)
         Post normalPost = postRepository.save(Post.builder()
-                .user(user4).title("점수 보너스 없는 일반글").content("조금 뒤에 밀려날 운명").build());
+                .user(user4)
+                .title("점수 보너스 없는 일반글")
+                .content("조금 뒤에 밀려날 운명")
+                .build());
 
         // [게시글 2] 내가 팔로우한 user1이 쓴 글 -> 팔로우 보너스 (+12시간)
         User user1 = userRepository.findByEmail("user1@test.com").get();
         Post followPost = postRepository.save(Post.builder()
-                .user(user1).title("팔로우 보너스 적용글").content("내 친구의 소식").build());
+                .user(user1)
+                .title("팔로우 보너스 적용글")
+                .content("내 친구의 소식")
+                .build());
 
         // [게시글 3] 팔로우 안 한 user5가 쓴 'Java' 관련 글 -> 기술 보너스 (+24시간)
         Post techPost = Post.builder()
-                .user(user5).title("기술 보너스 적용글").content("Java 신기술 정보").build();
+                .user(user5)
+                .title("기술 보너스 적용글")
+                .content("Java 신기술 정보")
+                .build();
         addTagToPost(techPost, java);
         postRepository.save(techPost);
 

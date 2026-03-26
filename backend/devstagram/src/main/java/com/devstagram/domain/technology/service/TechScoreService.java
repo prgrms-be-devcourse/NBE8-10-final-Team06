@@ -1,5 +1,8 @@
 package com.devstagram.domain.technology.service;
 
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,9 +12,6 @@ import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.entity.User;
 
 import lombok.RequiredArgsConstructor;
-
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -85,8 +85,7 @@ public class TechScoreService {
      */
     @Transactional(readOnly = true)
     public Set<Long> getInterestedTechIds(Long userId, int minScore) {
-        return userTechScoreRepository.findAllByUserIdAndScoreGreaterThanEqual(userId, minScore)
-                .stream()
+        return userTechScoreRepository.findAllByUserIdAndScoreGreaterThanEqual(userId, minScore).stream()
                 .map(uts -> uts.getTechnology().getId())
                 .collect(Collectors.toSet());
     }

@@ -26,11 +26,11 @@ import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostMediaRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
-import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
+import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
@@ -61,9 +61,8 @@ public class PostService {
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
         // 1. FeedService를 통해 Redis에서 랭킹 기반 ID 목록 확보
-        List<Long> rankedIds = (memberId != null)
-                ? feedService.getRankedPostIds(memberId, pageable)
-                : Collections.emptyList();
+        List<Long> rankedIds =
+                (memberId != null) ? feedService.getRankedPostIds(memberId, pageable) : Collections.emptyList();
 
         Slice<Post> posts;
 
@@ -89,10 +88,7 @@ public class PostService {
 
         // 6. DTO 변환 및 반환
         return posts.map(post -> PostFeedRes.from(
-                post,
-                likedPostIds.contains(post.getId()),
-                scrappedPostIds.contains(post.getId()),
-                memberId));
+                post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), memberId));
     }
 
     private Set<Long> getLikedPostIds(Long memberId, List<Post> posts) {
@@ -332,7 +328,8 @@ public class PostService {
 
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
 
-        List<Follow> followRelations = followRepository.findAllByToUserId(post.getUser().getId());
+        List<Follow> followRelations =
+                followRepository.findAllByToUserId(post.getUser().getId());
         List<User> followers = followRelations.stream().map(Follow::getFromUser).toList();
 
         // 좋아요 행위자의 기술 태그 점수 반영
@@ -342,8 +339,7 @@ public class PostService {
             postRepository.decrementLikeCount(postId);
 
             // 행위자의 기술 점수 차감
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "LIKE"));
+            post.getTechTags().forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "LIKE"));
 
             // 피드 점수 실시간 차감 (비동기)
             feedService.updatePostScoreInFeeds(post, followers, false);
@@ -357,8 +353,7 @@ public class PostService {
             postRepository.incrementLikeCount(postId);
 
             // 행위자의 기술 점수 부여
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "LIKE"));
+            post.getTechTags().forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "LIKE"));
 
             // [추가] 피드 점수 실시간 증가 (비동기)
             feedService.updatePostScoreInFeeds(post, followers, true);
@@ -396,15 +391,13 @@ public class PostService {
         if (scrapOpt.isPresent()) {
             postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
 
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "SCRAP"));
+            post.getTechTags().forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "SCRAP"));
 
             return false; // 스크랩 취소
         } else {
             postScrapRepository.save(PostScrap.builder().user(actor).post(post).build());
 
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "SCRAP"));
+            post.getTechTags().forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "SCRAP"));
 
             return true; // 스크랩 성공
         }
@@ -436,12 +429,14 @@ public class PostService {
                 .toList();
 
         // 1. 나를 팔로우하는 유저들
-        List<User> followers = followRepository.findAllByToUserId(authorId)
-                .stream().map(Follow::getFromUser).toList();
+        List<User> followers = followRepository.findAllByToUserId(authorId).stream()
+                .map(Follow::getFromUser)
+                .toList();
 
         // 2. 이 기술들에 관심 있는 유저들 (예: 최소 10점 이상)
-        List<User> techInterestedUsers = techIds.isEmpty() ? Collections.emptyList() :
-                userRepository.findUsersByInterestedTechIds(techIds, 10.0, authorId);
+        List<User> techInterestedUsers = techIds.isEmpty()
+                ? Collections.emptyList()
+                : userRepository.findUsersByInterestedTechIds(techIds, 10.0, authorId);
 
         // 3. 중복 제거하여 합치기
         Set<User> allTargets = new HashSet<>(followers);

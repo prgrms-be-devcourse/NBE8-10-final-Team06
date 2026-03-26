@@ -5,9 +5,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.devstagram.domain.technology.service.TechScoreService;
-import com.devstagram.domain.user.repository.FollowRepository;
-import com.devstagram.domain.user.service.FollowService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -15,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,14 +24,14 @@ public class FeedService {
 
     private final StringRedisTemplate redisTemplate;
     private final FeedScoringStrategy scoringStrategy;
-    private final FollowRepository  followRepository;
+    private final FollowRepository followRepository;
     private final TechScoreService techScoreService;
 
     private static final double MINUTE = 60_000.0;
     private static final double HOUR = 3_600_000.0;
     private static final double DAY = 86_400_000.0;
 
-    private static final short MIN_SCORE= 50;
+    private static final short MIN_SCORE = 50;
 
     private static final String FEED_KEY_PREFIX = "feed:user:";
     private static final int MAX_FEED_SIZE = 500; // 유저당 정예 멤버 500개 유지

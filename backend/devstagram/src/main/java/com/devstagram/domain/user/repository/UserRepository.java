@@ -55,10 +55,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo " + "WHERE u.nickname = :nickname AND u.isDeleted = false")
     Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
 
-    @Query("SELECT DISTINCT ts.user FROM UserTechScore ts " +
-            "WHERE ts.technology.id IN :techIds " +
-            "AND ts.score >= :minScore " +
-            "AND ts.user.id != :authorId")
+    @Query("SELECT DISTINCT ts.user FROM UserTechScore ts " + "WHERE ts.technology.id IN :techIds "
+            + "AND ts.score >= :minScore "
+            + "AND ts.user.id != :authorId")
     List<User> findUsersByInterestedTechIds(
             @Param("techIds") List<Long> techIds,
             @Param("minScore") double minScore,
