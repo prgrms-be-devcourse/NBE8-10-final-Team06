@@ -41,8 +41,8 @@ export const storyApi = {
     if (data.content) formData.append('content', data.content);
     formData.append('mediaType', data.mediaType);
     
-    if (data.taggedUserIds && data.taggedUserIds.length > 0) {
-      data.taggedUserIds.forEach(id => formData.append('taggedUserIds', id.toString()));
+    if (data.tagUserIds && data.tagUserIds.length > 0) {
+      data.tagUserIds.forEach(id => formData.append('tagUserIds', id.toString()));
     }
 
     const res = await client.post<RsData<StoryCreateResponse>>('/story', formData, {

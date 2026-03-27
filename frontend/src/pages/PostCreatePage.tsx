@@ -13,6 +13,7 @@ const PostCreatePage: React.FC = () => {
   const [previews, setPreviews] = useState<string[]>([]);
   const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
+  const [techIdInput, setTechIdInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -67,6 +68,16 @@ const PostCreatePage: React.FC = () => {
     URL.revokeObjectURL(newPreviews[index]);
     newPreviews.splice(index, 1);
     setPreviews(newPreviews);
+  };
+
+  const applyManualTechIds = () => {
+    const parsed = techIdInput
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((v) => Number.isInteger(v) && v > 0);
+
+    const unique = Array.from(new Set(parsed));
+    setSelectedTechIds(unique);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -156,6 +167,38 @@ const PostCreatePage: React.FC = () => {
 
           <div style={{ marginBottom: '30px' }}>
             <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>기술 태그</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <input
+                type="text"
+                value={techIdInput}
+                onChange={(e) => setTechIdInput(e.target.value)}
+                placeholder="기술 ID 입력 (예: 1,2,3)"
+                style={{ flex: 1, padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px' }}
+              />
+              <button
+                type="button"
+                onClick={applyManualTechIds}
+                style={{ padding: '10px 12px', border: '1px solid #dbdbdb', borderRadius: '4px', background: '#fff', cursor: 'pointer' }}
+              >
+                적용
+              </button>
+            </div>
+
+            {selectedTechIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                {selectedTechIds.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedTechIds((prev) => prev.filter((v) => v !== id))}
+                    style={{ padding: '4px 10px', border: '1px solid #dbdbdb', borderRadius: '14px', background: '#f7f7f7', cursor: 'pointer', fontSize: '0.8rem' }}
+                  >
+                    #{id} ×
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {allTechs.map(tech => {
                 const isSelected = selectedTechIds.includes(tech.id);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2, Bookmark } from 'lucide-react';
 import { PostFeedResponse } from '../../types/post';
 import { postApi } from '../../api/post';
 import UserListModal from '../profile/UserListModal';
@@ -34,6 +34,17 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
         }));
       }
     } catch (err) { console.error(err); }
+  };
+
+  const handleScrap = async () => {
+    try {
+      const res = await postApi.toggleScrap(post.id);
+      if (res.resultCode.includes('-S-') || res.resultCode.startsWith('200')) {
+        setPost(prev => ({ ...prev, isScrapped: !prev.isScrapped }));
+      }
+    } catch (err) {
+      console.error('스크랩 처리 실패:', err);
+    }
   };
 
   const handlePostDelete = async () => {
@@ -94,6 +105,12 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
         <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
           <Heart size={24} onClick={handleLike} style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }} fill={post.isLiked ? '#ed4956' : 'none'} />
           <MessageCircle size={24} style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post.id}`)} />
+          <Bookmark
+            size={24}
+            onClick={handleScrap}
+            style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'inherit' }}
+            fill={post.isScrapped ? '#ffd700' : 'none'}
+          />
         </div>
         
         <div 

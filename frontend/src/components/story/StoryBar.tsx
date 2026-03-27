@@ -80,13 +80,11 @@ const StoryBar: React.FC = () => {
       <div style={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0, width: '74px' }} onClick={handleMyStoryClick}>
         <div style={{ 
           width: '70px', height: '70px', borderRadius: '50%', padding: '2.5px',
-          background: hasActiveMyStory 
-            ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' 
-            : 'none',
+          background: '#dbdbdb',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', position: 'relative'
         }}>
           <div style={{
-            width: '100%', height: '100%', borderRadius: '50%', border: hasActiveMyStory ? '2px solid #fff' : 'none',
+            width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 'bold',
             color: '#8e8e8e', overflow: 'hidden', backgroundColor: '#efefef'
           }}>
@@ -98,7 +96,7 @@ const StoryBar: React.FC = () => {
             </div>
           )}
         </div>
-        <div style={{ fontSize: '0.75rem', marginTop: '6px', color: hasActiveMyStory ? '#262626' : '#8e8e8e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>내 스토리</div>
+        <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#8e8e8e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>내 스토리</div>
       </div>
 
       {/* 타인 스토리 섹션 */}

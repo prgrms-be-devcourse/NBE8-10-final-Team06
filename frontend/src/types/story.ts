@@ -43,7 +43,7 @@ export interface StoryCreateRequest {
   content?: string;
   file: File;
   mediaType: MediaType;
-  taggedUserIds?: number[];
+  tagUserIds?: number[];
 }
 
 export interface StoryCreateResponse {

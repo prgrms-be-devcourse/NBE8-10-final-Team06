@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { userApi } from '../api/user';
+import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
 import { postApi } from '../api/post';
+import { storyApi } from '../api/story';
 import { dmApi } from '../api/dm';
 import { UserProfileResponse, Resume } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
-import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut } from 'lucide-react';
+import { StoryDetailResponse } from '../types/story';
+import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3 } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
 
@@ -26,9 +28,11 @@ const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech' | 'archive'>('posts');
   const [scrappedPosts, setScrappedPosts] = useState<PostFeedProfileRes[]>([]);
+  const [archivedStories, setArchivedStories] = useState<StoryDetailResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFollowProcessing, setIsFollowProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [modalConfig, setModalConfig] = useState<{ title: string; id: number; type: 'followers' | 'followings' } | null>(null);
@@ -75,8 +79,31 @@ const ProfilePage: React.FC = () => {
     } catch (err) { console.error('스크랩 로드 실패', err); }
   }, [isMe]);
 
+  const fetchArchivedStories = useCallback(async () => {
+    if (!isMe) return;
+    try {
+      const res = await storyApi.getArchive();
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        setArchivedStories(res.data || []);
+      }
+    } catch (err) {
+      console.error('스토리 아카이브 로드 실패', err);
+    }
+  }, [isMe]);
+
   useEffect(() => {
     if (targetNickname) fetchProfile(targetNickname);
+  }, [targetNickname, fetchProfile]);
+
+  useEffect(() => {
+    if (!targetNickname) return;
+
+    const handleFollowChanged = () => {
+      fetchProfile(targetNickname, true);
+    };
+
+    window.addEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
+    return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
   }, [targetNickname, fetchProfile]);
 
   useEffect(() => {
@@ -85,14 +112,58 @@ const ProfilePage: React.FC = () => {
     }
   }, [isMe, activeTab, fetchScraps, scrappedPosts.length]);
 
+  useEffect(() => {
+    if (isMe && activeTab === 'archive' && archivedStories.length === 0) {
+      fetchArchivedStories();
+    }
+  }, [isMe, activeTab, archivedStories.length, fetchArchivedStories]);
+
   const handleFollowToggle = async () => {
-    if (!profile) return;
+    if (!profile || isFollowProcessing) return;
+    const targetId = profile.userId;
+    const desiredState = !profile.isFollowing;
+
     try {
-      const res = profile.isFollowing ? await userApi.unfollow(profile.userId) : await userApi.follow(profile.userId);
-      if (res.resultCode.startsWith('200')) {
-        setProfile({ ...profile, isFollowing: res.data.isFollowing, followerCount: res.data.followerCount });
+      setIsFollowProcessing(true);
+      // 1) 서버의 현재 팔로우 상태 확인
+      const statusRes = await userApi.isFollowing(targetId);
+      const serverFollowing = statusRes.data;
+
+      // 2) 이미 원하는 상태면 프로필만 동기화
+      if (serverFollowing === desiredState) {
+        if (targetNickname) {
+          const syncRes = await userApi.getProfile(targetNickname);
+          if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
+            setProfile(syncRes.data);
+          }
+        }
+        return;
       }
-    } catch (err) { console.error('팔로우 처리 실패:', err); }
+
+      // 3) 필요한 경우에만 토글 API 호출
+      const res = desiredState ? await userApi.follow(targetId) : await userApi.unfollow(targetId);
+      if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
+        const syncRes = await userApi.getProfile(targetNickname || profile.nickname);
+        if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
+          setProfile(syncRes.data);
+        }
+      }
+    } catch (err: any) {
+      console.error('팔로우 처리 실패:', err);
+      // 실패 시 프로필 재조회로 서버 상태와 강제 동기화
+      if (targetNickname) {
+        try {
+          const syncRes = await userApi.getProfile(targetNickname);
+          if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
+            setProfile(syncRes.data);
+          }
+        } catch {
+          // 동기화 실패 시 기존 상태 유지
+        }
+      }
+    } finally {
+      setIsFollowProcessing(false);
+    }
   };
 
   const handleMessageClick = async () => {
@@ -131,7 +202,7 @@ const ProfilePage: React.FC = () => {
               </>
             ) : (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <button onClick={handleFollowToggle} style={{ padding: '6px 24px', backgroundColor: profile.isFollowing ? '#efefef' : '#0095f6', color: profile.isFollowing ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>{profile.isFollowing ? '팔로잉' : '팔로우'}</button>
+                <button onClick={handleFollowToggle} disabled={isFollowProcessing} style={{ padding: '6px 24px', backgroundColor: profile.isFollowing ? '#efefef' : '#0095f6', color: profile.isFollowing ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer', opacity: isFollowProcessing ? 0.7 : 1 }}>{isFollowProcessing ? '처리 중...' : (profile.isFollowing ? '팔로잉' : '팔로우')}</button>
                 <button onClick={handleMessageClick} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>메시지 보내기</button>
                 {profile.isFollower && <span style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>나를 팔로우함</span>}
               </div>
@@ -159,6 +230,7 @@ const ProfilePage: React.FC = () => {
         <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Grid size={12} /> 게시물</button>
         <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><BarChart2 size={12} /> 기술 레벨</button>
         {isMe && <button onClick={() => setActiveTab('scraps')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'scraps' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Bookmark size={12} /> 저장됨</button>}
+        {isMe && <button onClick={() => setActiveTab('archive')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'archive' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Clock3 size={12} /> 만료 스토리</button>}
       </div>
 
       <div style={{ marginTop: '20px' }}>
@@ -195,6 +267,24 @@ const ProfilePage: React.FC = () => {
                 </div>
               </div>
             )) : <div style={{ textAlign: 'center', padding: '40px 0' }}><p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p></div>}
+          </div>
+        )}
+        {activeTab === 'archive' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+            {archivedStories.map((story) => (
+              <div key={story.storyId} style={{ position: 'relative', aspectRatio: '9/16', backgroundColor: '#efefef', overflow: 'hidden' }}>
+                {story.mediaType.toLowerCase().includes('mp4') || story.mediaType.toLowerCase().includes('webm') || story.mediaType.toLowerCase().includes('mov') ? (
+                  <video src={story.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <img src={story.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="archived-story" />
+                )}
+              </div>
+            ))}
+            {archivedStories.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8e8e8e', padding: '40px 0' }}>
+                만료된 스토리가 없습니다.
+              </div>
+            )}
           </div>
         )}
       </div>

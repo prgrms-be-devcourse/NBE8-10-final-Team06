@@ -2,25 +2,23 @@
 export interface SignupRequest {
   email: string;
   nickname: string;
-  password?: string; // 회원가입 시 필수, 조회 시 불필요
+  password: string;
+  birthDate: string;
+  gender: 'MALE' | 'FEMALE';
+  githubUrl?: string;
+  resume: 'UNSPECIFIED' | 'UNDERGRADUATE' | 'JUNIOR' | 'INTERMEDIATE' | 'SENIOR';
 }
 
 export interface LoginRequest {
   email: string;
-  password?: string;
+  password: string;
 }
 
 export interface SignupResponse {
   id: number;
   nickname: string;
   email: string;
-  apiKey: string | null;
+  apiKey: string;
 }
 
-export interface LoginResponse {
-  accessToken: string;
-  apiKey: string;
-  id: number;
-  nickname: string;
-  email: string;
-}
+export type LoginResponse = string;

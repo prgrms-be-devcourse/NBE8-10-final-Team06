@@ -3,7 +3,10 @@ import { RsData } from '../types/common';
 import { TechTagRes } from '../types/post';
 
 export const technologyApi = {
-  // 기술 스택 전체 목록 조회
-  getTechnologies: () =>
-    client.get<RsData<TechTagRes[]>>('/technologies').then(res => res.data),
+  // OpenAPI 계약에 기술스택 목록 엔드포인트가 없어 호출하지 않음
+  getTechnologies: async (): Promise<RsData<TechTagRes[]>> => ({
+    resultCode: '200',
+    msg: 'TECH_ENDPOINT_NOT_IN_OPENAPI_CONTRACT',
+    data: [],
+  }),
 };

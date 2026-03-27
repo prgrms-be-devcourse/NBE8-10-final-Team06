@@ -94,3 +94,11 @@ export interface PostUpdateRequest {
   content: string;
   techIds: number[];
 }
+
+/**
+ * com.devstagram.domain.post.dto.PostLikerRes
+ */
+export interface PostLikerResponse {
+  userId: number;
+  nickname: string;
+}

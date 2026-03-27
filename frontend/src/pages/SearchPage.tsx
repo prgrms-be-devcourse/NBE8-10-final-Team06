@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
-import { userApi } from '../api/user';
+import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
+import { dmApi } from '../api/dm';
 import { UserSearchResponse } from '../types/user';
 import { Search, X, History, UserCheck, Clock, UserPlus, UserMinus } from 'lucide-react';
 import { searchUtil } from '../util/search';
@@ -12,8 +13,9 @@ const SearchResultItem: React.FC<{
   user: UserSearchResponse; 
   myNickname: string | null;
   onUserClick: (user: UserSearchResponse) => void;
-}> = ({ user: initialUser, myNickname, onUserClick }) => {
-  // 프롭스가 변경될 때 상태를 동기화하기 위해 useEffect 사용
+  onMessageClick: (user: UserSearchResponse) => void;
+  onFollowStateChange: (userId: number, isFollowing: boolean) => void;
+}> = ({ user: initialUser, myNickname, onUserClick, onMessageClick, onFollowStateChange }) => {
   const [user, setUser] = useState(initialUser);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -25,24 +27,47 @@ const SearchResultItem: React.FC<{
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isProcessing || isMe) return;
+    if (isMe || !user.userId || isProcessing) return;
+
+    const targetId = Number(user.userId);
+    const desiredState = !user.isFollowing;
 
     try {
       setIsProcessing(true);
-      // 현재 상태에 따라 API 결정
-      const apiCall = user.isFollowing ? userApi.unfollow : userApi.follow;
-      const res = await apiCall(user.userId);
-      
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        // 성공 시 로컬 상태 즉시 반전
-        setUser(prev => ({ ...prev, isFollowing: !prev.isFollowing }));
+
+      // 1) 서버 기준 현재 상태를 먼저 확인해 중복 요청 방지
+      const statusRes = await userApi.isFollowing(targetId);
+      const serverFollowing = statusRes.data;
+
+      // 2) 이미 원하는 상태면 API 호출 없이 UI만 동기화
+      if (serverFollowing === desiredState) {
+        setUser(prev => ({ ...prev, isFollowing: serverFollowing }));
+        onFollowStateChange(targetId, serverFollowing);
+        window.dispatchEvent(new CustomEvent(FOLLOW_CHANGED_EVENT));
+        return;
+      }
+
+      // 3) 서버 상태와 반대일 때만 토글 API 호출
+      const res = desiredState
+        ? await userApi.follow(targetId)
+        : await userApi.unfollow(targetId);
+
+      if (res.resultCode?.startsWith('200')) {
+        setUser(prev => ({ ...prev, isFollowing: res.data.isFollowing }));
+        onFollowStateChange(targetId, res.data.isFollowing);
       } else {
-        alert(res.msg || '처리에 실패했습니다.');
+        alert(res.msg);
       }
     } catch (err: any) {
-      console.error('팔로우/언팔로우 실패:', err);
-      const errorMsg = err.response?.data?.msg || '잘못된 요청입니다. (백엔드 파라미터 매핑 이슈 가능성)';
-      alert(errorMsg);
+      // 4) 실패 시 서버 상태 재조회로 최종 동기화
+      try {
+        const sync = await userApi.isFollowing(targetId);
+        setUser(prev => ({ ...prev, isFollowing: sync.data }));
+        onFollowStateChange(targetId, sync.data);
+      } catch {
+        alert('요청 처리에 실패했습니다.');
+      }
+      console.error('팔로우 처리 실패:', err);
     } finally {
       setIsProcessing(false);
     }
@@ -67,19 +92,33 @@ const SearchResultItem: React.FC<{
       </div>
       
       {!isMe && (
-        <button 
-          onClick={handleFollowToggle}
-          disabled={isProcessing}
-          style={{
-            padding: '6px 12px', borderRadius: '4px', border: 'none',
-            backgroundColor: user.isFollowing ? '#efefef' : '#0095f6',
-            color: user.isFollowing ? '#262626' : '#fff',
-            fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
-            minWidth: '85px', opacity: isProcessing ? 0.7 : 1
-          }}
-        >
-          {isProcessing ? '...' : (user.isFollowing ? '언팔로우' : '팔로우')}
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMessageClick(user);
+            }}
+            style={{
+              padding: '6px 10px', borderRadius: '4px', border: '1px solid #dbdbdb',
+              backgroundColor: '#fff', color: '#262626', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer'
+            }}
+          >
+            DM
+          </button>
+          <button 
+            onClick={handleFollowToggle}
+            disabled={isProcessing}
+            style={{
+              padding: '6px 12px', borderRadius: '4px', border: 'none',
+              backgroundColor: user.isFollowing ? '#efefef' : '#0095f6',
+              color: user.isFollowing ? '#262626' : '#fff',
+              fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
+              minWidth: '85px', opacity: isProcessing ? 0.7 : 1
+            }}
+          >
+            {isProcessing ? '...' : (user.isFollowing ? '언팔로우' : '팔로우')}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -89,6 +128,7 @@ const SearchResultItem: React.FC<{
 const SearchPage: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<UserSearchResponse[]>([]);
+  const [followOverrides, setFollowOverrides] = useState<Record<number, boolean>>({});
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -114,10 +154,14 @@ const SearchPage: React.FC = () => {
       setIsLoading(true);
       const res = await userApi.searchUsers(searchKeyword, pageNumber);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const content = (res.data.content || []).map((u) => ({
+          ...u,
+          isFollowing: followOverrides[u.userId] ?? u.isFollowing
+        }));
         if (pageNumber === 0) {
-          setResults(res.data.content || []);
+          setResults(content);
         } else {
-          setResults(prev => [...prev, ...(res.data.content || [])]);
+          setResults(prev => [...prev, ...content]);
         }
         setIsLast(res.data.last);
         setPage(pageNumber);
@@ -127,7 +171,7 @@ const SearchPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [followOverrides]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -147,9 +191,45 @@ const SearchPage: React.FC = () => {
     navigate(`/profile/${user.nickname}`);
   };
 
+  const handleMessageClick = async (user: UserSearchResponse) => {
+    try {
+      const res = await dmApi.create1v1Room(user.userId);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        navigate(`/dm/${res.data.roomId}`);
+      } else {
+        alert(res.msg || 'DM 방 생성에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('DM 방 생성 실패:', err);
+      alert('DM 방 생성에 실패했습니다.');
+    }
+  };
+
   const filteredResults = filterFollowing 
     ? results.filter(u => u.isFollowing) 
     : results;
+
+  const handleFollowStateChange = (userId: number, isFollowing: boolean) => {
+    setFollowOverrides(prev => ({ ...prev, [userId]: isFollowing }));
+    setResults(prev =>
+      prev.map(item =>
+        item.userId === userId ? { ...item, isFollowing } : item
+      )
+    );
+  };
+
+  useEffect(() => {
+    const handleFollowChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ toUserId?: number; isFollowing?: boolean }>;
+      const toUserId = customEvent.detail?.toUserId;
+      const isFollowing = customEvent.detail?.isFollowing;
+      if (typeof toUserId !== 'number' || typeof isFollowing !== 'boolean') return;
+      handleFollowStateChange(toUserId, isFollowing);
+    };
+
+    window.addEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged as EventListener);
+    return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged as EventListener);
+  }, []);
 
   return (
     <MainLayout title="검색" maxWidth="600px">
@@ -203,7 +283,9 @@ const SearchPage: React.FC = () => {
                   key={user.userId} 
                   user={user} 
                   myNickname={myNickname}
-                  onUserClick={handleUserClick} 
+                  onUserClick={handleUserClick}
+                  onMessageClick={handleMessageClick}
+                  onFollowStateChange={handleFollowStateChange}
                 />
               ))}
               

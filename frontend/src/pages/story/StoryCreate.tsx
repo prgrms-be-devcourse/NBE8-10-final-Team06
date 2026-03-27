@@ -66,7 +66,7 @@ const StoryCreate: React.FC = () => {
         file,
         content,
         mediaType: extension,
-        taggedUserIds: taggedUsers.map(u => u.userId)
+        tagUserIds: taggedUsers.map(u => u.userId)
       });
 
       if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
@@ -209,7 +209,68 @@ const StoryCreate: React.FC = () => {
               <UserPlus size={18} /> 사람 태그하기 ({taggedUsers.length})
             </button>
             
-            {/* 태그 메뉴 및 칩 생략 (기존 로직 유지) */}
+            {taggedUsers.length > 0 && (
+              <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {taggedUsers.map((u) => (
+                  <span
+                    key={u.userId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      border: '1px solid #dbdbdb',
+                      borderRadius: '12px',
+                      padding: '4px 8px',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    <AtSign size={12} />
+                    {u.nickname}
+                    <X size={12} style={{ cursor: 'pointer' }} onClick={() => toggleTagUser(u)} />
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {showTagMenu && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  border: '1px solid #dbdbdb',
+                  borderRadius: '4px',
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                  backgroundColor: '#fff'
+                }}
+              >
+                {availableUsers.length === 0 ? (
+                  <div style={{ padding: '10px', color: '#8e8e8e', fontSize: '0.85rem' }}>태그 가능한 사용자가 없습니다.</div>
+                ) : (
+                  availableUsers.map((user) => {
+                    const selected = taggedUsers.some((u) => u.userId === user.userId);
+                    return (
+                      <button
+                        key={user.userId}
+                        type="button"
+                        onClick={() => toggleTagUser(user)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '10px',
+                          border: 'none',
+                          borderBottom: '1px solid #f0f0f0',
+                          background: selected ? '#f5faff' : '#fff',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {selected ? '✓ ' : ''}{user.nickname}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>

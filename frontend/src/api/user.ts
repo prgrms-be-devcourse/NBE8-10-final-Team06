@@ -2,6 +2,12 @@ import client from './client';
 import { RsData, Slice } from '../types/common';
 import { FollowUserResponse, FollowResponse, UserProfileResponse, ProfileUpdateRequest, UserSearchResponse } from '../types/user';
 
+const FOLLOW_CHANGED_EVENT = 'follow:changed';
+
+const emitFollowChanged = (payload: FollowResponse) => {
+  window.dispatchEvent(new CustomEvent(FOLLOW_CHANGED_EVENT, { detail: payload }));
+};
+
 export const userApi = {
   // 특정 사용자의 프로필 조회
   getProfile: (nickname: string, page: number = 0) =>
@@ -29,11 +35,21 @@ export const userApi = {
 
   // 팔로우 실행 (ID 기반으로 수정)
   follow: (userId: number) => 
-    client.post<RsData<FollowResponse>>(`/follows/${userId}`).then(res => res.data),
+    client.post<RsData<FollowResponse>>(`/follows/${userId}`).then(res => {
+      emitFollowChanged(res.data.data);
+      return res.data;
+    }),
 
   // 팔로우 취소 (ID 기반으로 수정)
   unfollow: (userId: number) => 
-    client.delete<RsData<FollowResponse>>(`/follows/${userId}`).then(res => res.data),
+    client.delete<RsData<FollowResponse>>(`/follows/${userId}`).then(res => {
+      emitFollowChanged(res.data.data);
+      return res.data;
+    }),
+
+  // 현재 로그인 사용자의 팔로우 상태 조회
+  isFollowing: (toUserId: number) =>
+    client.get<RsData<boolean>>(`/follows/${toUserId}/status`).then(res => res.data),
 
   // 팔로워 목록 조회
   getFollowers: (userId: number) => 
@@ -43,3 +59,5 @@ export const userApi = {
   getFollowings: (userId: number) => 
     client.get<RsData<FollowUserResponse[]>>(`/follows/${userId}/followings`).then(res => res.data),
 };
+
+export { FOLLOW_CHANGED_EVENT };
