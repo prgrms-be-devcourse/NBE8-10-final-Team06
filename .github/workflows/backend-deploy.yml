@@ -113,8 +113,8 @@ jobs:
             sudo mkdir -p /home/ec2-user/nginx/conf.d
 
             # [Step 2] 새 버전 이미지 풀링 및 컨테이너 실행 (Nginx 및 모니터링 도구 포함)
-            sudo docker compose pull backend-$TARGET_COLOR
-            sudo docker compose up -d nginx backend-$TARGET_COLOR prometheus grafana node-exporter
+            sudo docker compose pull redis nginx prometheus grafana node-exporter backend-$TARGET_COLOR
+            sudo docker compose up -d redis nginx backend-$TARGET_COLOR prometheus grafana node-exporter
 
             # [Step 3] 새 컨테이너가 정상적으로 떴는지 Actuator Health 체크
             echo "새 컨테이너($TARGET_COLOR) 헬스체크 시작..."
