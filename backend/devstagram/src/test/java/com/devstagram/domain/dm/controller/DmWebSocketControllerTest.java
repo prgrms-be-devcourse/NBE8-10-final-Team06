@@ -47,7 +47,7 @@ class DmWebSocketControllerTest {
 
         DmSendMessageRequest req = new DmSendMessageRequest(MessageType.TEXT, "hello", null);
         DmMessageResponse saved =
-                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, LocalDateTime.now());
+                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, LocalDateTime.now(), 1L);
         when(dmService.sendMessage(1L, 1L, req)).thenReturn(saved);
 
         controller.message(1L, req);

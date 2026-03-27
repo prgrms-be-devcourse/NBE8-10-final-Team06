@@ -31,6 +31,8 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class DmService {
 
@@ -87,7 +89,9 @@ public class DmService {
                         dm.getContent(),
                         dm.getThumbnailUrl(),
                         dm.isValid(),
-                        dm.getCreatedAt()))
+                        dm.getCreatedAt(),
+                        dm.getSender().getId() // 누가 보냈는지까지 같이 담아서
+                        ))
                 .collect(Collectors.toList());
 
         Long nextCursor = slice.hasNext() && !messages.isEmpty()
@@ -243,7 +247,8 @@ public class DmService {
                                 last.getContent(),
                                 last.getThumbnailUrl(),
                                 last.isValid(),
-                                last.getCreatedAt());
+                                last.getCreatedAt(),
+                                last.getSender().getId());
                     }
 
                     var participantDtos = participantsByRoomId.getOrDefault(roomId, List.of()).stream()
@@ -251,7 +256,10 @@ public class DmService {
                                     && ru.getUser().getId() != null
                                     && !ru.getUser().getId().equals(userId))
                             .map(ru -> new DmRoomParticipantSummary(
-                                    ru.getUser().getId(), ru.getUser().getEmail()))
+                                    ru.getUser().getId(),
+                                    ru.getUser().getEmail(),
+                                    ru.getUser().getNickname(), // 상대 닉네임, 프로필 추가
+                                    ru.getUser().getProfileImageUrl()))
                             .collect(Collectors.toList());
 
                     Long lastReadId = roomUser.getLastReadMessageCursor();
@@ -335,7 +343,8 @@ public class DmService {
                 saved.getContent(),
                 saved.getThumbnailUrl(),
                 saved.isValid(),
-                saved.getCreatedAt());
+                saved.getCreatedAt(),
+                saved.getSender().getId());
     }
 
     /**
@@ -437,5 +446,65 @@ public class DmService {
         dmRoomUserRepository.save(ru2);
 
         return savedRoom.getId();
+    }
+
+    // 1:1 채팅방 나가기 - 한명이라도 나가면 채팅방 삭제
+    @Transactional
+    public void leave1v1Room(Long userId, Long roomId) {
+        DmRoomUser roomUser = getValidRoomUser(userId, roomId);
+        DmRoom room = roomUser.getDmRoom();
+
+        if (room.getIsGroup()) {
+            throw new ServiceException("400-F-2", "1:1 채팅방이 아닙니다.");
+        }
+
+        // 1:1 방은 퇴장시 예외 없이 삭제
+        dmRepository.deleteByDmRoom_Id(roomId);
+        dmRoomUserRepository.deleteByDmRoom_Id(roomId); // 해당 방의 모든 유저 관계 삭제
+        dmRoomRepository.delete(room);
+    }
+
+    // 그룹 채팅방 퇴장 : 퇴장 메시지 보내고 나감
+    @Transactional
+    public DmMessageResponse leaveGroupRoom(Long userId, Long roomId) {
+        DmRoomUser roomUser = getValidRoomUser(userId, roomId);
+        DmRoom room = roomUser.getDmRoom();
+
+        if (!room.getIsGroup()) {
+            throw new ServiceException("400-F-2", "그룹 채팅방이 아닙니다.");
+        }
+
+        long currentUsers = dmRoomUserRepository.countByDmRoom_Id(roomId);
+        DmMessageResponse response = null;
+
+        // 다른 사람이 있다면 퇴장 메시지 먼저 생성 (내 권한이 살아있을 때)
+        if (currentUsers > 1) {
+            String systemMsg = roomUser.getUser().getNickname() + "님이 나갔습니다.";
+            DmSendMessageRequest request = new DmSendMessageRequest(MessageType.SYSTEM, systemMsg, null);
+
+            response = this.sendMessage(userId, roomId, request);
+        }
+
+        // 내 참여 정보 삭제
+        dmRoomUserRepository.delete(roomUser);
+        dmRoomUserRepository.flush();
+
+        // 마지막 사람이 나간 거면 채팅방 삭제
+        if (currentUsers == 1) {
+            dmRepository.deleteByDmRoom_Id(roomId);
+            dmRoomRepository.delete(room);
+        }
+
+        return response;
+    }
+
+    // 채팅방 참여 여부 검증
+    private DmRoomUser getValidRoomUser(Long userId, Long roomId) {
+        if (userId == null || roomId == null) {
+            throw new ServiceException("400-F-1", "유저 또는 방 정보가 필요합니다.");
+        }
+        return dmRoomUserRepository
+                .findByDmRoom_IdAndUser_Id(roomId, userId)
+                .orElseThrow(() -> new ServiceException("404-F-1", "참여 중인 채팅방이 아닙니다."));
     }
 }
