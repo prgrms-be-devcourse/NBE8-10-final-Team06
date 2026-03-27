@@ -11,6 +11,12 @@ terraform {
 # [2] AWS 접속 설정
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      Team = var.prefix
+    }
+  }
 }
 
 # [3] VPC 네트워크 설정

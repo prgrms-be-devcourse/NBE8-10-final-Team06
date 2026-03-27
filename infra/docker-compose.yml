@@ -81,7 +81,16 @@ services:
     container_name: node-exporter
     ports:
       - "9100:9100"
-      
+
+  #7. redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    command: redis-server --loglevel warning
+    networks:
+      - devstagram-net
+
 networks:
   devstagram-net:
     driver: bridge
