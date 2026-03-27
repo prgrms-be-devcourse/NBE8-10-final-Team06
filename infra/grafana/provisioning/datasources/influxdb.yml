@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB-k6
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: devstagram
+      defaultBucket: k6
+      tlsSkipVerify: true
+    secureJsonData:
+      token: devstagram-influx-token
+    isDefault: false
+    editable: true

@@ -58,31 +58,89 @@ services:
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     networks:
       - devstagram-net
-      
-# 4. 프로메테우스 서비스
+
+  # [4-1] 프로메테우스 서비스
   prometheus:
     image: prom/prometheus
     container_name: prometheus
+    restart: always
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+    networks:
+      - devstagram-net
 
   # 5. 그라파나
   grafana:
     image: grafana/grafana
     container_name: grafana
+    restart: always
     ports:
       - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: devstagram123!
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - influxdb
+    networks:
+      - devstagram-net
 
-  #6. Node expoter
+  # [6] Node exporter
   node-exporter:
     image: prom/node-exporter
     container_name: node-exporter
+    restart: always
     ports:
       - "9100:9100"
+    networks:
+      - devstagram-net
 
-  #7. redis
+  # [7] InfluxDB v2 - k6 결과 저장소
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    restart: always
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: devstagram123!
+      DOCKER_INFLUXDB_INIT_ORG: devstagram
+      DOCKER_INFLUXDB_INIT_BUCKET: k6
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: devstagram-influx-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - devstagram-net
+
+  # [8] k6 - 부하 테스트 실행 컨테이너 (필요할 때만 run)
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    profiles:
+      - loadtest
+    environment:
+      K6_INFLUXDB_ORGANIZATION: devstagram
+      K6_INFLUXDB_BUCKET: k6
+      K6_INFLUXDB_TOKEN: devstagram-influx-token
+    volumes:
+      - ./k6:/scripts
+    networks:
+      - devstagram-net
+    depends_on:
+      - influxdb
+    # 기본 커맨드 (run.sh 또는 직접 지정):
+    # docker compose --profile loadtest run --rm k6 run \
+    #   -o xk6-influxdb=http://influxdb:8086 \
+    #   /scripts/scenarios/smoke.js
+
+  #9. redis
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -91,7 +149,12 @@ services:
     networks:
       - devstagram-net
 
+
+
 networks:
   devstagram-net:
     driver: bridge
-    
+
+volumes:
+  influxdb-data:
+  grafana-data:
