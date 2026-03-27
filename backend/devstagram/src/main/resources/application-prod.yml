@@ -25,3 +25,16 @@ spring:
 storage:
   # EC2 내부 경로
   location: ${STORAGE_PATH:/home/ec2-user/uploads}
+
+# S3 설정 추가
+cloud:
+  aws:
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+    region:
+      static: ap-northeast-2
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}   # IAM 사용자 비밀 키
+    stack:
+      auto: false
