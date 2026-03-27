@@ -7,6 +7,7 @@ import { UserSearchResponse } from '../types/user';
 import { Search, X, History, UserCheck, Clock, UserPlus, UserMinus } from 'lucide-react';
 import { searchUtil } from '../util/search';
 import { useAuthStore } from '../store/useAuthStore';
+import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 
 // --- 서브 컴포넌트: 검색 결과 아이템 ---
 const SearchResultItem: React.FC<{ 
@@ -79,10 +80,10 @@ const SearchResultItem: React.FC<{
       style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
     >
       <img 
-        src={user.profileImageUrl || '/default-profile.png'} 
+        src={resolveProfileImageUrl(user.profileImageUrl)} 
         alt={user.nickname}
         style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #dbdbdb' }}
-        onError={(e) => { (e.target as HTMLImageElement).src = '/default-profile.png'; }}
+        onError={(e) => applyImageFallback(e, user.profileImageUrl)}
       />
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>

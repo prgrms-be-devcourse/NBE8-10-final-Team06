@@ -99,9 +99,10 @@ const PostCreatePage: React.FC = () => {
         alert('게시글이 생성되었습니다.');
         navigate('/');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('게시글 생성 오류:', err);
-      alert('게시글 생성에 실패했습니다.');
+      const errorMsg = err.response?.data?.msg || '게시글 생성에 실패했습니다.';
+      alert(errorMsg);
     } finally {
       setIsSubmitting(false);
     }

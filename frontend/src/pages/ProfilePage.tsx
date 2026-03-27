@@ -8,9 +8,10 @@ import { dmApi } from '../api/dm';
 import { UserProfileResponse, Resume } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
-import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3 } from 'lucide-react';
+import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
+import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -36,6 +37,23 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   const [modalConfig, setModalConfig] = useState<{ title: string; id: number; type: 'followers' | 'followings' } | null>(null);
+
+  const getFullUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/')) return url;
+    return `/uploads/${url}`;
+  };
+
+  const getFallbackUrl = (url: string) => {
+    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
+    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
+    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
+    return `/temp/media/${url}`;
+  };
+
+  const isVideo = (mediaType: string) =>
+    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const targetNickname = urlNickname || myNickname;
   const isMe = myNickname === targetNickname;
@@ -174,6 +192,21 @@ const ProfilePage: React.FC = () => {
     } catch (err) { alert('채팅방을 시작할 수 없습니다.'); }
   };
 
+  const handleHardDeleteStory = async (storyId: number) => {
+    if (!window.confirm('이 만료 스토리를 완전히 삭제하시겠습니까?')) return;
+    try {
+      const res = await storyApi.hardDelete(storyId);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        setArchivedStories(prev => prev.filter(story => story.storyId !== storyId));
+      } else {
+        alert(res.msg || '스토리 삭제에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('스토리 하드 삭제 실패:', err);
+      alert('스토리 삭제에 실패했습니다.');
+    }
+  };
+
   if (loading && !profile) return <MainLayout title={targetNickname || "Profile"}><div style={{ textAlign: 'center' }}>로딩 중...</div></MainLayout>;
   
   if (error) return (
@@ -191,7 +224,12 @@ const ProfilePage: React.FC = () => {
   return (
     <MainLayout title={profile.nickname}>
       <header style={{ display: 'flex', gap: '40px', marginBottom: '44px' }}>
-        <img src={profile.profileImageUrl} style={{ width: '150px', height: '150px', borderRadius: '50%', border: '1px solid #dbdbdb', objectFit: 'cover' }} alt="profile" onError={(e) => { (e.target as HTMLImageElement).src = '/default-profile.png'; }} />
+        <img
+          src={resolveProfileImageUrl(profile.profileImageUrl)}
+          style={{ width: '150px', height: '150px', borderRadius: '50%', border: '1px solid #dbdbdb', objectFit: 'cover' }}
+          alt="profile"
+          onError={(e) => applyImageFallback(e, profile.profileImageUrl)}
+        />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: '300' }}>{profile.nickname}</span>
@@ -238,7 +276,41 @@ const ProfilePage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
             {profile.posts.content.map(post => (
               <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ position: 'relative', aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && <img src={post.medias[0].sourceUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="thumb" />}
+                {post.medias[0] && (
+                  isVideo(post.medias[0].mediaType) ? (
+                    <video
+                      src={getFullUrl(post.medias[0].sourceUrl)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      muted
+                      playsInline
+                      onError={(e) => {
+                        const video = e.currentTarget;
+                        if (video.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                        if (fallback) {
+                          video.dataset.fallbackApplied = '1';
+                          video.src = fallback;
+                          video.load();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={getFullUrl(post.medias[0].sourceUrl)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      alt="thumb"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                        if (fallback) {
+                          img.dataset.fallbackApplied = '1';
+                          img.src = fallback;
+                        }
+                      }}
+                    />
+                  )
+                )}
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', gap: '20px' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={20} fill="white" /> {post.likeCount}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><MessageCircle size={20} fill="white" /> {post.commentCount}</div>
@@ -251,7 +323,41 @@ const ProfilePage: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
             {scrappedPosts.map(post => (
               <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && <img src={post.medias[0].sourceUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="thumb" />}
+                {post.medias[0] && (
+                  isVideo(post.medias[0].mediaType) ? (
+                    <video
+                      src={getFullUrl(post.medias[0].sourceUrl)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      muted
+                      playsInline
+                      onError={(e) => {
+                        const video = e.currentTarget;
+                        if (video.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                        if (fallback) {
+                          video.dataset.fallbackApplied = '1';
+                          video.src = fallback;
+                          video.load();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={getFullUrl(post.medias[0].sourceUrl)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      alt="thumb"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                        if (fallback) {
+                          img.dataset.fallbackApplied = '1';
+                          img.src = fallback;
+                        }
+                      }}
+                    />
+                  )
+                )}
               </div>
             ))}
           </div>
@@ -274,10 +380,58 @@ const ProfilePage: React.FC = () => {
             {archivedStories.map((story) => (
               <div key={story.storyId} style={{ position: 'relative', aspectRatio: '9/16', backgroundColor: '#efefef', overflow: 'hidden' }}>
                 {story.mediaType.toLowerCase().includes('mp4') || story.mediaType.toLowerCase().includes('webm') || story.mediaType.toLowerCase().includes('mov') ? (
-                  <video src={story.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <video
+                    src={getFullUrl(story.mediaUrl)}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      if (video.dataset.fallbackApplied === '1') return;
+                      const fallback = getFallbackUrl(story.mediaUrl);
+                      if (fallback) {
+                        video.dataset.fallbackApplied = '1';
+                        video.src = fallback;
+                        video.load();
+                      }
+                    }}
+                  />
                 ) : (
-                  <img src={story.mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="archived-story" />
+                  <img
+                    src={getFullUrl(story.mediaUrl)}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    alt="archived-story"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      if (img.dataset.fallbackApplied === '1') return;
+                      const fallback = getFallbackUrl(story.mediaUrl);
+                      if (fallback) {
+                        img.dataset.fallbackApplied = '1';
+                        img.src = fallback;
+                      }
+                    }}
+                  />
                 )}
+                <button
+                  type="button"
+                  onClick={() => handleHardDeleteStory(story.storyId)}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="스토리 삭제"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             ))}
             {archivedStories.length === 0 && (

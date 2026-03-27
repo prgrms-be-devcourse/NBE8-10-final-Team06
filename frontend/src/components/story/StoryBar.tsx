@@ -5,6 +5,7 @@ import { storyApi } from '../../api/story';
 import { authApi } from '../../api/auth';
 import { StoryFeedResponse, StoryDetailResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
+import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
 
 const StoryBar: React.FC = () => {
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
@@ -108,7 +109,14 @@ const StoryBar: React.FC = () => {
             display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto'
           }}>
             <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: '#8e8e8e', overflow: 'hidden', backgroundColor: '#efefef' }}>
-              {item.profileImageUrl ? <img src={item.profileImageUrl} alt={item.nickname} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : item.nickname[0].toUpperCase()}
+              {item.profileImageUrl ? (
+                <img
+                  src={resolveProfileImageUrl(item.profileImageUrl)}
+                  alt={item.nickname}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => applyImageFallback(e, item.profileImageUrl)}
+                />
+              ) : item.nickname[0].toUpperCase()}
             </div>
           </div>
           <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nickname}</div>

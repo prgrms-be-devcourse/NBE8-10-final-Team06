@@ -10,6 +10,14 @@ interface AuthState {
   setLogout: () => void;
 }
 
+const setAuthCookie = (name: string, value: string) => {
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax`;
+};
+
+const clearAuthCookie = (name: string) => {
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -21,11 +29,14 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('nickname', nickname);
         localStorage.setItem('userId', userId.toString());
+        setAuthCookie('accessToken', accessToken);
         
         if (apiKey) {
           localStorage.setItem('apiKey', apiKey);
+          setAuthCookie('apiKey', apiKey);
         } else {
           localStorage.removeItem('apiKey');
+          clearAuthCookie('apiKey');
         }
         
         set({ isLoggedIn: true, nickname, userId });
@@ -36,6 +47,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('apiKey');
         localStorage.removeItem('nickname');
         localStorage.removeItem('userId');
+        clearAuthCookie('accessToken');
+        clearAuthCookie('apiKey');
         set({ isLoggedIn: false, nickname: null, userId: null });
       },
     }),

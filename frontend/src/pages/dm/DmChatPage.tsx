@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { useStomp } from '../../hooks/useStomp';
 import { DmMessageResponse, WebSocketEventPayload } from '../../types/dm';
+import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
 
 // --- 유틸리티: 스토리 만료 여부 체크 ---
 const checkIsExpired = (content: string, type: string) => {
@@ -249,7 +250,11 @@ const DmChatPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#efefef', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {currentRoom?.participants[0]?.profileImageUrl ? (
-                <img src={currentRoom.participants[0].profileImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img
+                  src={resolveProfileImageUrl(currentRoom.participants[0].profileImageUrl)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => applyImageFallback(e, currentRoom.participants[0].profileImageUrl)}
+                />
               ) : (
                 <ImageIcon size={20} color="#8e8e8e" />
               )}

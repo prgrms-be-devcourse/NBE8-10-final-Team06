@@ -21,6 +21,16 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // 1-1. 업로드 정적 파일 프록시
+      '/uploads': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // 1-2. 스토리지 정적 리소스 프록시 (WebMvcConfig)
+      '/temp/media': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
       // 2. WebSocket/SockJS 프록시 추가
       '/ws': {
         target: 'http://localhost:8080',

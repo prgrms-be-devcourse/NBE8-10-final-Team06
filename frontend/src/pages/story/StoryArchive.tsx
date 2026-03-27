@@ -29,7 +29,15 @@ const StoryArchive: React.FC = () => {
   const getFullUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+    if (url.startsWith('/')) return url;
+    return `/uploads/${url}`;
+  };
+
+  const getFallbackUrl = (url: string) => {
+    if (!url || url.startsWith('http')) return '';
+    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
+    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
+    return `/temp/media/${url}`;
   };
 
   return (
@@ -66,9 +74,35 @@ const StoryArchive: React.FC = () => {
                   onClick={() => navigate(`/story/archive/${story.storyId}`)} // 보관함 상세 보기 (추후 구현 가능)
                 >
                   {story.mediaType.toLowerCase().includes('mp4') ? (
-                    <video src={getFullUrl(story.mediaUrl)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <video
+                      src={getFullUrl(story.mediaUrl)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        const video = e.currentTarget;
+                        if (video.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(story.mediaUrl);
+                        if (fallback) {
+                          video.dataset.fallbackApplied = '1';
+                          video.src = fallback;
+                          video.load();
+                        }
+                      }}
+                    />
                   ) : (
-                    <img src={getFullUrl(story.mediaUrl)} alt="보관된 스토리" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={getFullUrl(story.mediaUrl)}
+                      alt="보관된 스토리"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.dataset.fallbackApplied === '1') return;
+                        const fallback = getFallbackUrl(story.mediaUrl);
+                        if (fallback) {
+                          img.dataset.fallbackApplied = '1';
+                          img.src = fallback;
+                        }
+                      }}
+                    />
                   )}
                   <div style={{ 
                     position: 'absolute', bottom: '8px', left: '8px', 

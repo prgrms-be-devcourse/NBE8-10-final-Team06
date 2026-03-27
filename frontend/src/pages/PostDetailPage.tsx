@@ -7,6 +7,7 @@ import { PostDetailResponse } from '../types/post';
 import CommentItem from '../components/comment/CommentItem';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
+import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 
 const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -19,6 +20,23 @@ const PostDetailPage: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [showLikers, setShowLikers] = useState(false);
+
+  const getFullUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/')) return url;
+    return `/uploads/${url}`;
+  };
+
+  const getFallbackUrl = (url: string) => {
+    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
+    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
+    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
+    return `/temp/media/${url}`;
+  };
+
+  const isVideo = (mediaType: string) =>
+    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const fetchDetail = useCallback(async () => {
     if (!postId) return;
@@ -106,7 +124,39 @@ const PostDetailPage: React.FC = () => {
         {/* 왼쪽: 미디어 */}
         <div style={{ flex: 1.5, backgroundColor: '#000', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
           {post.medias && post.medias.length > 0 && (
-            <img src={post.medias[currentMediaIndex].sourceUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="post" />
+            isVideo(post.medias[currentMediaIndex].mediaType) ? (
+              <video
+                src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                controls
+                playsInline
+                onError={(e) => {
+                  const video = e.currentTarget;
+                  if (video.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                  if (fallback) {
+                    video.dataset.fallbackApplied = '1';
+                    video.src = fallback;
+                    video.load();
+                  }
+                }}
+              />
+            ) : (
+              <img
+                src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                alt="post"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                  if (fallback) {
+                    img.dataset.fallbackApplied = '1';
+                    img.src = fallback;
+                  }
+                }}
+              />
+            )
           )}
           {post.medias && post.medias.length > 1 && (
             <>
@@ -120,7 +170,12 @@ const PostDetailPage: React.FC = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '350px' }}>
           <div style={{ padding: '15px', borderBottom: '1px solid #efefef', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src={post.profileImageUrl || '/default-profile.png'} style={{ width: '32px', height: '32px', borderRadius: '50%' }} alt="avatar" />
+              <img
+                src={resolveProfileImageUrl(post.profileImageUrl)}
+                style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+                alt="avatar"
+                onError={(e) => applyImageFallback(e, post.profileImageUrl)}
+              />
               <strong style={{ cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>{post.nickname}</strong>
             </div>
             {post.isMine && (
@@ -137,7 +192,7 @@ const PostDetailPage: React.FC = () => {
               <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
             </div>
             {post.comments?.content?.map(comment => (
-              <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={() => fetchDetail()} onReplyAdded={fetchDetail} />
+              <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={fetchDetail} onReplyAdded={fetchDetail} />
             ))}
           </div>
 

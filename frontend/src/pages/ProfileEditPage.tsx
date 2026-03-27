@@ -7,6 +7,7 @@ import { Gender, Resume, ProfileUpdateRequest } from '../types/user';
 import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
+import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -120,9 +121,10 @@ const ProfileEditPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '30px' }}>
             <div style={{ position: 'relative' }}>
               <img 
-                src={preview || '/default-profile.png'} 
+                src={resolveProfileImageUrl(preview)} 
                 style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #dbdbdb' }} 
                 alt="preview" 
+                onError={(e) => applyImageFallback(e, preview)}
               />
               <label style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#0095f6', color: '#fff', borderRadius: '50%', padding: '4px', cursor: 'pointer' }}>
                 <Camera size={14} />

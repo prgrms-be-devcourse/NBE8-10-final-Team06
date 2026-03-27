@@ -4,6 +4,7 @@ import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, 
 import { PostFeedResponse } from '../../types/post';
 import { postApi } from '../../api/post';
 import UserListModal from '../profile/UserListModal';
+import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
 
 interface PostCardProps {
   post: PostFeedResponse;
@@ -21,6 +22,23 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   useEffect(() => {
     setPost(initialPost);
   }, [initialPost]);
+
+  const getFullUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/')) return url;
+    return `/uploads/${url}`;
+  };
+
+  const getFallbackUrl = (url: string) => {
+    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
+    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
+    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
+    return `/temp/media/${url}`;
+  };
+
+  const isVideo = (mediaType: string) =>
+    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const handleLike = async () => {
     try {
@@ -61,7 +79,13 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
       {/* 헤더 섹션 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>
-          <img src={post.profileImageUrl || '/default-profile.png'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} alt="profile" />
+          <img
+            src={resolveProfileImageUrl(post.profileImageUrl)}
+            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+            alt="profile"
+            onError={(e) => applyImageFallback(e, post.profileImageUrl)}
+          />
+          
           <strong style={{ fontSize: '0.9rem' }}>{post.nickname}</strong>
         </div>
         <div style={{ position: 'relative' }}>
@@ -82,12 +106,42 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
       {/* 미디어 슬라이더 */}
       <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', backgroundColor: '#000', display: 'flex', alignItems: 'center' }}>
         {post.medias && post.medias.length > 0 ? (
-          <img 
-            src={post.medias[currentMediaIndex].sourceUrl} 
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-            alt="content" 
-            onClick={() => navigate(`/post/${post.id}`)} 
-          />
+          isVideo(post.medias[currentMediaIndex].mediaType) ? (
+            <video
+              src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              muted
+              playsInline
+              controls
+              onError={(e) => {
+                const video = e.currentTarget;
+                if (video.dataset.fallbackApplied === '1') return;
+                const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                if (fallback) {
+                  video.dataset.fallbackApplied = '1';
+                  video.src = fallback;
+                  video.load();
+                }
+              }}
+              onClick={() => navigate(`/post/${post.id}`)}
+            />
+          ) : (
+            <img
+              src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              alt="content"
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (img.dataset.fallbackApplied === '1') return;
+                const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                if (fallback) {
+                  img.dataset.fallbackApplied = '1';
+                  img.src = fallback;
+                }
+              }}
+              onClick={() => navigate(`/post/${post.id}`)}
+            />
+          )
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>이미지가 없습니다.</div>
         )}

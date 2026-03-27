@@ -6,6 +6,7 @@ import { postApi } from '../../api/post';
 import { dmApi } from '../../api/dm';
 import { FollowUserResponse } from '../../types/user';
 import { PostLikerResponse } from '../../types/post';
+import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
 
 interface UserListModalProps {
   title: string;
@@ -15,7 +16,7 @@ interface UserListModalProps {
 }
 
 const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose }) => {
-  const [users, setUsers] = useState<Array<{ id: number; nickname: string; profileImageUrl: string | null; email: string; isFollowing: boolean }>>([]);
+  const [users, setUsers] = useState<Array<{ id: number; nickname: string; profileImageUrl: string | null; isFollowing: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [processingUserId, setProcessingUserId] = useState<number | null>(null);
   const navigate = useNavigate();
@@ -40,13 +41,24 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
             ? ((res.data.content ?? []) as PostLikerResponse[])
             : (res.data as FollowUserResponse[]);
 
-        const normalized = rawUsers.map((u) => ({
-          id: u.userId,
-          nickname: u.nickname,
-          profileImageUrl: 'profileImageUrl' in u ? (u.profileImageUrl ?? null) : null,
-          email: '',
-          isFollowing: 'isFollowing' in u ? u.isFollowing : false
-        }));
+        const normalized = rawUsers.map((u) => {
+          if (type === 'likers') {
+            return {
+              id: u.userId,
+              nickname: u.nickname,
+              profileImageUrl: null,
+              isFollowing: false
+            };
+          }
+
+          const followUser = u as FollowUserResponse;
+          return {
+            id: followUser.userId,
+            nickname: followUser.nickname,
+            profileImageUrl: followUser.profileImageUrl ?? null,
+            isFollowing: followUser.isFollowing
+          };
+        });
         setUsers(normalized);
       }
     } catch (err) {
@@ -168,13 +180,13 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
                 }}
               >
                 <img 
-                  src={user.profileImageUrl || '/default-profile.png'} 
+                  src={resolveProfileImageUrl(user.profileImageUrl)} 
                   style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} 
                   alt={user.nickname} 
+                  onError={(e) => applyImageFallback(e, user.profileImageUrl)}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.nickname}</span>
-                  {user.email && <span style={{ fontSize: '0.8rem', color: '#8e8e8e' }}>{user.email}</span>}
                 </div>
                 {(type === 'followers' || type === 'followings') && (
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>

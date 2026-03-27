@@ -40,7 +40,15 @@ const StoryViewer: React.FC = () => {
   const getFullUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http') || url.startsWith('blob:')) return url;
-    return `http://localhost:8080${url.startsWith('/') ? '' : '/'}${url}`;
+    if (url.startsWith('/')) return url;
+    return `/uploads/${url}`;
+  };
+
+  const getFallbackUrl = (url: string) => {
+    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
+    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
+    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
+    return `/temp/media/${url}`;
   };
 
   useEffect(() => {
@@ -197,7 +205,39 @@ const StoryViewer: React.FC = () => {
         onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}
         style={{ width: '100%', maxWidth: '450px', height: '85vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#000' }}
       >
-        {isImage(currentStory.mediaType) ? <img src={getFullUrl(currentStory.mediaUrl)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <video src={getFullUrl(currentStory.mediaUrl)} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
+        {isImage(currentStory.mediaType) ? (
+          <img
+            src={getFullUrl(currentStory.mediaUrl)}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(currentStory.mediaUrl);
+              if (fallback) {
+                img.dataset.fallbackApplied = '1';
+                img.src = fallback;
+              }
+            }}
+          />
+        ) : (
+          <video
+            src={getFullUrl(currentStory.mediaUrl)}
+            autoPlay
+            muted
+            playsInline
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            onError={(e) => {
+              const video = e.currentTarget;
+              if (video.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(currentStory.mediaUrl);
+              if (fallback) {
+                video.dataset.fallbackApplied = '1';
+                video.src = fallback;
+                video.load();
+              }
+            }}
+          />
+        )}
         <div onClick={handlePrev} style={{ position: 'absolute', left: 0, top: 0, width: '30%', height: '100%' }} />
         <div onClick={handleNext} style={{ position: 'absolute', right: 0, top: 0, width: '70%', height: '100%' }} />
       </div>

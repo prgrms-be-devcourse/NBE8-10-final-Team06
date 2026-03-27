@@ -2,10 +2,10 @@ import { Slice } from "./common";
 import { PostFeedProfileRes, TechTagRes } from "./post";
 
 export interface FollowUserResponse {
-  id: number;
+  userId: number;
   nickname: string;
-  email: string;
   profileImageUrl: string | null;
+  isFollowing: boolean;
 }
 
 export interface FollowResponse {
