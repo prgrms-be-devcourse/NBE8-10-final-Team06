@@ -139,7 +139,8 @@ services:
     # docker compose --profile loadtest run --rm k6 run \
     #   -o xk6-influxdb=http://influxdb:8086 \
     #   /scripts/scenarios/smoke.js
-  #7. redis
+
+  #9. redis
   redis:
     image: redis:7-alpine
     container_name: redis
