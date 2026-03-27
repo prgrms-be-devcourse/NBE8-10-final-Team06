@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { userApi } from '../api/user';
 import { postApi } from '../api/post';
+import { dmApi } from '../api/dm';
 import { UserProfileResponse, Resume } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut } from 'lucide-react';
@@ -84,6 +85,24 @@ const ProfilePage: React.FC = () => {
     }
   }, [isMe, activeTab, fetchScraps, scrappedPosts.length]);
 
+  const handleFollowToggle = async () => {
+    if (!profile) return;
+    try {
+      const res = profile.isFollowing ? await userApi.unfollow(profile.userId) : await userApi.follow(profile.userId);
+      if (res.resultCode.startsWith('200')) {
+        setProfile({ ...profile, isFollowing: res.data.isFollowing, followerCount: res.data.followerCount });
+      }
+    } catch (err) { console.error('팔로우 처리 실패:', err); }
+  };
+
+  const handleMessageClick = async () => {
+    if (!profile) return;
+    try {
+      const res = await dmApi.create1v1Room(profile.userId);
+      if (res.resultCode.startsWith('200')) { navigate(`/dm/${res.data.roomId}`); }
+    } catch (err) { alert('채팅방을 시작할 수 없습니다.'); }
+  };
+
   if (loading && !profile) return <MainLayout title={targetNickname || "Profile"}><div style={{ textAlign: 'center' }}>로딩 중...</div></MainLayout>;
   
   if (error) return (
@@ -105,33 +124,44 @@ const ProfilePage: React.FC = () => {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: '300' }}>{profile.nickname}</span>
-            {isMe && <button onClick={() => navigate('/profile/edit')} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>프로필 편집</button>}
-            {isMe && <LogOut size={22} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={() => { setLogout(); navigate('/login'); }} />}
+            {isMe ? (
+              <>
+                <button onClick={() => navigate('/profile/edit')} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>프로필 편집</button>
+                <LogOut size={22} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={() => { setLogout(); navigate('/login'); }} />
+              </>
+            ) : (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <button onClick={handleFollowToggle} style={{ padding: '6px 24px', backgroundColor: profile.isFollowing ? '#efefef' : '#0095f6', color: profile.isFollowing ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>{profile.isFollowing ? '팔로잉' : '팔로우'}</button>
+                <button onClick={handleMessageClick} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>메시지 보내기</button>
+                {profile.isFollower && <span style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>나를 팔로우함</span>}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '40px', marginBottom: '20px' }}>
             <span>게시물 <strong>{profile.postCount}</strong></span>
             <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>팔로워 <strong>{profile.followerCount}</strong></span>
             <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로잉', id: profile.userId, type: 'followings' })}>팔로잉 <strong>{profile.followingCount}</strong></span>
           </div>
-          <div style={{ fontWeight: '600' }}>{profile.nickname}</div>
-          <div style={{ color: '#8e8e8e' }}>{RESUME_MAP[profile.resume]}</div>
+          <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {profile.nickname}
+            <div style={{ display: 'flex', gap: '5px' }}>
+              {profile.techStacks?.map(tech => (
+                <span key={tech.id} style={{ fontSize: '0.7rem', color: tech.color, backgroundColor: `${tech.color}15`, padding: '1px 6px', borderRadius: '4px', border: `1px solid ${tech.color}30` }}>{tech.name}</span>
+              ))}
+            </div>
+          </div>
+          <div style={{ color: '#8e8e8e', marginTop: '5px' }}>{RESUME_MAP[profile.resume]}</div>
+          {profile.githubUrl && <a href={profile.githubUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.85rem', color: '#00376b', textDecoration: 'none', display: 'block', marginTop: '5px' }}>{profile.githubUrl}</a>}
         </div>
       </header>
 
       <div style={{ borderTop: '1px solid #dbdbdb', display: 'flex', justifyContent: 'center', gap: '60px' }}>
-        <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <Grid size={12} /> 게시물
-        </button>
-        <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <BarChart2 size={12} /> 기술 레벨
-        </button>
-        {isMe && <button onClick={() => setActiveTab('scraps')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'scraps' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <Bookmark size={12} /> 저장됨
-        </button>}
+        <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Grid size={12} /> 게시물</button>
+        <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><BarChart2 size={12} /> 기술 레벨</button>
+        {isMe && <button onClick={() => setActiveTab('scraps')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'scraps' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Bookmark size={12} /> 저장됨</button>}
       </div>
 
       <div style={{ marginTop: '20px' }}>
-        {/* 게시물 탭 */}
         {activeTab === 'posts' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
             {profile.posts.content.map(post => (
@@ -145,8 +175,6 @@ const ProfilePage: React.FC = () => {
             ))}
           </div>
         )}
-
-        {/* 저장됨 탭 */}
         {activeTab === 'scraps' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
             {scrappedPosts.map(post => (
@@ -156,41 +184,21 @@ const ProfilePage: React.FC = () => {
             ))}
           </div>
         )}
-
-        {/* 기술 레벨 탭 (수정 완료) */}
         {activeTab === 'tech' && (
           <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '12px' }}>
             <h3 style={{ marginBottom: '20px', fontSize: '1rem', fontWeight: 'bold' }}>기술 스택 숙련도</h3>
-            {profile.topTechScores && profile.topTechScores.length > 0 ? (
-              profile.topTechScores.map(tech => (
-                <div key={tech.techName} style={{ marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
-                    <strong>{tech.techName}</strong>
-                    <span style={{ color: '#0095f6', fontWeight: 'bold' }}>{tech.score} pt</span>
-                  </div>
-                  <div style={{ width: '100%', height: '10px', backgroundColor: '#efefef', borderRadius: '5px', overflow: 'hidden' }}>
-                    <div style={{ 
-                      width: `${Math.min((tech.score / 500) * 100, 100)}%`, 
-                      height: '100%', 
-                      backgroundColor: '#0095f6',
-                      transition: 'width 1s ease-in-out'
-                    }} />
-                  </div>
+            {profile.topTechScores && profile.topTechScores.length > 0 ? profile.topTechScores.map(tech => (
+              <div key={tech.techName} style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}><strong>{tech.techName}</strong><span style={{ color: '#0095f6', fontWeight: 'bold' }}>{tech.score} pt</span></div>
+                <div style={{ width: '100%', height: '10px', backgroundColor: '#efefef', borderRadius: '5px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min((tech.score / 500) * 100, 100)}%`, height: '100%', backgroundColor: '#0095f6', transition: 'width 1s ease-in-out' }} />
                 </div>
-              ))
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족하여 기술 레벨을 산정할 수 없습니다.</p>
-                <p style={{ fontSize: '0.8rem', color: '#a8a8a8', marginTop: '10px' }}>게시물을 작성하거나 좋아요를 눌러보세요!</p>
               </div>
-            )}
+            )) : <div style={{ textAlign: 'center', padding: '40px 0' }}><p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p></div>}
           </div>
         )}
       </div>
-
-      {modalConfig && (
-        <UserListModal title={modalConfig.title} id={modalConfig.id} type={modalConfig.type} onClose={() => setModalConfig(null)} />
-      )}
+      {modalConfig && <UserListModal title={modalConfig.title} id={modalConfig.id} type={modalConfig.type} onClose={() => setModalConfig(null)} />}
     </MainLayout>
   );
 };

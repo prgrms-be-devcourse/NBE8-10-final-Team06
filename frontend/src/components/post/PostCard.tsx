@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2 } from 'lucide-react';
 import { PostFeedResponse } from '../../types/post';
 import { postApi } from '../../api/post';
+import UserListModal from '../profile/UserListModal';
 
 interface PostCardProps {
   post: PostFeedResponse;
@@ -14,6 +15,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   const [post, setPost] = useState(initialPost);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const [showLikers, setShowLikers] = useState(false); // 좋아요 모달 상태
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,10 +26,11 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
     try {
       const res = await postApi.toggleLike(post.id);
       if (res.resultCode.includes('-S-')) {
+        const isNowLiked = !post.isLiked;
         setPost(prev => ({
           ...prev,
-          isLiked: !prev.isLiked,
-          likeCount: prev.isLiked ? prev.likeCount - 1 : prev.likeCount + 1
+          isLiked: isNowLiked,
+          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
         }));
       }
     } catch (err) { console.error(err); }
@@ -93,20 +96,48 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
           <MessageCircle size={24} style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post.id}`)} />
         </div>
         
-        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px' }}>좋아요 {post.likeCount || 0}개</div>
+        <div 
+          style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', cursor: 'pointer' }}
+          onClick={() => setShowLikers(true)}
+        >
+          좋아요 {post.likeCount || 0}개
+        </div>
         
         <div style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
           <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{post.nickname}</span>
           <span style={{ fontWeight: 'bold', display: 'block', margin: '4px 0' }}>{post.title}</span>
+          
+          {/* 기술 스택 태그 추가 */}
+          {post.techStacks && post.techStacks.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '8px 0' }}>
+              {post.techStacks.map(tech => (
+                <span 
+                  key={tech.id} 
+                  style={{ 
+                    fontSize: '0.7rem', 
+                    color: tech.color, 
+                    backgroundColor: `${tech.color}15`, // 배경은 옅게
+                    padding: '2px 8px', 
+                    borderRadius: '10px', 
+                    border: `1px solid ${tech.color}40`,
+                    fontWeight: '600'
+                  }}
+                >
+                  #{tech.name}
+                </span>
+              ))}
+            </div>
+          )}
+          
           <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{post.content}</p>
         </div>
 
-        {/* 댓글 개수 표시 - 데이터 존재 여부에 따른 조건부 출력 강화 */}
+        {/* 댓글 개수 표시 */}
         <div 
           style={{ color: '#8e8e8e', fontSize: '0.85rem', marginTop: '12px', cursor: 'pointer' }} 
           onClick={() => navigate(`/post/${post.id}`)}
         >
-          {post.commentCount && post.commentCount > 0 
+          {post.commentCount > 0 
             ? `댓글 ${post.commentCount}개 모두 보기` 
             : '댓글 작성하기...'}
         </div>
@@ -115,6 +146,16 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
           {new Date(post.createdAt).toLocaleDateString()}
         </div>
       </div>
+
+      {/* 좋아요 모달 */}
+      {showLikers && (
+        <UserListModal 
+          title="좋아요" 
+          id={post.id} 
+          type="likers" 
+          onClose={() => setShowLikers(false)} 
+        />
+      )}
     </article>
   );
 };

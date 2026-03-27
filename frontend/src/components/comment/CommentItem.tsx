@@ -18,16 +18,16 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
   const [replyText, setReplyText] = useState('');
   const [loadingReplies, setLoadingReplies] = useState(false);
 
-  // 백엔드에 likeCount가 없으므로 프론트에서 임시 가상 카운트 관리 (UX용)
-  const [virtualLikeCount, setVirtualLikeCount] = useState(0); 
-
   const toggleLike = async () => {
     try {
       const res = await commentApi.toggleLike(comment.id);
       if (res.resultCode.includes('-S-')) {
         const isNowLiked = !comment.isLiked;
-        setComment(prev => ({ ...prev, isLiked: isNowLiked }));
-        setVirtualLikeCount(prev => isNowLiked ? prev + 1 : Math.max(0, prev - 1));
+        setComment(prev => ({ 
+          ...prev, 
+          isLiked: isNowLiked,
+          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
+        }));
       }
     } catch (err) { 
       console.error('댓글 좋아요 실패:', err); 
@@ -84,7 +84,7 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
           </div>
           <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem', color: '#8e8e8e', marginTop: '4px', alignItems: 'center' }}>
             <span>{new Date(comment.createdAt).toLocaleDateString()}</span>
-            {virtualLikeCount > 0 && <span style={{ fontWeight: 'bold' }}>좋아요 {virtualLikeCount}개</span>}
+            {comment.likeCount > 0 && <span style={{ fontWeight: 'bold' }}>좋아요 {comment.likeCount}개</span>}
             <span style={{ cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setIsReplyInputVisible(!isReplyInputVisible)}>답글 달기</span>
             {comment.isMine && (
               <Trash2 size={14} style={{ cursor: 'pointer' }} onClick={() => onDelete(comment.id)} />
@@ -108,23 +108,29 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
           {showReplies ? <><ChevronUp size={14} /> 답글 숨기기</> : <><ChevronDown size={14} /> 답글 보기 ({comment.replyCount}개)</>}
         </div>
       )}
-
-      {showReplies && (
-        <div style={{ marginLeft: '44px', marginTop: '10px' }}>
-          {replies.map(reply => (
-            <div key={reply.id} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
-              <img src={reply.profileImageUrl || '/default-profile.png'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} alt="avatar" />
-              <div style={{ flex: 1, fontSize: '0.8rem' }}>
-                <strong>{reply.nickname}</strong> {reply.content}
-                <div style={{ fontSize: '0.7rem', color: '#8e8e8e', marginTop: '2px' }}>
-                  {new Date(reply.createdAt).toLocaleDateString()}
-                </div>
-              </div>
-              {/* 대댓글은 백엔드 DTO 부족으로 좋아요 기능 제외 */}
-            </div>
-          ))}
+{showReplies && (
+  <div style={{ marginLeft: '44px', marginTop: '10px' }}>
+    {replies.map(reply => (
+      <div key={reply.id} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
+        <img src={reply.profileImageUrl || '/default-profile.png'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} alt="avatar" />
+        <div style={{ flex: 1, fontSize: '0.8rem' }}>
+          <strong>{reply.nickname}</strong> {reply.content}
+          <div style={{ display: 'flex', gap: '12px', fontSize: '0.7rem', color: '#8e8e8e', marginTop: '2px', alignItems: 'center' }}>
+            <span>{new Date(reply.createdAt).toLocaleDateString()}</span>
+            {reply.likeCount > 0 && <span style={{ fontWeight: 'bold' }}>좋아요 {reply.likeCount}개</span>}
+          </div>
         </div>
-      )}
+        <Heart 
+          size={12} 
+          style={{ cursor: 'pointer', color: reply.isLiked ? '#ed4956' : '#8e8e8e', marginTop: '4px' }} 
+          fill={reply.isLiked ? '#ed4956' : 'none'}
+          onClick={() => handleReplyLike(reply.id)}
+        />
+      </div>
+    ))}
+  </div>
+)}
+
 
       {isReplyInputVisible && (
         <form onSubmit={handleReplySubmit} style={{ marginLeft: '44px', marginTop: '10px', display: 'flex', gap: '10px' }}>

@@ -13,6 +13,7 @@ const PostDetailPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [post, setPost] = useState<PostDetailResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [commentText, setCommentText] = useState('');
@@ -23,12 +24,15 @@ const PostDetailPage: React.FC = () => {
     if (!postId) return;
     try {
       setLoading(true);
+      setErrorMsg(null);
       const res = await postApi.getDetail(Number(postId));
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
         setPost(res.data);
+      } else {
+        setErrorMsg(res.msg);
       }
-    } catch (err) {
-      console.error('상세 조회 실패:', err);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.msg || '게시물을 불러오는 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -43,10 +47,11 @@ const PostDetailPage: React.FC = () => {
     try {
       const res = await postApi.toggleLike(post.id);
       if (res.resultCode.includes('-S-')) {
+        const isNowLiked = !post.isLiked;
         setPost(prev => prev ? ({
           ...prev,
-          isLiked: !prev.isLiked,
-          likeCount: prev.isLiked ? prev.likeCount - 1 : prev.likeCount + 1
+          isLiked: isNowLiked,
+          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
         }) : null);
       }
     } catch (err) { console.error(err); }
@@ -62,8 +67,38 @@ const PostDetailPage: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
-  if (loading) return <MainLayout title="Post"><div style={{ textAlign: 'center' }}>로딩 중...</div></MainLayout>;
-  if (!post) return <MainLayout title="Error"><div style={{ textAlign: 'center' }}>게시물을 찾을 수 없습니다.</div></MainLayout>;
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || isSubmittingComment || !post) return;
+
+    try {
+      setIsSubmittingComment(true);
+      const res = await commentApi.create(post.id, { content: commentText });
+      if (res.resultCode.includes('-S-')) {
+        setCommentText('');
+        fetchDetail(); // 댓글 목록 갱신
+      }
+    } catch (err) {
+      alert('댓글 작성 실패');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handlePostDelete = async () => {
+    if (!post || !window.confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      const res = await postApi.delete(post.id);
+      if (res.resultCode.includes('-S-')) {
+        navigate('/');
+      }
+    } catch (err) {
+      alert('삭제 실패');
+    }
+  };
+
+  if (loading) return <MainLayout title="Post"><div style={{ textAlign: 'center', padding: '100px' }}>로딩 중...</div></MainLayout>;
+  if (errorMsg || !post) return <MainLayout title="Error"><div style={{ textAlign: 'center', padding: '100px', color: '#8e8e8e' }}>{errorMsg || '게시물을 찾을 수 없습니다.'}</div></MainLayout>;
 
   return (
     <MainLayout title="Post" maxWidth="935px">
@@ -91,7 +126,7 @@ const PostDetailPage: React.FC = () => {
             {post.isMine && (
               <div style={{ display: 'flex', gap: '10px' }}>
                 <Edit size={18} style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post.id}/edit`)} />
-                <Trash2 size={18} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={() => {}} />
+                <Trash2 size={18} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={handlePostDelete} />
               </div>
             )}
           </div>
@@ -102,7 +137,7 @@ const PostDetailPage: React.FC = () => {
               <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
             </div>
             {post.comments?.content?.map(comment => (
-              <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={() => {}} onReplyAdded={fetchDetail} />
+              <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={() => fetchDetail()} onReplyAdded={fetchDetail} />
             ))}
           </div>
 
@@ -113,7 +148,23 @@ const PostDetailPage: React.FC = () => {
               <Bookmark size={24} onClick={handleScrap} style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'black' }} fill={post.isScrapped ? '#ffd700' : 'none'} />
             </div>
             <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '10px', cursor: 'pointer' }} onClick={() => setShowLikers(true)}>좋아요 {post.likeCount}개</div>
-            {/* 댓글 폼 로직 동일 */}
+            
+            <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '10px', borderTop: '1px solid #efefef', paddingTop: '10px' }}>
+              <input 
+                type="text" 
+                placeholder="댓글 달기..." 
+                style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }}
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+              <button 
+                type="submit" 
+                disabled={!commentText.trim() || isSubmittingComment}
+                style={{ background: 'none', border: 'none', color: '#0095f6', fontWeight: 'bold', cursor: 'pointer', opacity: commentText.trim() ? 1 : 0.5 }}
+              >
+                게시
+              </button>
+            </form>
           </div>
         </div>
       </div>

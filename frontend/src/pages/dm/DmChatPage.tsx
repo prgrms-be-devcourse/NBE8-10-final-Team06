@@ -187,17 +187,18 @@ const DmChatPage: React.FC = () => {
                 if (prev.some(m => m.id === newMsg.id)) return prev;
                 return [...prev.filter(m => m.id !== -1), newMsg];
               });
-              if (newMsg.userId !== userId) sendReadEvent(newMsg.id);
+              if (newMsg.senderId !== userId) sendReadEvent(newMsg.id);
               // 새 메시지 수신 시 하단 스크롤
               setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 0);
             }
             break;
           case 'typing':
-            if (event.userId !== userId) setTypingUser(event.status === 'start' ? '상대방이 입력 중...' : null);
+            if (event.data && event.data.userId !== userId) setTypingUser(event.data.status === 'start' ? '상대방이 입력 중...' : null);
             break;
           case 'read':
-            if (event.messageId) setLastReadIdByOpponent(prev => Math.max(prev, event.messageId!));
+            if (event.data && event.data.messageId) setLastReadIdByOpponent(prev => Math.max(prev, event.data.messageId!));
             break;
+
         }
       });
       return () => {
@@ -211,9 +212,9 @@ const DmChatPage: React.FC = () => {
     e.preventDefault();
     if (!inputValue.trim() || !isConnected) return;
     const content = inputValue.trim();
-    setMessages(prev => [...prev, { id: -1, type: 'TEXT' as any, content, thumbnail: null, valid: true, createdAt: new Date().toISOString(), userId: userId || undefined }]);
+    setMessages(prev => [...prev, { id: -1, type: 'TEXT' as any, content, thumbnail: null, valid: true, createdAt: new Date().toISOString(), senderId: userId || 0 }]);
     setInputValue('');
-    publish(`/app/dm/${roomId}/message`, { type: 'TEXT', content });
+    publish(`/app/dm/${roomId}/message`, { type: 'TEXT', content, thumbnail: null });
     setIsMeTyping(false);
     // 하단 이동
     setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 0);
@@ -224,6 +225,20 @@ const DmChatPage: React.FC = () => {
     if (!isMeTyping) { setIsMeTyping(true); publish(`/app/dm/${roomId}/typing`, { roomId: Number(roomId), userId, status: 'start' }); }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => { setIsMeTyping(false); publish(`/app/dm/${roomId}/typing`, { roomId: Number(roomId), userId, status: 'stop' }); }, 2000);
+  };
+
+  const handleLeaveRoom = async () => {
+    if (!window.confirm('방을 나가시겠습니까?')) return;
+    try {
+      const res = currentRoom?.isGroup 
+        ? await dmApi.leaveGroupRoom(Number(roomId)) 
+        : await dmApi.leave1v1Room(Number(roomId));
+      if (res.resultCode.startsWith('200')) {
+        navigate('/dm');
+      }
+    } catch (err) {
+      alert('방 나가기 실패');
+    }
   };
 
   return (
@@ -245,7 +260,15 @@ const DmChatPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <Info size={24} style={{ cursor: 'pointer' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button 
+            onClick={handleLeaveRoom}
+            style={{ color: '#ed4956', background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            나가기
+          </button>
+          <Info size={24} style={{ cursor: 'pointer' }} />
+        </div>
       </header>
 
       <main ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column' }}>

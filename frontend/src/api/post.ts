@@ -50,4 +50,8 @@ export const postApi = {
     client.get<RsData<Slice<PostFeedResponse>>>('/posts/scraps', {
       params: { page, size: 10 }
     }).then(res => res.data),
+
+  // 특정 포스트 좋아요 유저 목록 조회
+  getLikers: (postId: number) =>
+    client.get<RsData<any[]>>(`/posts/${postId}/likers`).then(res => res.data),
 };

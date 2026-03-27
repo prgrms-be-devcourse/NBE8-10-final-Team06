@@ -1,6 +1,6 @@
 // src/types/dm.ts
 
-export type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'FILE';
+export type MessageType = 'TEXT' | 'POST' | 'STORY' | 'IMAGE' | 'SYSTEM';
 
 export interface DmMessageResponse {
   id: number;
@@ -9,8 +9,7 @@ export interface DmMessageResponse {
   thumbnail: string | null;
   valid: boolean;
   createdAt: string;
-  userId?: number;
-  isRead?: boolean; // 프론트엔드 관리용: 읽음 여부
+  senderId: number; // 백엔드 기준: senderId
 }
 
 export interface DmRoomParticipantSummary {
@@ -38,14 +37,35 @@ export interface DmMessageSliceResponse {
 export interface DmSendMessageRequest {
   type: MessageType;
   content: string;
-  thumbnail?: string;
+  thumbnail?: string | null;
+}
+
+export interface DmCreate1v1WithRoomListResponse {
+  roomId: number;
+  rooms: DmRoomSummaryResponse[];
+}
+
+export interface DmCreateGroupWithRoomListResponse {
+  roomId: number;
+  rooms: DmRoomSummaryResponse[];
 }
 
 export interface WebSocketEventPayload<T> {
   type: 'message' | 'typing' | 'read' | 'join' | 'leave';
-  data?: T;
-  roomId?: number;
-  userId?: number;
-  status?: 'start' | 'stop';
-  messageId?: number; // 읽음 처리 시 전달되는 ID
+  data: T;
+}
+
+export interface TypingWsPayload {
+  roomId: number;
+  userId: number;
+  status: 'start' | 'stop';
+}
+
+export interface ReadWsPayload {
+  messageId: number;
+}
+
+export interface JoinLeaveWsPayload {
+  roomId: number;
+  userId: number;
 }

@@ -12,6 +12,7 @@ export interface CommentInfoResponse {
   createdAt: string;
   modifiedAt: string;
   replyCount: number;
+  likeCount: number; // 추가
 }
 
 /**
@@ -22,11 +23,12 @@ export interface ReplyInfoResponse {
   userId: number;
   content: string;
   nickname: string;
-  isLiked: boolean; // 백엔드 ReplyInfoRes 필드 확인 필요
+  isLiked: boolean;
   isMine: boolean;
   profileImageUrl: string | null;
   createdAt: string;
   modifiedAt: string;
+  likeCount: number; // 추가
 }
 
 export interface CommentCreateRequest {

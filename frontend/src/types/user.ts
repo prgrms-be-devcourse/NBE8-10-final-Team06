@@ -1,5 +1,5 @@
 import { Slice } from "./common";
-import { PostFeedProfileRes } from "./post";
+import { PostFeedProfileRes, TechTagRes } from "./post";
 
 export interface FollowUserResponse {
   id: number;
@@ -67,6 +67,8 @@ export interface UserProfileResponse {
   followerCount: number;
   followingCount: number;
   isFollowing: boolean;
+  isFollower: boolean; // 추가
+  techStacks: TechTagRes[]; // 추가
   topTechScores: TechScoreDto[];
   posts: Slice<PostFeedProfileRes>;
 }
@@ -80,4 +82,5 @@ export interface ProfileUpdateRequest {
   resume: Resume;
   birthDate: string;
   gender: Gender;
+  techIds: number[]; // 추가
 }

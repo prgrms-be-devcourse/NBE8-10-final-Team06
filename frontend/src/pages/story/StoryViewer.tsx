@@ -60,7 +60,8 @@ const StoryViewer: React.FC = () => {
         const res = await storyApi.getUserStories(targetUserId);
         if (res.resultCode.startsWith('200') && res.data.length > 0) {
           setStories(res.data);
-          storyApi.recordView(res.data[0].storyId);
+          const firstStoryId = res.data[0]?.storyId;
+          if (firstStoryId) storyApi.recordView(firstStoryId);
         } else {
           navigate('/');
         }
@@ -183,10 +184,11 @@ const StoryViewer: React.FC = () => {
         <button onClick={() => navigate('/')} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}><X size={28} /></button>
       </div>
 
-      {/* 메뉴/통계창 (생략 로직 동일) */}
+      {/* 메뉴창 */}
       {showMenu && isOwner && (
-        <div style={{ position: 'absolute', top: '70px', right: '20px', backgroundColor: '#fff', borderRadius: '12px', zIndex: 3100, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-          <button onClick={handleDelete} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 20px', border: 'none', background: 'none', color: '#ed4956', fontWeight: 'bold' }}><Trash2 size={18} /> 삭제</button>
+        <div style={{ position: 'absolute', top: '70px', right: '20px', backgroundColor: '#fff', borderRadius: '12px', zIndex: 3100, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', width: '180px' }}>
+          <button onClick={handleSoftDelete} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '10px', padding: '15px 20px', border: 'none', background: 'none', color: '#262626', cursor: 'pointer', borderBottom: '1px solid #efefef' }}>보관하기</button>
+          <button onClick={handleHardDelete} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '10px', padding: '15px 20px', border: 'none', background: 'none', color: '#ed4956', fontWeight: 'bold', cursor: 'pointer' }}><Trash2 size={18} /> 영구 삭제</button>
         </div>
       )}
 

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, X, Image as ImageIcon } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 import { postApi } from '../api/post';
+import { technologyApi } from '../api/technology';
+import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 
 const PostCreatePage: React.FC = () => {
@@ -9,11 +11,41 @@ const PostCreatePage: React.FC = () => {
   const [content, setContent] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [isSubmitting, setIsRequesting] = useState(false);
+  const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
+  const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  // 1. 기술 스택 목록 로드
+  useEffect(() => {
+    const fetchTechs = async () => {
+      try {
+        const res = await technologyApi.getTechnologies();
+        if (res.resultCode.startsWith('200')) {
+          setAllTechs(res.data);
+        }
+      } catch (err) { console.error('기술 스택 로드 실패:', err); }
+    };
+    fetchTechs();
+  }, []);
+
+  const toggleTech = (techId: number) => {
+    setSelectedTechIds(prev => 
+      prev.includes(techId) ? prev.filter(id => id !== techId) : [...prev, techId]
+    );
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     const files = Array.from(e.target.files || []);
+    
+    // 용량 체크
+    const oversizedFiles = files.filter(f => f.size > MAX_SIZE);
+    if (oversizedFiles.length > 0) {
+      alert('10MB를 초과하는 파일은 업로드할 수 없습니다.');
+      return;
+    }
+
     if (files.length + selectedFiles.length > 5) {
       alert('최대 5개의 파일만 업로드 가능합니다.');
       return;
@@ -45,28 +77,28 @@ const PostCreatePage: React.FC = () => {
     }
 
     try {
-      setIsRequesting(true);
+      setIsSubmitting(true);
       const res = await postApi.create({
         title,
         content,
-        techIds: [] // TODO: 기술 스택 API 연동 시 업데이트
+        techIds: selectedTechIds
       }, selectedFiles);
 
-      if (res.resultCode.includes('-S-')) {
+      if (res.resultCode.includes('-S-') || res.resultCode.startsWith('200')) {
         alert('게시글이 생성되었습니다.');
         navigate('/');
       }
     } catch (err) {
-      console.error(err);
+      console.error('게시글 생성 오류:', err);
       alert('게시글 생성에 실패했습니다.');
     } finally {
-      setIsRequesting(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div style={{ backgroundColor: '#fafafa', minHeight: '100vh', paddingBottom: '80px' }}>
-      <header style={{ height: '60px', backgroundColor: '#fff', borderBottom: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'sticky', top: 0 }}>
+      <header style={{ height: '60px', backgroundColor: '#fff', borderBottom: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>새 게시물 만들기</h2>
       </header>
 
@@ -120,6 +152,35 @@ const PostCreatePage: React.FC = () => {
               style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px', boxSizing: 'border-box', resize: 'none' }}
               required 
             />
+          </div>
+
+          <div style={{ marginBottom: '30px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>기술 태그</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {allTechs.map(tech => {
+                const isSelected = selectedTechIds.includes(tech.id);
+                return (
+                  <button
+                    key={tech.id}
+                    type="button"
+                    onClick={() => toggleTech(tech.id)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${tech.color}`,
+                      backgroundColor: isSelected ? tech.color : '#fff',
+                      color: isSelected ? '#fff' : tech.color,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    #{tech.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button 

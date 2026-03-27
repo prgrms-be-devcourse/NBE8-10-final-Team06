@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { userApi } from '../api/user';
+import { technologyApi } from '../api/technology';
 import { Gender, Resume, ProfileUpdateRequest } from '../types/user';
+import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
 
@@ -25,15 +27,26 @@ const ProfileEditPage: React.FC = () => {
     githubUrl: '',
     resume: Resume.UNSPECIFIED,
     birthDate: '',
-    gender: Gender.MALE
+    gender: Gender.MALE,
+    techIds: []
   });
+  
+  const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchCurrentProfile = async () => {
+    const fetchData = async () => {
       if (!myNickname) return;
       try {
+        setLoading(true);
+        // 1. 전체 기술 스택 목록 조회
+        const techRes = await technologyApi.getTechnologies();
+        if (techRes.resultCode.startsWith('200')) {
+          setAllTechs(techRes.data);
+        }
+
+        // 2. 현재 프로필 정보 조회
         const res = await userApi.getProfile(myNickname);
         if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
           const d = res.data;
@@ -42,17 +55,18 @@ const ProfileEditPage: React.FC = () => {
             githubUrl: d.githubUrl || '',
             resume: d.resume || Resume.UNSPECIFIED,
             birthDate: d.birthDate || '',
-            gender: d.gender || Gender.MALE
+            gender: d.gender || Gender.MALE,
+            techIds: d.techStacks.map(t => t.id)
           });
           setPreview(d.profileImageUrl);
         }
       } catch (err) {
-        console.error('프로필 정보 조회 실패:', err);
+        console.error('데이터 로드 실패:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchCurrentProfile();
+    fetchData();
   }, [myNickname]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,6 +77,15 @@ const ProfileEditPage: React.FC = () => {
     }
   };
 
+  const toggleTech = (techId: number) => {
+    setForm(prev => ({
+      ...prev,
+      techIds: prev.techIds.includes(techId)
+        ? prev.techIds.filter(id => id !== techId)
+        : [...prev.techIds, techId]
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -70,7 +93,6 @@ const ProfileEditPage: React.FC = () => {
       const res = await userApi.updateProfile(form, profileImage || undefined);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
         alert('프로필이 수정되었습니다.');
-        // 닉네임이 변경되었을 수도 있으므로 필요 시 전역 상태 업데이트 로직 추가 가능
         navigate('/profile');
       } else {
         alert(res.msg || '수정에 실패했습니다.');
@@ -155,7 +177,7 @@ const ProfileEditPage: React.FC = () => {
             </select>
           </div>
 
-          <div style={{ marginBottom: '30px' }}>
+          <div style={{ marginBottom: '20px' }}>
             <label style={{ fontSize: '0.8rem', color: '#8e8e8e' }}>경력</label>
             <select 
               value={form.resume} 
@@ -166,6 +188,35 @@ const ProfileEditPage: React.FC = () => {
                 <option key={key} value={key}>{RESUME_MAP[key as Resume]}</option>
               ))}
             </select>
+          </div>
+
+          <div style={{ marginBottom: '30px' }}>
+            <label style={{ fontSize: '0.8rem', color: '#8e8e8e', fontWeight: 'bold' }}>기술 스택</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+              {allTechs.map(tech => {
+                const isSelected = form.techIds.includes(tech.id);
+                return (
+                  <button
+                    key={tech.id}
+                    type="button"
+                    onClick={() => toggleTech(tech.id)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${tech.color}`,
+                      backgroundColor: isSelected ? tech.color : '#fff',
+                      color: isSelected ? '#fff' : tech.color,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {tech.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button 
