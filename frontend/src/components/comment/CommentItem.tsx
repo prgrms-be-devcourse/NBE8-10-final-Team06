@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Heart, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CommentInfoResponse, ReplyInfoResponse } from '../../types/comment';
 import { commentApi } from '../../api/comment';
-import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../common/ProfileAvatar';
 
 interface CommentItemProps {
   postId: number;
@@ -182,11 +182,11 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
   return (
     <div style={{ marginBottom: '15px' }}>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-        <img 
-          src={resolveProfileImageUrl(comment.profileImageUrl)} 
-          style={{ width: '32px', height: '32px', borderRadius: '50%' }} 
-          alt="avatar" 
-          onError={(e) => applyImageFallback(e, comment.profileImageUrl)}
+        <ProfileAvatar
+          authorUserId={comment.userId}
+          profileImageUrl={comment.profileImageUrl}
+          nickname={comment.nickname}
+          sizePx={32}
         />
         <div style={{ flex: 1 }}>
           {isEditMode ? (
@@ -240,11 +240,11 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
   <div style={{ marginLeft: '44px', marginTop: '10px' }}>
     {replies.map(reply => (
       <div key={reply.id} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
-        <img
-          src={resolveProfileImageUrl(reply.profileImageUrl)}
-          style={{ width: '24px', height: '24px', borderRadius: '50%' }}
-          alt="avatar"
-          onError={(e) => applyImageFallback(e, reply.profileImageUrl)}
+        <ProfileAvatar
+          authorUserId={reply.userId}
+          profileImageUrl={reply.profileImageUrl}
+          nickname={reply.nickname}
+          sizePx={24}
         />
         <div style={{ flex: 1, fontSize: '0.8rem' }}>
           {editingReplyId === reply.id ? (

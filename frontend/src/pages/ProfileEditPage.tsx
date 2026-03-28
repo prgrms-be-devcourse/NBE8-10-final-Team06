@@ -8,6 +8,9 @@ import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
 import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
+import { getApiErrorMessage } from '../util/apiError';
+import { syncMyProfileImageFromUserApi } from '../services/syncMyProfileImage';
+import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -18,7 +21,7 @@ const RESUME_MAP: Record<Resume, string> = {
 };
 
 const ProfileEditPage: React.FC = () => {
-  const { nickname: myNickname } = useAuthStore();
+  const { nickname: myNickname, userId: myUserId, setSessionNickname } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,34 +38,46 @@ const ProfileEditPage: React.FC = () => {
   const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!myNickname) return;
+      setLoadError(null);
       try {
         setLoading(true);
-        // 1. 전체 기술 스택 목록 조회
         const techRes = await technologyApi.getTechnologies();
-        if (techRes.resultCode.startsWith('200')) {
-          setAllTechs(techRes.data);
+        if (techRes.resultCode?.includes('-S-') || techRes.resultCode?.startsWith('200')) {
+          setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
         }
 
-        // 2. 현재 프로필 정보 조회
         const res = await userApi.getProfile(myNickname);
         if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
           const d = res.data;
+          if (!d) {
+            setLoadError('프로필 데이터가 비어 있습니다.');
+            return;
+          }
+          const stacks = Array.isArray(d.techStacks) ? d.techStacks : [];
           setForm({
-            nickname: d.nickname,
+            nickname: d.nickname ?? '',
             githubUrl: d.githubUrl || '',
             resume: d.resume || Resume.UNSPECIFIED,
             birthDate: d.birthDate || '',
             gender: d.gender || Gender.MALE,
-            techIds: d.techStacks.map(t => t.id)
+            techIds: stacks.map((t) => t.id),
           });
-          setPreview(d.profileImageUrl);
+          setPreview(d.profileImageUrl ?? null);
+          useProfileImageCacheStore.getState().setAuthoritativeProfileImage(
+            d.userId,
+            d.profileImageUrl ?? null
+          );
+        } else {
+          setLoadError(res.msg || '프로필을 불러오지 못했습니다.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('데이터 로드 실패:', err);
+        setLoadError(err.response?.data?.msg || '프로필을 불러오지 못했습니다.');
       } finally {
         setLoading(false);
       }
@@ -93,21 +108,51 @@ const ProfileEditPage: React.FC = () => {
       setSubmitting(true);
       const res = await userApi.updateProfile(form, profileImage || undefined);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const nextNick = form.nickname.trim();
+        await syncMyProfileImageFromUserApi({ force: true, nicknameOverride: nextNick });
+        if (myUserId != null && nextNick && nextNick !== myNickname?.trim()) {
+          setSessionNickname(nextNick);
+        }
         alert('프로필이 수정되었습니다.');
         navigate('/profile');
       } else {
         alert(res.msg || '수정에 실패했습니다.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('수정 오류:', err);
-      const errorMsg = err.response?.data?.msg || '수정 중 오류가 발생했습니다.';
-      alert(errorMsg);
+      alert(getApiErrorMessage(err, '수정 중 오류가 발생했습니다.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}>데이터를 불러오는 중...</div>;
+
+  if (loadError) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', maxWidth: '400px', margin: '40px auto' }}>
+        <p style={{ color: '#ed4956', marginBottom: '16px' }}>{loadError}</p>
+        <p style={{ fontSize: '0.85rem', color: '#8e8e8e', marginBottom: '20px' }}>
+          로그인한 닉네임과 DB에 있는 사용자가 일치하는지 확인해 주세요.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#0095f6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          내 프로필로
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ backgroundColor: '#fff', minHeight: '100vh', paddingBottom: '80px' }}>

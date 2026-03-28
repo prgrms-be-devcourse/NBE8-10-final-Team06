@@ -19,6 +19,8 @@ export interface SignupResponse {
   nickname: string;
   email: string;
   apiKey: string;
+  /** 백엔드가 내려주는 경우에만 존재 — 스토리바·헤더 등과 동일 출처로 맞춤 */
+  profileImageUrl?: string | null;
 }
 
 export type LoginResponse = string;

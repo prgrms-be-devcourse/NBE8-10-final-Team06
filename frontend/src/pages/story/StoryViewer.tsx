@@ -1,11 +1,18 @@
 // src/pages/story/StoryViewer.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, X, Users, MoreHorizontal, Trash2, Send } from 'lucide-react';
+import { Heart, X, Users, MoreHorizontal, Trash2, Send, Share2 } from 'lucide-react';
 import { storyApi } from '../../api/story';
-import { dmApi } from '../../api/dm'; // DM API 추가
+import { dmApi } from '../../api/dm';
 import { StoryDetailResponse, StoryFeedResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useDmStore } from '../../store/useDmStore';
+import { setPendingDmBatch } from '../../services/dmPendingSend';
+import { buildStorySharePayload } from '../../util/dmDeepLinks';
+import { getApiErrorMessage } from '../../util/apiError';
+import DmShareModal from '../../components/dm/DmShareModal';
+import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 
 const STORY_DURATION = 5000;
 
@@ -25,9 +32,11 @@ const StoryViewer: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<'views' | 'likes'>('views');
-  const [replyText, setReplyText] = useState(''); // 답장 텍스트 추가
-  
-  const { userId: loggedInUserId } = useAuthStore();
+  const [replyText, setReplyText] = useState('');
+  const [showDmShare, setShowDmShare] = useState(false);
+
+  const { userId: loggedInUserId, nickname: loggedInNickname } = useAuthStore();
+  const setRooms = useDmStore((s) => s.setRooms);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
@@ -37,19 +46,8 @@ const StoryViewer: React.FC = () => {
     return imageExtensions.includes(mediaType.toLowerCase());
   };
 
-  const getFullUrl = (url: string) => {
-    if (!url) return '';
-    if (url.startsWith('http') || url.startsWith('blob:')) return url;
-    if (url.startsWith('/')) return url;
-    return `/uploads/${url}`;
-  };
-
-  const getFallbackUrl = (url: string) => {
-    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
-    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
-    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
-    return `/temp/media/${url}`;
-  };
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
 
   useEffect(() => {
     const initData = async () => {
@@ -83,7 +81,7 @@ const StoryViewer: React.FC = () => {
   }, [targetUserId, navigate]);
 
   useEffect(() => {
-    if (stories.length === 0 || isLoading || showStats || isPaused || showMenu || replyText.length > 0) {
+    if (stories.length === 0 || isLoading || showStats || isPaused || showMenu || replyText.length > 0 || showDmShare) {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
       return;
@@ -102,7 +100,7 @@ const StoryViewer: React.FC = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
     };
-  }, [currentIndex, stories, isLoading, showStats, isPaused, showMenu, replyText]);
+  }, [currentIndex, stories, isLoading, showStats, isPaused, showMenu, replyText, showDmShare]);
 
   const handleNext = () => {
     if (currentIndex < stories.length - 1) {
@@ -135,43 +133,83 @@ const StoryViewer: React.FC = () => {
     }
   };
 
-  // 답장 전송 핸들러
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || !currentStory) return;
+    const text = replyText.trim();
+    if (!text || !currentStory) return;
 
     try {
       const res = await dmApi.create1v1Room(currentStory.userId);
-      if (res.resultCode.startsWith('200')) {
-        alert(`${currentStory.userId}님께 답장을 보냈습니다 (기능 데모)`);
+      if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
+        setPendingDmBatch(res.data.roomId, [
+          { type: 'TEXT', content: text, thumbnail: null },
+          buildStorySharePayload(currentStory.storyId, currentStory.createdAt, currentStory.userId),
+        ]);
+        setRooms(res.data.rooms);
         setReplyText('');
+        navigate(`/dm/${res.data.roomId}`);
+      } else {
+        alert(res.msg || '답장을 보낼 수 없습니다.');
       }
-    } catch (error) {
-      alert('답장 전송 실패');
+    } catch (error: unknown) {
+      alert(getApiErrorMessage(error, '답장 전송 실패'));
     }
   };
 
-  const handleDelete = async () => {
-    if (!currentStory || !window.confirm('삭제하시겠습니까?')) return;
+  const removeStoryFromList = (updated: StoryDetailResponse[]) => {
+    if (updated.length === 0) navigate('/');
+    else {
+      setStories(updated);
+      setCurrentIndex((prev) => Math.min(prev, updated.length - 1));
+      setProgress(0);
+      setShowMenu(false);
+    }
+  };
+
+  const handleSoftDelete = async () => {
+    if (!currentStory || !window.confirm('보관하시겠습니까?')) return;
     try {
       const res = await storyApi.softDelete(currentStory.storyId);
       if (res.resultCode.startsWith('200')) {
-        const updated = stories.filter((_, idx) => idx !== currentIndex);
-        if (updated.length === 0) navigate('/');
-        else {
-          setStories(updated);
-          setCurrentIndex(prev => Math.min(prev, updated.length - 1));
-          setProgress(0);
-          setShowMenu(false);
-        }
+        removeStoryFromList(stories.filter((_, idx) => idx !== currentIndex));
       }
-    } catch (err) { alert('오류 발생'); }
+    } catch (err) {
+      alert('오류 발생');
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!currentStory || !window.confirm('영구 삭제하시겠습니까?')) return;
+    try {
+      const res = await storyApi.hardDelete(currentStory.storyId);
+      if (res.resultCode.startsWith('200')) {
+        removeStoryFromList(stories.filter((_, idx) => idx !== currentIndex));
+      }
+    } catch (err) {
+      alert('오류 발생');
+    }
   };
 
   const currentStory = stories[currentIndex];
   const isOwner = loggedInUserId === currentStory?.userId;
 
   if (isLoading || !currentStory) return <div style={{ backgroundColor: '#000', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>로딩 중...</div>;
+
+  const authorFeed = feed.find((u) => Number(u.userId) === Number(currentStory.userId));
+  const authorNickname =
+    authorFeed?.nickname?.trim() ||
+    (loggedInUserId != null && Number(currentStory.userId) === Number(loggedInUserId)
+      ? loggedInNickname?.trim() ?? ''
+      : '') ||
+    '';
+  const authorProfileImageUrl = authorFeed?.profileImageUrl ?? null;
+  const authorLabel = authorNickname || (isOwner ? '나' : `User ${currentStory.userId}`);
+
+  const goToProfileByNickname = (nickname: string) => {
+    const nick = nickname.trim();
+    if (!nick) return;
+    navigate(`/profile/${encodeURIComponent(nick)}`);
+  };
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#1a1a1a', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -186,8 +224,51 @@ const StoryViewer: React.FC = () => {
 
       {/* 헤더 */}
       <div style={{ position: 'absolute', top: '30px', width: '95%', maxWidth: '400px', display: 'flex', alignItems: 'center', zIndex: 2100, padding: '0 10px' }}>
-        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#efefef', marginRight: '10px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontSize: '0.8rem', fontWeight: 'bold' }}>{currentStory.userId}</div>
-        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff' }}>User {isOwner ? '나' : currentStory.userId}</span>
+        <div
+          role={authorNickname ? 'button' : undefined}
+          tabIndex={authorNickname ? 0 : undefined}
+          onClick={() => goToProfileByNickname(authorNickname)}
+          onKeyDown={(e) => {
+            if (!authorNickname) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              goToProfileByNickname(authorNickname);
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            minWidth: 0,
+            marginRight: '8px',
+            cursor: authorNickname ? 'pointer' : 'default',
+          }}
+        >
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              backgroundColor: '#efefef',
+              marginRight: '10px',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#000',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              flexShrink: 0,
+            }}
+          >
+            <ProfileAvatar
+              fillContainer
+              authorUserId={currentStory.userId}
+              profileImageUrl={authorProfileImageUrl}
+              nickname={authorLabel}
+            />
+          </div>
+          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{authorLabel}</span>
+        </div>
         {isOwner && <button onClick={() => { setShowMenu(!showMenu); setShowStats(false); }} style={{ marginLeft: 'auto', marginRight: '10px', background: 'none', border: 'none', color: '#fff' }}><MoreHorizontal size={24} /></button>}
         <button onClick={() => navigate('/')} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}><X size={28} /></button>
       </div>
@@ -258,8 +339,22 @@ const StoryViewer: React.FC = () => {
             {replyText && <button type="submit" style={{ background: 'none', border: 'none', color: '#0095f6', cursor: 'pointer' }}><Send size={20} /></button>}
           </form>
         )}
+        <button
+          type="button"
+          title="DM으로 공유"
+          onClick={() => setShowDmShare(true)}
+          style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px' }}
+        >
+          <Share2 size={24} />
+        </button>
         <button onClick={() => storyApi.toggleLike(currentStory.storyId)} style={{ background: 'none', border: 'none', color: currentStory.isLiked ? '#ed4956' : '#fff' }}><Heart size={28} fill={currentStory.isLiked ? '#ed4956' : 'none'} /></button>
       </div>
+
+      <DmShareModal
+        open={showDmShare}
+        onClose={() => setShowDmShare(false)}
+        payloads={[buildStorySharePayload(currentStory.storyId, currentStory.createdAt, currentStory.userId)]}
+      />
 
       {/* 통계창 시트 (생략) */}
       {showStats && isOwner && (
@@ -272,9 +367,23 @@ const StoryViewer: React.FC = () => {
             <X onClick={() => setShowStats(false)} style={{ cursor: 'pointer' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {(activeTab === 'views' ? currentStory.viewers : currentStory.likers).map(user => (
-              <div key={user.userId} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{user.nickname[0]}</div>
+            {(activeTab === 'views' ? currentStory.viewers : currentStory.likers).map((user) => (
+              <div
+                key={user.userId}
+                role="button"
+                tabIndex={0}
+                onClick={() => goToProfileByNickname(user.nickname)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    goToProfileByNickname(user.nickname);
+                  }
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+              >
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <ProfileAvatar fillContainer authorUserId={user.userId} profileImageUrl={user.profileImageUrl} nickname={user.nickname} />
+                </div>
                 <span style={{ fontWeight: '600' }}>{user.nickname}</span>
               </div>
             ))}

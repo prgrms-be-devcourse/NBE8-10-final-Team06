@@ -10,7 +10,12 @@ interface UseStompProps {
 
 export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
   const clientRef = useRef<Client | null>(null);
+  const onConnectRef = useRef<(() => void) | undefined>(undefined);
   const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    onConnectRef.current = onConnect;
+  }, [onConnect]);
 
   useEffect(() => {
     const socket = new SockJS(endpoint);
@@ -24,7 +29,7 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
       heartbeatOutgoing: 4000,
       onConnect: () => {
         setIsConnected(true);
-        if (onConnect) onConnect();
+        onConnectRef.current?.();
       },
       onDisconnect: () => {
         setIsConnected(false);

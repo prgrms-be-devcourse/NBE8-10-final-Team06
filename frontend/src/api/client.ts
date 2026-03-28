@@ -1,5 +1,15 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
+import { shouldTreat403ResponseAsSessionExpired } from '../util/apiError';
+
+function clearSessionAndRedirectToLogin(reason: string) {
+  console.error(`인증이 필요합니다 (${reason}). 세션을 종료하고 로그인 페이지로 이동합니다.`);
+  const { setLogout } = useAuthStore.getState();
+  setLogout();
+  if (!window.location.pathname.includes('/login')) {
+    window.location.href = '/login?reason=' + encodeURIComponent(reason);
+  }
+}
 
 const client = axios.create({
   baseURL: '/api',
@@ -11,6 +21,14 @@ const client = axios.create({
 
 // 요청 인터셉터
 client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.skipAuth) {
+    if (config.headers) {
+      delete config.headers.Authorization;
+      delete config.headers['X-API-KEY'];
+    }
+    return config;
+  }
+
   const token = localStorage.getItem('accessToken');
   const apiKey = localStorage.getItem('apiKey');
 
@@ -33,19 +51,20 @@ client.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
     const status = error.response?.status;
-    
-    // 401(인증만료) 또는 403(권한없음/토큰부적합) 발생 시 세션 파괴 및 로그인 이동
-    if (status === 401 || status === 403) {
-      console.error(`인증 오류 (${status}): 세션을 종료하고 로그인 페이지로 이동합니다.`);
-      
-      const { setLogout } = useAuthStore.getState();
-      setLogout();
-      
-      // 무한 리다이렉트 방지
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login?reason=' + status;
-      }
+    const data = error.response?.data;
+
+    // 401: 미인증·만료 토큰 등 → 항상 세션 정리
+    if (status === 401) {
+      clearSessionAndRedirectToLogin('401');
+      return Promise.reject(error);
     }
+
+    // 403: 기본은 화면에서 처리(순수 권한 거부). 본문 resultCode가 인증 계열일 때만 세션 정리
+    if (status === 403 && shouldTreat403ResponseAsSessionExpired(data)) {
+      clearSessionAndRedirectToLogin('403-auth');
+      return Promise.reject(error);
+    }
+
     return Promise.reject(error);
   }
 );

@@ -5,6 +5,7 @@ import { postApi } from '../api/post';
 import { technologyApi } from '../api/technology';
 import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
+import { getApiErrorMessage } from '../util/apiError';
 
 const PostCreatePage: React.FC = () => {
   const [title, setTitle] = useState('');
@@ -99,10 +100,9 @@ const PostCreatePage: React.FC = () => {
         alert('게시글이 생성되었습니다.');
         navigate('/');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('게시글 생성 오류:', err);
-      const errorMsg = err.response?.data?.msg || '게시글 생성에 실패했습니다.';
-      alert(errorMsg);
+      alert(getApiErrorMessage(err, '게시글 생성에 실패했습니다.'));
     } finally {
       setIsSubmitting(false);
     }

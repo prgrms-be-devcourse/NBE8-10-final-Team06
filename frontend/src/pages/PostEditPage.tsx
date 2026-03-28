@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { X, Camera, ChevronLeft } from 'lucide-react';
 import { postApi } from '../api/post';
-import { PostUpdateReq } from '../types/post';
+import { PostUpdateRequest } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
+import { resolveAssetUrl } from '../util/assetUrl';
+import { getApiErrorMessage } from '../util/apiError';
 
 const PostEditPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -21,10 +23,10 @@ const PostEditPage: React.FC = () => {
       if (!postId) return;
       try {
         const res = await postApi.getDetail(Number(postId));
-        if (res.resultCode.includes('-S-')) {
+        if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
           setTitle(res.data.title);
           setContent(res.data.content);
-          setPreviews(res.data.medias.map(m => m.sourceUrl));
+          setPreviews(res.data.medias.map(m => resolveAssetUrl(m.sourceUrl)));
         }
       } catch (err) {
         console.error(err);
@@ -46,17 +48,28 @@ const PostEditPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postId) return;
+    if (!postId || submitting) return;
+
+    const nextTitle = title.trim();
+    const nextContent = content.trim();
+    if (!nextTitle || !nextContent) {
+      alert('제목과 내용을 입력해주세요.');
+      return;
+    }
 
     try {
       setSubmitting(true);
-      const req = { title, content, techIds: [] }; // techIds는 현재 목록 API 부재로 빈 배열 유지
-      await postApi.update(Number(postId), req, newFiles);
-      alert('게시글이 수정되었습니다.');
-      navigate(`/post/${postId}`);
-    } catch (err) {
+      const req: PostUpdateRequest = { title: nextTitle, content: nextContent, techIds: [] }; // techIds는 현재 목록 API 부재로 빈 배열 유지
+      const res = await postApi.update(Number(postId), req, newFiles);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        alert('게시글이 수정되었습니다.');
+        navigate(`/post/${postId}`, { replace: true });
+        return;
+      }
+      alert(res.msg || '수정에 실패했습니다.');
+    } catch (err: unknown) {
       console.error(err);
-      alert('수정에 실패했습니다.');
+      alert(getApiErrorMessage(err, '수정에 실패했습니다.'));
     } finally {
       setSubmitting(false);
     }

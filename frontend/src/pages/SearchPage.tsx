@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
+import { toggleFollowRelation } from '../services/followToggle';
 import { dmApi } from '../api/dm';
-import { UserSearchResponse } from '../types/user';
-import { Search, X, History, UserCheck, Clock, UserPlus, UserMinus } from 'lucide-react';
+import { UserSearchResponse, FollowResponse } from '../types/user';
+import { Search, X, History, Clock } from 'lucide-react';
 import { searchUtil } from '../util/search';
 import { useAuthStore } from '../store/useAuthStore';
-import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
+import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
+import ProfileAvatar from '../components/common/ProfileAvatar';
 
 // --- 서브 컴포넌트: 검색 결과 아이템 ---
 const SearchResultItem: React.FC<{ 
@@ -19,6 +21,11 @@ const SearchResultItem: React.FC<{
 }> = ({ user: initialUser, myNickname, onUserClick, onMessageClick, onFollowStateChange }) => {
   const [user, setUser] = useState(initialUser);
   const [isProcessing, setIsProcessing] = useState(false);
+  const uid = Number(initialUser.userId);
+  const hinted = useFollowLocalStore((s) =>
+    Number.isFinite(uid) ? s.followingHintByUserId[uid] : undefined
+  );
+  const following = hinted !== undefined ? hinted : user.isFollowing;
 
   useEffect(() => {
     setUser(initialUser);
@@ -28,47 +35,29 @@ const SearchResultItem: React.FC<{
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isMe || !user.userId || isProcessing) return;
+    if (isMe || isProcessing) return;
 
-    const targetId = Number(user.userId);
-    const desiredState = !user.isFollowing;
-
+    const { userId: myUserId } = useAuthStore.getState();
+    const prevFollowing = following;
+    setUser((prev) => ({ ...prev, isFollowing: !prevFollowing }));
+    setIsProcessing(true);
     try {
-      setIsProcessing(true);
-
-      // 1) 서버 기준 현재 상태를 먼저 확인해 중복 요청 방지
-      const statusRes = await userApi.isFollowing(targetId);
-      const serverFollowing = statusRes.data;
-
-      // 2) 이미 원하는 상태면 API 호출 없이 UI만 동기화
-      if (serverFollowing === desiredState) {
-        setUser(prev => ({ ...prev, isFollowing: serverFollowing }));
-        onFollowStateChange(targetId, serverFollowing);
-        window.dispatchEvent(new CustomEvent(FOLLOW_CHANGED_EVENT));
-        return;
-      }
-
-      // 3) 서버 상태와 반대일 때만 토글 API 호출
-      const res = desiredState
-        ? await userApi.follow(targetId)
-        : await userApi.unfollow(targetId);
-
-      if (res.resultCode?.startsWith('200')) {
-        setUser(prev => ({ ...prev, isFollowing: res.data.isFollowing }));
-        onFollowStateChange(targetId, res.data.isFollowing);
+      const r = await toggleFollowRelation(user.userId, prevFollowing ? 'unfollow' : 'follow', myUserId);
+      if (r.ok) {
+        setUser((prev) => ({ ...prev, isFollowing: r.follow.isFollowing }));
+        onFollowStateChange(user.userId, r.follow.isFollowing);
+      } else if (r.reason === 'busy') {
+        setUser((prev) => ({ ...prev, isFollowing: prevFollowing }));
       } else {
-        alert(res.msg);
+        setUser((prev) => ({ ...prev, isFollowing: prevFollowing }));
+        if (r.reason === 'self' || r.reason === 'failed') {
+          alert(r.message || '팔로우 처리에 실패했습니다.');
+        }
       }
-    } catch (err: any) {
-      // 4) 실패 시 서버 상태 재조회로 최종 동기화
-      try {
-        const sync = await userApi.isFollowing(targetId);
-        setUser(prev => ({ ...prev, isFollowing: sync.data }));
-        onFollowStateChange(targetId, sync.data);
-      } catch {
-        alert('요청 처리에 실패했습니다.');
-      }
+    } catch (err) {
       console.error('팔로우 처리 실패:', err);
+      setUser((prev) => ({ ...prev, isFollowing: prevFollowing }));
+      alert('팔로우 처리에 실패했습니다.');
     } finally {
       setIsProcessing(false);
     }
@@ -79,17 +68,18 @@ const SearchResultItem: React.FC<{
       onClick={() => onUserClick(user)}
       style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
     >
-      <img 
-        src={resolveProfileImageUrl(user.profileImageUrl)} 
-        alt={user.nickname}
-        style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #dbdbdb' }}
-        onError={(e) => applyImageFallback(e, user.profileImageUrl)}
+      <ProfileAvatar
+        authorUserId={user.userId}
+        profileImageUrl={user.profileImageUrl}
+        nickname={user.nickname}
+        sizePx={44}
+        style={{ border: '1px solid #dbdbdb' }}
       />
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>
           {user.nickname} {isMe && <span style={{ color: '#8e8e8e', fontWeight: 'normal' }}>(나)</span>}
         </div>
-        {user.isFollowing && !isMe && <div style={{ fontSize: '0.75rem', color: '#0095f6' }}>팔로잉 중</div>}
+        {following && !isMe && <div style={{ fontSize: '0.75rem', color: '#0095f6' }}>팔로잉 중</div>}
       </div>
       
       {!isMe && (
@@ -111,13 +101,13 @@ const SearchResultItem: React.FC<{
             disabled={isProcessing}
             style={{
               padding: '6px 12px', borderRadius: '4px', border: 'none',
-              backgroundColor: user.isFollowing ? '#efefef' : '#0095f6',
-              color: user.isFollowing ? '#262626' : '#fff',
+              backgroundColor: following ? '#efefef' : '#0095f6',
+              color: following ? '#262626' : '#fff',
               fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
               minWidth: '85px', opacity: isProcessing ? 0.7 : 1
             }}
           >
-            {isProcessing ? '...' : (user.isFollowing ? '언팔로우' : '팔로우')}
+            {following ? '언팔로우' : '팔로우'}
           </button>
         </div>
       )}
@@ -129,12 +119,10 @@ const SearchResultItem: React.FC<{
 const SearchPage: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<UserSearchResponse[]>([]);
-  const [followOverrides, setFollowOverrides] = useState<Record<number, boolean>>({});
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [isLast, setIsLast] = useState(false);
-  const [filterFollowing, setFilterFollowing] = useState(false);
   
   const navigate = useNavigate();
   const { nickname: myNickname } = useAuthStore();
@@ -155,14 +143,15 @@ const SearchPage: React.FC = () => {
       setIsLoading(true);
       const res = await userApi.searchUsers(searchKeyword, pageNumber);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        const content = (res.data.content || []).map((u) => ({
-          ...u,
-          isFollowing: followOverrides[u.userId] ?? u.isFollowing
+        const content = res.data.content || [];
+        const merged = content.map((item: UserSearchResponse) => ({
+          ...item,
+          isFollowing: mergeFollowingHint(item.userId, item.isFollowing),
         }));
         if (pageNumber === 0) {
-          setResults(content);
+          setResults(merged);
         } else {
-          setResults(prev => [...prev, ...content]);
+          setResults((prev) => [...prev, ...merged]);
         }
         setIsLast(res.data.last);
         setPage(pageNumber);
@@ -172,13 +161,31 @@ const SearchPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [followOverrides]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (keyword) handleSearch(keyword, 0);
     }, 300);
     return () => clearTimeout(timer);
+  }, [keyword, handleSearch]);
+
+  useEffect(() => {
+    const onFollowChanged = (event: Event) => {
+      const detail = (event as CustomEvent<FollowResponse>).detail;
+      if (detail && detail.toUserId != null && typeof detail.isFollowing === 'boolean') {
+        const tid = Number(detail.toUserId);
+        setResults((prev) =>
+          prev.map((item) =>
+            Number(item.userId) === tid ? { ...item, isFollowing: detail.isFollowing } : item
+          )
+        );
+      }
+      const k = keyword.trim();
+      if (k) void handleSearch(k, 0);
+    };
+    window.addEventListener(FOLLOW_CHANGED_EVENT, onFollowChanged);
+    return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, onFollowChanged);
   }, [keyword, handleSearch]);
 
   const loadMore = () => {
@@ -206,31 +213,13 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const filteredResults = filterFollowing 
-    ? results.filter(u => u.isFollowing) 
-    : results;
-
   const handleFollowStateChange = (userId: number, isFollowing: boolean) => {
-    setFollowOverrides(prev => ({ ...prev, [userId]: isFollowing }));
     setResults(prev =>
       prev.map(item =>
         item.userId === userId ? { ...item, isFollowing } : item
       )
     );
   };
-
-  useEffect(() => {
-    const handleFollowChanged = (event: Event) => {
-      const customEvent = event as CustomEvent<{ toUserId?: number; isFollowing?: boolean }>;
-      const toUserId = customEvent.detail?.toUserId;
-      const isFollowing = customEvent.detail?.isFollowing;
-      if (typeof toUserId !== 'number' || typeof isFollowing !== 'boolean') return;
-      handleFollowStateChange(toUserId, isFollowing);
-    };
-
-    window.addEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged as EventListener);
-    return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged as EventListener);
-  }, []);
 
   return (
     <MainLayout title="검색" maxWidth="600px">
@@ -262,24 +251,8 @@ const SearchPage: React.FC = () => {
       <div className="content-area">
         {keyword.trim() ? (
           <>
-            {results.length > 0 && (
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                <button 
-                  onClick={() => setFilterFollowing(!filterFollowing)}
-                  style={{
-                    padding: '6px 12px', borderRadius: '20px', border: '1px solid #dbdbdb',
-                    fontSize: '0.8rem', cursor: 'pointer',
-                    backgroundColor: filterFollowing ? '#0095f6' : '#fff',
-                    color: filterFollowing ? '#fff' : '#262626'
-                  }}
-                >
-                  <UserCheck size={14} style={{ marginRight: '5px' }} /> 팔로잉 중
-                </button>
-              </div>
-            )}
-
             <div className="results-list">
-              {filteredResults.map((user) => (
+              {results.map((user) => (
                 <SearchResultItem 
                   key={user.userId} 
                   user={user} 

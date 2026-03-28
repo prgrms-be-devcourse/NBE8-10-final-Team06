@@ -5,38 +5,49 @@ import { storyApi } from '../../api/story';
 import { authApi } from '../../api/auth';
 import { StoryFeedResponse, StoryDetailResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
-import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../common/ProfileAvatar';
+import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
 
 const StoryBar: React.FC = () => {
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
   const [myStories, setMyStories] = useState<StoryDetailResponse[]>([]);
   const navigate = useNavigate();
-  const { nickname, isLoggedIn, userId, setLogin } = useAuthStore();
+  const { nickname, isLoggedIn, userId, setLogin, profileImageUrl: sessionProfileImageUrl } = useAuthStore();
   
   useEffect(() => {
     if (!isLoggedIn) return;
 
     const fetchData = async () => {
       try {
-        // 1. 전체 스토리 피드 조회
-        const feedRes = await storyApi.getFeed();
-        if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
-          setFeed(feedRes.data || []);
-        }
+        await syncMyProfileImageFromUserApi();
 
-        // 2. 내 정보 확보
+        // 1. 내 userId 확보 — 피드에서 본인 행 매칭에 필요
         let currentUserId = userId;
         if (!currentUserId) {
           const meRes = await authApi.me();
-          if (meRes.resultCode?.includes('-S-')) {
+          if (meRes.resultCode?.includes('-S-') || meRes.resultCode?.startsWith('200')) {
             currentUserId = meRes.data.id;
             const token = localStorage.getItem('accessToken') || '';
-            const apiKey = localStorage.getItem('apiKey');
-            setLogin(meRes.data.nickname, token, apiKey, currentUserId);
+            const rawApiKey = localStorage.getItem('apiKey');
+            setLogin(
+              meRes.data.nickname,
+              token,
+              rawApiKey === null ? undefined : rawApiKey,
+              currentUserId,
+              undefined
+            );
           }
         }
 
-        // 3. 내 스토리 목록 조회 (백엔드 수정 완료로 인한 복구)
+        // 2. 스토리 피드 — 세션 프로필 URL은 syncMyProfileImage(프로필 API)만 갱신.
+        // 피드의 본인 행은 캐시/지연으로 옛 URL일 수 있어 세션을 덮어쓰면 프로필 수정 직후 화면이 되돌아감.
+        const feedRes = await storyApi.getFeed();
+        if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
+          const nextFeed = feedRes.data || [];
+          setFeed(nextFeed);
+        }
+
+        // 3. 내 스토리 목록
         if (currentUserId) {
           try {
             const myStoryRes = await storyApi.getUserStories(currentUserId);
@@ -53,11 +64,20 @@ const StoryBar: React.FC = () => {
     };
 
     fetchData();
-  }, [isLoggedIn, userId, setLogin]);
+  }, [isLoggedIn, userId, nickname, setLogin]);
 
   const hasActiveMyStory = myStories.length > 0;
   // 다른 사용자들의 피드 (내 닉네임 중복 제거)
   const otherUsersFeed = feed.filter(item => item.nickname !== nickname);
+  /** 피드 본인 행 → 없으면 세션(로그인/me/내 프로필)에 맞춘 URL — 피드에 내 행이 없어도 포스트와 같은 사진 */
+  const myProfileImageUrl =
+    sessionProfileImageUrl ??
+    feed.find(
+      (f) =>
+        (userId != null && Number(f.userId) === Number(userId)) ||
+        (nickname != null && f.nickname === nickname)
+    )?.profileImageUrl ??
+    null;
 
   const handleMyStoryClick = () => {
     if (hasActiveMyStory && userId) {
@@ -84,12 +104,17 @@ const StoryBar: React.FC = () => {
           background: '#dbdbdb',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', position: 'relative'
         }}>
-          <div style={{
-            width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 'bold',
-            color: '#8e8e8e', overflow: 'hidden', backgroundColor: '#efefef'
-          }}>
-            {nickname ? nickname[0].toUpperCase() : 'U'}
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              border: '2px solid #fff',
+              overflow: 'hidden',
+              backgroundColor: '#efefef',
+            }}
+          >
+            <ProfileAvatar fillContainer authorUserId={userId ?? undefined} profileImageUrl={myProfileImageUrl} nickname={nickname} />
           </div>
           {!hasActiveMyStory && (
             <div style={{ position: 'absolute', bottom: '2px', right: '2px', backgroundColor: '#0095f6', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', zIndex: 2 }}>
@@ -108,15 +133,18 @@ const StoryBar: React.FC = () => {
             background: item.isUnread ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' : '#dbdbdb',
             display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto'
           }}>
-            <div style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: '#8e8e8e', overflow: 'hidden', backgroundColor: '#efefef' }}>
-              {item.profileImageUrl ? (
-                <img
-                  src={resolveProfileImageUrl(item.profileImageUrl)}
-                  alt={item.nickname}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => applyImageFallback(e, item.profileImageUrl)}
-                />
-              ) : item.nickname[0].toUpperCase()}
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '2px solid #fff',
+                overflow: 'hidden',
+                backgroundColor: '#efefef',
+              }}
+            >
+              {/* 타인: StoryFeedResponse.profileImageUrl만 사용(세션·전역 캐시 미사용) */}
+              <ProfileAvatar fillContainer profileImageUrl={item.profileImageUrl} nickname={item.nickname} />
             </div>
           </div>
           <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nickname}</div>

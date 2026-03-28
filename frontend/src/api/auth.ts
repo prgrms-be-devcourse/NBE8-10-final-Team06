@@ -6,12 +6,16 @@ import { AxiosResponse } from 'axios';
 
 export const authApi = {
   signup: async (data: SignupRequest): Promise<RsData<SignupResponse>> => {
-    const response: AxiosResponse<RsData<SignupResponse>> = await client.post('/auth/signup', data);
+    const response: AxiosResponse<RsData<SignupResponse>> = await client.post('/auth/signup', data, {
+      skipAuth: true,
+    });
     return response.data;
   },
 
   login: async (data: LoginRequest): Promise<RsData<LoginResponse>> => {
-    const response: AxiosResponse<RsData<LoginResponse>> = await client.post('/auth/login', data);
+    const response: AxiosResponse<RsData<LoginResponse>> = await client.post('/auth/login', data, {
+      skipAuth: true,
+    });
     return response.data;
   },
 
@@ -29,14 +33,16 @@ export const authApi = {
 
   checkEmail: async (email: string): Promise<RsData<void>> => {
     const response: AxiosResponse<RsData<void>> = await client.get('/auth/check-email', {
-      params: { email }
+      params: { email },
+      skipAuth: true,
     });
     return response.data;
   },
 
   checkNickname: async (nickname: string): Promise<RsData<void>> => {
     const response: AxiosResponse<RsData<void>> = await client.get('/auth/check-nickname', {
-      params: { nickname }
+      params: { nickname },
+      skipAuth: true,
     });
     return response.data;
   }

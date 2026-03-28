@@ -1,85 +1,141 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { userApi, FOLLOW_CHANGED_EVENT } from '../../api/user';
+import { isRsDataSuccess } from '../../util/rsData';
+import { toggleFollowRelation } from '../../services/followToggle';
 import { postApi } from '../../api/post';
 import { dmApi } from '../../api/dm';
-import { FollowUserResponse } from '../../types/user';
 import { PostLikerResponse } from '../../types/post';
-import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../common/ProfileAvatar';
+import { useAuthStore } from '../../store/useAuthStore';
+import { mergeFollowingHint, useFollowLocalStore } from '../../store/useFollowLocalStore';
+import {
+  filterMyFollowingsByActiveEdge,
+  filterViewerFromOwnersFollowersWhenUnfollowed,
+} from '../../services/profileFollowStats';
+import type { FollowUserResponse } from '../../types/user';
+
+function mapFollowUsersToRows(list: FollowUserResponse[]) {
+  return list.map((followUser) => ({
+    id: followUser.userId,
+    nickname: followUser.nickname,
+    profileImageUrl: followUser.profileImageUrl ?? null,
+    isFollowing: mergeFollowingHint(followUser.userId, followUser.isFollowing),
+  }));
+}
 
 interface UserListModalProps {
   title: string;
   id?: number | null; // 선택적 필드로 변경 및 null 허용
   type: 'followers' | 'followings' | 'likers';
   onClose: () => void;
+  /** 프로필 페이지가 이미 가진 목록 — 헤더 숫자·행 수와 맞춘 뒤 서버 재조회로 최신화 */
+  seedUsers?: FollowUserResponse[];
+  /** 팔로워 모달: 내가 프로필 주인을 팔로우하지 않으면 팔로워 명단에서 본인 행 제거 */
+  viewerFollowsProfileOwner?: boolean;
 }
 
-const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose }) => {
-  const [users, setUsers] = useState<Array<{ id: number; nickname: string; profileImageUrl: string | null; isFollowing: boolean }>>([]);
+const UserListModal: React.FC<UserListModalProps> = ({
+  title,
+  id,
+  type,
+  onClose,
+  seedUsers,
+  viewerFollowsProfileOwner = true,
+}) => {
+  const navigate = useNavigate();
+  const { userId: myUserId } = useAuthStore();
+  const [users, setUsers] = useState<Array<{ id: number; nickname: string; profileImageUrl: string | null; isFollowing: boolean }>>(() => {
+    if ((type === 'followers' || type === 'followings') && seedUsers != null) {
+      let list = seedUsers;
+      if (type === 'followings' && id != null) {
+        list = filterMyFollowingsByActiveEdge(Number(id), myUserId, seedUsers);
+      } else if (type === 'followers' && id != null) {
+        list = filterViewerFromOwnersFollowersWhenUnfollowed(
+          Number(id),
+          myUserId,
+          seedUsers,
+          viewerFollowsProfileOwner
+        );
+      }
+      return mapFollowUsersToRows(list);
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(true);
   const [processingUserId, setProcessingUserId] = useState<number | null>(null);
-  const navigate = useNavigate();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (opts?: { silent?: boolean }) => {
     if (id === undefined || id === null) {
       console.error(`ID가 누락되어 ${title} 목록을 가져올 수 없습니다.`);
       setLoading(false);
       return;
     }
 
+    const silent = opts?.silent === true;
     try {
-      setLoading(true);
-      let res;
-      if (type === 'followers') res = await userApi.getFollowers(id);
-      else if (type === 'followings') res = await userApi.getFollowings(id);
-      else res = await postApi.getLikers(id);
-
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        const rawUsers: Array<FollowUserResponse | PostLikerResponse> =
-          type === 'likers'
-            ? ((res.data.content ?? []) as PostLikerResponse[])
-            : (res.data as FollowUserResponse[]);
-
-        const normalized = rawUsers.map((u) => {
-          if (type === 'likers') {
-            return {
-              id: u.userId,
-              nickname: u.nickname,
-              profileImageUrl: null,
-              isFollowing: false
-            };
-          }
-
-          const followUser = u as FollowUserResponse;
-          return {
-            id: followUser.userId,
-            nickname: followUser.nickname,
-            profileImageUrl: followUser.profileImageUrl ?? null,
-            isFollowing: followUser.isFollowing
-          };
-        });
-        setUsers(normalized);
+      if (!silent) setLoading(true);
+      if (type === 'followers') {
+        const res = await userApi.getFollowers(id);
+        if (!isRsDataSuccess(res)) return;
+        let rawUsers = res.data ?? [];
+        rawUsers = filterViewerFromOwnersFollowersWhenUnfollowed(
+          Number(id),
+          myUserId,
+          rawUsers,
+          viewerFollowsProfileOwner
+        );
+        setUsers(mapFollowUsersToRows(rawUsers));
+      } else if (type === 'followings') {
+        const res = await userApi.getFollowings(id);
+        if (!isRsDataSuccess(res)) return;
+        let rawUsers = res.data ?? [];
+        rawUsers = filterMyFollowingsByActiveEdge(Number(id), myUserId, rawUsers);
+        setUsers(mapFollowUsersToRows(rawUsers));
+      } else {
+        const res = await postApi.getLikers(id);
+        if (!isRsDataSuccess(res)) return;
+        const rawUsers = (res.data?.content ?? []) as PostLikerResponse[];
+        setUsers(
+          rawUsers.map((u) => ({
+            id: u.userId,
+            nickname: u.nickname,
+            profileImageUrl: null,
+            isFollowing: false,
+          }))
+        );
       }
     } catch (err) {
       console.error(`${title} 로드 실패:`, err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [id, type, title, myUserId, viewerFollowsProfileOwner]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [id, type, title]);
+    void fetchUsers();
+  }, [fetchUsers]);
+
+  const followingHints = useFollowLocalStore((s) => s.followingHintByUserId);
+  useEffect(() => {
+    if (type !== 'followers' && type !== 'followings') return;
+    setUsers((prev) =>
+      prev.map((u) => ({
+        ...u,
+        isFollowing: mergeFollowingHint(u.id, u.isFollowing),
+      }))
+    );
+  }, [followingHints, type]);
 
   useEffect(() => {
     if (type !== 'followers' && type !== 'followings') return;
     const handleFollowChanged = () => {
-      fetchUsers();
+      void fetchUsers({ silent: true });
     };
     window.addEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
     return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
-  }, [type, id, title]);
+  }, [type, fetchUsers]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -103,35 +159,38 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
 
   const handleFollowToggle = async (userId: number, currentFollowing: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (processingUserId === userId) return;
+    if (processingUserId === userId || myUserId === userId) return;
 
-    const desiredState = !currentFollowing;
+    const prevFollowing = currentFollowing;
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, isFollowing: !prevFollowing } : u))
+    );
+    setProcessingUserId(userId);
     try {
-      setProcessingUserId(userId);
-      const statusRes = await userApi.isFollowing(userId);
-      const serverFollowing = statusRes.data;
-
-      if (serverFollowing === desiredState) {
-        setUsers(prev => prev.map(u => (u.id === userId ? { ...u, isFollowing: serverFollowing } : u)));
-        return;
-      }
-
-      if (desiredState) {
-        await userApi.follow(userId);
+      const r = await toggleFollowRelation(userId, prevFollowing ? 'unfollow' : 'follow', myUserId);
+      if (r.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isFollowing: r.follow.isFollowing } : u))
+        );
+        void fetchUsers({ silent: true });
+      } else if (r.reason === 'busy') {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isFollowing: prevFollowing } : u))
+        );
       } else {
-        await userApi.unfollow(userId);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isFollowing: prevFollowing } : u))
+        );
+        if (r.reason === 'self' || r.reason === 'failed') {
+          alert(r.message || '팔로우 처리에 실패했습니다.');
+        }
       }
-
-      const syncRes = await userApi.isFollowing(userId);
-      setUsers(prev => prev.map(u => (u.id === userId ? { ...u, isFollowing: syncRes.data } : u)));
     } catch (err) {
       console.error('팔로우 처리 실패:', err);
-      try {
-        const syncRes = await userApi.isFollowing(userId);
-        setUsers(prev => prev.map(u => (u.id === userId ? { ...u, isFollowing: syncRes.data } : u)));
-      } catch {
-        alert('팔로우 처리에 실패했습니다.');
-      }
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isFollowing: prevFollowing } : u))
+      );
+      alert('팔로우 처리에 실패했습니다.');
     } finally {
       setProcessingUserId(null);
     }
@@ -167,7 +226,9 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
           ) : users.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '20px', color: '#8e8e8e' }}>목록이 비어있습니다.</p>
           ) : (
-            users.map(user => (
+            users.map((user) => {
+              const effectiveFollowing = followingHints[user.id] ?? user.isFollowing;
+              return (
               <div 
                 key={user.id} 
                 style={{ 
@@ -179,16 +240,11 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
                   onClose();
                 }}
               >
-                <img 
-                  src={resolveProfileImageUrl(user.profileImageUrl)} 
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} 
-                  alt={user.nickname} 
-                  onError={(e) => applyImageFallback(e, user.profileImageUrl)}
-                />
+                <ProfileAvatar authorUserId={user.id} profileImageUrl={user.profileImageUrl} nickname={user.nickname} sizePx={44} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.nickname}</span>
                 </div>
-                {(type === 'followers' || type === 'followings') && (
+                {(type === 'followers' || type === 'followings') && myUserId !== user.id && (
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
                     <button
                       type="button"
@@ -208,25 +264,26 @@ const UserListModal: React.FC<UserListModalProps> = ({ title, id, type, onClose 
                     <button
                       type="button"
                       disabled={processingUserId === user.id}
-                      onClick={(e) => handleFollowToggle(user.id, user.isFollowing, e)}
+                      onClick={(e) => handleFollowToggle(user.id, effectiveFollowing, e)}
                       style={{
                         padding: '6px 10px',
                         border: 'none',
                         borderRadius: '4px',
-                        background: user.isFollowing ? '#efefef' : '#0095f6',
-                        color: user.isFollowing ? '#262626' : '#fff',
+                        background: effectiveFollowing ? '#efefef' : '#0095f6',
+                        color: effectiveFollowing ? '#262626' : '#fff',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
                         fontWeight: '600',
                         opacity: processingUserId === user.id ? 0.7 : 1
                       }}
                     >
-                      {processingUserId === user.id ? '...' : (user.isFollowing ? '언팔로우' : '팔로우')}
+                      {effectiveFollowing ? '언팔로우' : '팔로우'}
                     </button>
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

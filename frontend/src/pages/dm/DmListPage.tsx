@@ -6,7 +6,7 @@ import { userApi } from '../../api/user';
 import { useDmStore } from '../../store/useDmStore';
 import BottomNav from '../../components/layout/BottomNav';
 import { UserSearchResponse } from '../../types/user';
-import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
 
 const DmListPage: React.FC = () => {
   const { rooms, setRooms, markAsRead } = useDmStore();
@@ -137,12 +137,7 @@ const DmListPage: React.FC = () => {
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {searchResults.map(user => (
                 <div key={user.userId} onClick={() => toggleUserSelection(user.userId)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px', cursor: 'pointer' }}>
-                  <img
-                    src={resolveProfileImageUrl(user.profileImageUrl)}
-                    alt="user"
-                    style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
-                    onError={(e) => applyImageFallback(e, user.profileImageUrl)}
-                  />
+                  <ProfileAvatar authorUserId={user.userId} profileImageUrl={user.profileImageUrl} nickname={user.nickname} sizePx={44} />
                   <div style={{ flex: 1 }}><div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.nickname}</div></div>
                   <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: selectedUserIds.includes(user.userId) ? '#0095f6' : 'transparent' }}>
                     {selectedUserIds.includes(user.userId) && <Check size={16} color="#fff" />}
@@ -171,14 +166,16 @@ const DmListPage: React.FC = () => {
               <div key={room.roomId} onClick={() => { markAsRead(room.roomId); navigate(`/dm/${room.roomId}`); }} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', cursor: 'pointer', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, minWidth: 0 }}>
                   <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                    {room.participants[0]?.profileImageUrl ? (
-                      <img
-                        src={resolveProfileImageUrl(room.participants[0].profileImageUrl)}
-                        alt="profile"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => applyImageFallback(e, room.participants[0].profileImageUrl)}
+                    {room.participants[0] ? (
+                      <ProfileAvatar
+                        fillContainer
+                        authorUserId={room.participants[0].userId}
+                        profileImageUrl={room.participants[0].profileImageUrl}
+                        nickname={room.participants[0].nickname}
                       />
-                    ) : <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{room.roomName ? room.roomName[0].toUpperCase() : '?'}</span>}
+                    ) : (
+                      <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{room.roomName ? room.roomName[0].toUpperCase() : '?'}</span>
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#262626' }}>{room.roomName}</div>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Calendar } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import { StoryDetailResponse } from '../../types/story';
+import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 
 const StoryArchive: React.FC = () => {
   const [archivedStories, setArchivedStories] = useState<StoryDetailResponse[]>([]);
@@ -26,19 +27,8 @@ const StoryArchive: React.FC = () => {
     fetchArchive();
   }, []);
 
-  const getFullUrl = (url: string) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    if (url.startsWith('/')) return url;
-    return `/uploads/${url}`;
-  };
-
-  const getFallbackUrl = (url: string) => {
-    if (!url || url.startsWith('http')) return '';
-    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
-    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
-    return `/temp/media/${url}`;
-  };
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fff' }}>

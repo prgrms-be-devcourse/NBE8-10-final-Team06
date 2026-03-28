@@ -1,17 +1,27 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { useFollowSyncStore } from '../store/useFollowSyncStore';
+import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
 import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
+import { performClientLogout } from '../services/performClientLogout';
+import { applyAuthoritativeFollowStatus } from '../services/profileFollowState';
+import { loadFollowListsAndCounts } from '../services/profileFollowStats';
+import { toggleFollowRelation } from '../services/followToggle';
 import { postApi } from '../api/post';
 import { storyApi } from '../api/story';
 import { dmApi } from '../api/dm';
-import { UserProfileResponse, Resume } from '../types/user';
+import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
 import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
-import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
+import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
+import { getApiErrorMessage } from '../util/apiError';
+import ProfileAvatar from '../components/common/ProfileAvatar';
+import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -25,63 +35,216 @@ const BLACKLIST = new Set<string>();
 
 const ProfilePage: React.FC = () => {
   const { nickname: urlNickname } = useParams<{ nickname: string }>();
-  const { nickname: myNickname, isLoggedIn, setLogout } = useAuthStore();
+  const { nickname: myNickname, isLoggedIn, userId: myUserId, setSessionProfileImageUrl } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech' | 'archive'>('posts');
   const [scrappedPosts, setScrappedPosts] = useState<PostFeedProfileRes[]>([]);
   const [archivedStories, setArchivedStories] = useState<StoryDetailResponse[]>([]);
+  const [followers, setFollowers] = useState<FollowUserResponse[]>([]);
+  const [followings, setFollowings] = useState<FollowUserResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFollowProcessing, setIsFollowProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [modalConfig, setModalConfig] = useState<{ title: string; id: number; type: 'followers' | 'followings' } | null>(null);
 
-  const getFullUrl = (url: string) => {
-    if (!url) return '';
-    if (url.startsWith('http') || url.startsWith('blob:')) return url;
-    if (url.startsWith('/')) return url;
-    return `/uploads/${url}`;
-  };
-
-  const getFallbackUrl = (url: string) => {
-    if (!url || url.startsWith('http') || url.startsWith('blob:')) return '';
-    if (url.startsWith('/uploads/')) return url.replace('/uploads/', '/temp/media/');
-    if (url.startsWith('/temp/media/')) return url.replace('/temp/media/', '/uploads/');
-    return `/temp/media/${url}`;
-  };
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
 
   const isVideo = (mediaType: string) =>
     ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const targetNickname = urlNickname || myNickname;
   const isMe = myNickname === targetNickname;
-  const isFetching = useRef(false);
+
+  /** 라우트 전환 직후 옛 profile 객체가 남아 있을 수 있어 userId까지 대조 */
+  useEffect(() => {
+    if (!isMe || !profile || myUserId == null || Number(profile.userId) !== Number(myUserId)) return;
+    setSessionProfileImageUrl(profile.profileImageUrl ?? null);
+  }, [isMe, profile, myUserId, setSessionProfileImageUrl]);
+
+  /** 빠른 라우트 전환 시 이전 getProfile 응답이 늦게 와도 상태를 덮어쓰지 않게 함 */
+  const profileLoadGen = useRef(0);
+  /** resyncProfileQuiet 전용 — profileLoadGen 과 분리 (메인 fetchProfile 의 loading finally 와 충돌 방지) */
+  const quietResyncGen = useRef(0);
+  /** 팔로워/팔로잉 목록 요청 — 늦게 도착한 이전 프로필·이전 타이밍 응답이 목록만 덮어쓰지 않게 함 */
+  const followListGen = useRef(0);
+  const profileRef = useRef<UserProfileResponse | null>(null);
+  /** setState 보다 먼저 들어오는 연타 클릭 차단 (언팔 직후 재요청 레이스 방지) */
+  const followToggleLockRef = useRef(false);
+  /**
+   * toggleFollowRelation 이 status 병합 후 쏘는 follow:changed 와 handleFollowToggle 의 setProfile 이 겹치면
+   * 헤더 isFollowing 이 잠깐 맞았다가 다시 뒤집히는 현상이 날 수 있어, 이 페이지에서 버튼으로 토글한
+   * 대상에 한해 한 틱 동안 리스너의 상대 헤더 갱신을 건너뜀 (모달·검색 등 다른 출처 이벤트는 그대로 반영).
+   */
+  const suppressFollowEventForTargetIdRef = useRef<number | null>(null);
+  /** 이전 렌더가 '내 닉네임 프로필'이었는지 — 타 유저 → 내 프로필 전환 시 팔로우 변경분 반영 */
+  const prevViewingSelfRef = useRef(false);
+  /** 라우트 기준 닉네임 — 전환 직후 profileRef 는 아직 이전 유저를 가리킬 수 있어 비동기 완료 시 이것과만 대조 */
+  const targetNicknameRef = useRef<string | undefined>(undefined);
+  profileRef.current = profile;
+  targetNicknameRef.current = targetNickname ?? undefined;
+  const followSyncEpoch = useFollowSyncStore((s) => s.epoch);
+
+  const viewedOthersUserId =
+    profile != null && !isMe ? Number(profile.userId) : NaN;
+  const followHintForViewedProfile = useFollowLocalStore((s) =>
+    Number.isFinite(viewedOthersUserId) ? s.followingHintByUserId[viewedOthersUserId] : undefined
+  );
+  /** 다른 화면에서 토글한 뒤 돌아와도 헤더가 힌트와 맞게 보이도록 */
+  const displayIsFollowingOthersProfile =
+    profile != null && !isMe
+      ? followHintForViewedProfile !== undefined
+        ? followHintForViewedProfile
+        : profile.isFollowing
+      : false;
+
+  /**
+   * 팔로워/팔로잉 목록 + 헤더 카운트를 서버와 맞춤.
+   * - forceApplyFollowLists: setProfile 직후 호출 시 true — 아직 커밋 전이라 profileRef 가 옛 유저를 가리켜도 목록을 반드시 반영
+   * - false(기본): 지금 화면의 프로필 userId 와 uid 가 같을 때만 followers/followings 상태 갱신(오염 방지)
+   */
+  const fetchFollowLists = useCallback(
+    async (
+      targetUserId: number,
+      opts?: { forceApplyFollowLists?: boolean; viewerFollowsOwner?: boolean }
+    ) => {
+      const uid = Number(targetUserId);
+      if (!Number.isFinite(uid)) return;
+      const forceLists = opts?.forceApplyFollowLists === true;
+      const gen = ++followListGen.current;
+      try {
+        let viewerFollowsOwner = opts?.viewerFollowsOwner;
+        if (viewerFollowsOwner === undefined) {
+          const pr = profileRef.current;
+          if (
+            pr != null &&
+            Number(pr.userId) === uid &&
+            myUserId != null &&
+            Number(pr.userId) !== Number(myUserId)
+          ) {
+            viewerFollowsOwner = mergeFollowingHint(uid, pr.isFollowing);
+          } else {
+            viewerFollowsOwner = true;
+          }
+        }
+        const pack = await loadFollowListsAndCounts(uid, {
+          viewerUserId: myUserId,
+          viewerFollowsOwner,
+        });
+        if (gen !== followListGen.current) return;
+        if (!pack) return;
+        const viewedRaw = profileRef.current?.userId;
+        const viewed =
+          viewedRaw != null && Number.isFinite(Number(viewedRaw)) ? Number(viewedRaw) : NaN;
+        const mayApplyLists = forceLists || (!Number.isNaN(viewed) && viewed === uid);
+        if (mayApplyLists) {
+          setFollowers(
+            pack.followers.map((f) => ({
+              ...f,
+              isFollowing: mergeFollowingHint(f.userId, f.isFollowing),
+            }))
+          );
+          setFollowings(
+            pack.followings.map((f) => ({
+              ...f,
+              isFollowing: mergeFollowingHint(f.userId, f.isFollowing),
+            }))
+          );
+        }
+        setProfile((prev) => {
+          if (!prev || Number(prev.userId) !== uid) return prev;
+          const next = { ...prev };
+          if (pack.followerCount != null) next.followerCount = pack.followerCount;
+          if (pack.followingCount != null) next.followingCount = pack.followingCount;
+          return next;
+        });
+      } catch (err) {
+        console.error('팔로우 목록 동기화 실패:', err);
+      }
+    },
+    [myUserId]
+  );
+
+  const resyncProfileQuiet = useCallback(
+    async (name: string) => {
+      if (!name || BLACKLIST.has(name)) return;
+      const requestedName = name;
+      const gen = ++quietResyncGen.current;
+      try {
+        const res = await userApi.getProfile(name);
+        if (gen !== quietResyncGen.current) return;
+        if (targetNicknameRef.current !== requestedName) return;
+        if (!(res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) || !res.data) return;
+        const normalized = await applyAuthoritativeFollowStatus(res.data, () => gen !== quietResyncGen.current);
+        if (gen !== quietResyncGen.current) return;
+        if (targetNicknameRef.current !== requestedName) return;
+        setProfile(normalized);
+        useProfileImageCacheStore.getState().setAuthoritativeProfileImage(
+          normalized.userId,
+          normalized.profileImageUrl ?? null
+        );
+        await fetchFollowLists(normalized.userId, { forceApplyFollowLists: true });
+      } catch {
+        /* */
+      }
+    },
+    [fetchFollowLists]
+  );
 
   const fetchProfile = useCallback(async (name: string, force: boolean = false) => {
-    if (isFetching.current || (!force && BLACKLIST.has(name))) return;
+    if (!force && BLACKLIST.has(name)) return;
+    const gen = ++profileLoadGen.current;
     try {
-      isFetching.current = true;
       setLoading(true);
       setError(null);
       const res = await userApi.getProfile(name);
+      if (gen !== profileLoadGen.current) return;
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        setProfile(res.data);
+        if (!res.data) {
+          setProfile(null);
+          setError('프로필 데이터가 비어 있습니다.');
+          return;
+        }
+        const normalized = await applyAuthoritativeFollowStatus(res.data, () => gen !== profileLoadGen.current);
+        if (gen !== profileLoadGen.current) return;
+        setProfile(normalized);
+        useProfileImageCacheStore.getState().setAuthoritativeProfileImage(
+          normalized.userId,
+          normalized.profileImageUrl ?? null
+        );
         BLACKLIST.delete(name);
+        await fetchFollowLists(normalized.userId, { forceApplyFollowLists: true });
+      } else {
+        setProfile(null);
+        setFollowers([]);
+        setFollowings([]);
+        const code = res.resultCode || '';
+        const isNotFound = /404/i.test(code);
+        setError(isNotFound ? res.msg || '존재하지 않는 사용자입니다.' : res.msg || '프로필 정보를 불러오지 못했습니다.');
       }
-    } catch (err: any) {
-      if (err.response?.status === 500) {
+    } catch (err: unknown) {
+      if (gen !== profileLoadGen.current) return;
+      setProfile(null);
+      setFollowers([]);
+      setFollowings([]);
+      if (isAxiosError(err) && err.response?.status === 500) {
         BLACKLIST.add(name);
         setError('백엔드 결함으로 정보를 표시할 수 없습니다.');
+      } else if (isAxiosError(err) && err.response?.status === 404) {
+        setError(getApiErrorMessage(err, '존재하지 않는 사용자입니다.'));
       } else {
-        setError('프로필 정보를 불러오지 못했습니다.');
+        setError(getApiErrorMessage(err, '프로필 정보를 불러오지 못했습니다.'));
       }
     } finally {
-      setLoading(false);
-      isFetching.current = false;
+      if (gen === profileLoadGen.current) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [fetchFollowLists]);
 
   const fetchScraps = useCallback(async () => {
     if (!isMe) return;
@@ -109,20 +272,123 @@ const ProfilePage: React.FC = () => {
     }
   }, [isMe]);
 
+  const followHints = useFollowLocalStore((s) => s.followingHintByUserId);
   useEffect(() => {
-    if (targetNickname) fetchProfile(targetNickname);
-  }, [targetNickname, fetchProfile]);
+    setFollowers((prev) =>
+      prev.map((f) => ({
+        ...f,
+        isFollowing: mergeFollowingHint(f.userId, f.isFollowing),
+      }))
+    );
+    setFollowings((prev) =>
+      prev.map((f) => ({
+        ...f,
+        isFollowing: mergeFollowingHint(f.userId, f.isFollowing),
+      }))
+    );
+  }, [followHints]);
+
+  useEffect(() => {
+    if (!targetNickname) return;
+    // nickname 이 같아도(예: 홈 → 동일 유저 프로필 재진입) history key 가 바뀌므로 매번 서버에서 다시 받는다.
+    // persist 재수화 후 userId 가 채워지면 팔로우 상태 동기화를 위해 한 번 더 받는다.
+    fetchProfile(targetNickname, true);
+  }, [targetNickname, fetchProfile, location.key, myUserId, isLoggedIn]);
+
+  useEffect(() => {
+    if (!targetNickname || !myNickname) return;
+    const wasSelf = prevViewingSelfRef.current;
+    const nowSelf = myNickname === targetNickname;
+    prevViewingSelfRef.current = nowSelf;
+    const becameSelfProfile = nowSelf && !wasSelf;
+    if (!becameSelfProfile) return;
+    const myId = myUserId != null ? Number(myUserId) : NaN;
+    /** 언팔 등으로 followSync 가 올랐으면 프로필+목록 조용히 재동기화. epoch 가 0이어도 전환 시 목록만 한 번 더 맞춰 헤더·모달과 서버 일치 */
+    if (followSyncEpoch > 0) {
+      void resyncProfileQuiet(targetNickname);
+    } else if (Number.isFinite(myId)) {
+      void fetchFollowLists(myId, { forceApplyFollowLists: true });
+    }
+  }, [targetNickname, myNickname, myUserId, followSyncEpoch, resyncProfileQuiet, fetchFollowLists]);
 
   useEffect(() => {
     if (!targetNickname) return;
 
-    const handleFollowChanged = () => {
-      fetchProfile(targetNickname, true);
+    const handleFollowChanged = (event: Event) => {
+      const detail = (event as CustomEvent<FollowResponse>).detail;
+      const { userId: authUserId, nickname: storeNick } = useAuthStore.getState();
+      /** 이벤트 시점에 보고 있는 프로필 — 목록/카운트는 항상 이 유저 기준으로 서버 재동기화 */
+      const listOwnerIdRaw = profileRef.current?.userId;
+      const listOwnerId =
+        listOwnerIdRaw != null && Number.isFinite(Number(listOwnerIdRaw)) ? Number(listOwnerIdRaw) : null;
+      const tidNum = detail?.toUserId != null ? Number(detail.toUserId) : NaN;
+      const aid = authUserId != null ? Number(authUserId) : NaN;
+      /** 내 프로필이면 내 팔로우 관련 변경이 반영될 수 있음 / 남 프로필이면 해당 유저(toUserId)일 때만 목록·카운트 재조회 */
+      const shouldRefreshLists =
+        detail != null &&
+        listOwnerId != null &&
+        ((!Number.isNaN(aid) && listOwnerId === aid) ||
+          (!Number.isNaN(tidNum) && tidNum === listOwnerId));
+
+      // ref 로 분기하면 axios 콜백이 React 커밋보다 먼저 돌 때 잘못된 분기(또는 미적용)가 난다.
+      // 항상 함수형 업데이트 + id 는 Number 로 통일 (JSON Long 문자열 대비).
+      if (detail) {
+        setProfile((p) => {
+          if (!p) return p;
+          const pid = Number(p.userId);
+          const tid = Number(detail.toUserId);
+          const aidLocal = authUserId != null ? Number(authUserId) : NaN;
+          const onMyProfileById = !Number.isNaN(aidLocal) && pid === aidLocal;
+          const onMyProfileByNick =
+            !!storeNick && storeNick !== '' && p.nickname === storeNick;
+          if (onMyProfileById || onMyProfileByNick) {
+            if (typeof detail.followingCount !== 'number') return p;
+            return { ...p, followingCount: detail.followingCount };
+          }
+          if (tid === pid) {
+            /** 토글 중: 이벤트로 isFollowing·followerCount 덮지 않음(구 payload 레이스 방지). 성공 분기·fetchFollowLists가 반영 */
+            if (
+              suppressFollowEventForTargetIdRef.current != null &&
+              suppressFollowEventForTargetIdRef.current === tid
+            ) {
+              return p;
+            }
+            if (typeof detail.isFollowing !== 'boolean') {
+              return p;
+            }
+            const next = {
+              ...p,
+              isFollowing: detail.isFollowing,
+              followerCount:
+                typeof detail.followerCount === 'number' ? detail.followerCount : p.followerCount,
+            };
+            return next;
+          }
+          return p;
+        });
+      }
+
+      /**
+       * 목록 재조회: 프로필 헤더 토글 시 handleFollowToggle 이 이미 fetchFollowLists 를 호출하므로
+       * suppress 대상(toUserId)과 같으면 이벤트 쪽 중복 호출을 생략(4개 GET 배치가 두 번 나가는 것 방지).
+       */
+      if (shouldRefreshLists && listOwnerId != null) {
+        const suppressedDuplicateListFetch =
+          suppressFollowEventForTargetIdRef.current != null &&
+          !Number.isNaN(tidNum) &&
+          suppressFollowEventForTargetIdRef.current === tidNum;
+        if (!suppressedDuplicateListFetch) {
+          const lid = listOwnerId;
+          window.setTimeout(() => {
+            void fetchFollowLists(lid);
+          }, 0);
+        }
+      }
     };
 
     window.addEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
     return () => window.removeEventListener(FOLLOW_CHANGED_EVENT, handleFollowChanged);
-  }, [targetNickname, fetchProfile]);
+  }, [targetNickname, fetchFollowLists]);
 
   useEffect(() => {
     if (isMe && activeTab === 'scraps' && scrappedPosts.length === 0) {
@@ -137,50 +403,70 @@ const ProfilePage: React.FC = () => {
   }, [isMe, activeTab, archivedStories.length, fetchArchivedStories]);
 
   const handleFollowToggle = async () => {
-    if (!profile || isFollowProcessing) return;
+    if (!profile || isMe || isFollowProcessing || followToggleLockRef.current) return;
+    followToggleLockRef.current = true;
     const targetId = profile.userId;
-    const desiredState = !profile.isFollowing;
+    const hinted = useFollowLocalStore.getState().followingHintByUserId[Number(profile.userId)];
+    const snapshot = {
+      isFollowing: hinted !== undefined ? hinted : profile.isFollowing,
+      followerCount: profile.followerCount,
+    };
+    const nextFollowing = !snapshot.isFollowing;
+    const optimisticFollowers = Math.max(0, snapshot.followerCount + (nextFollowing ? 1 : -1));
 
+    setIsFollowProcessing(true);
+    // 낙관적 UI (스냅샷은 위에서 고정 — 연타 시 profile 이 이미 뒤집힌 뒤가 아님)
+    setProfile((p) =>
+      p ? { ...p, isFollowing: nextFollowing, followerCount: optimisticFollowers } : p
+    );
+    suppressFollowEventForTargetIdRef.current = Number(targetId);
     try {
-      setIsFollowProcessing(true);
-      // 1) 서버의 현재 팔로우 상태 확인
-      const statusRes = await userApi.isFollowing(targetId);
-      const serverFollowing = statusRes.data;
-
-      // 2) 이미 원하는 상태면 프로필만 동기화
-      if (serverFollowing === desiredState) {
-        if (targetNickname) {
-          const syncRes = await userApi.getProfile(targetNickname);
-          if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
-            setProfile(syncRes.data);
-          }
+      const r = await toggleFollowRelation(
+        targetId,
+        snapshot.isFollowing ? 'unfollow' : 'follow',
+        myUserId
+      );
+      if (r.ok) {
+        if (!r.follow.isFollowing && myUserId != null) {
+          setFollowers((prev) => prev.filter((f) => Number(f.userId) !== Number(myUserId)));
         }
-        return;
-      }
-
-      // 3) 필요한 경우에만 토글 API 호출
-      const res = desiredState ? await userApi.follow(targetId) : await userApi.unfollow(targetId);
-      if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
-        const syncRes = await userApi.getProfile(targetNickname || profile.nickname);
-        if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
-          setProfile(syncRes.data);
+        // 4단계 성공: FollowResponse 로 정확한 isFollowing·상대 팔로워 수 동기화 (OpenAPI RsDataFollowResponse.data)
+        setProfile((p) => {
+          if (!p) return p;
+          return {
+            ...p,
+            isFollowing: r.follow.isFollowing,
+            followerCount: r.follow.followerCount,
+          };
+        });
+        void fetchFollowLists(Number(targetId), {
+          forceApplyFollowLists: true,
+          viewerFollowsOwner: r.follow.isFollowing,
+        });
+      } else if (r.reason === 'busy') {
+        setProfile((p) =>
+          p ? { ...p, isFollowing: snapshot.isFollowing, followerCount: snapshot.followerCount } : p
+        );
+      } else {
+        setProfile((p) =>
+          p ? { ...p, isFollowing: snapshot.isFollowing, followerCount: snapshot.followerCount } : p
+        );
+        if (r.reason === 'self' || r.reason === 'failed') {
+          alert(r.message || '팔로우 처리에 실패했습니다.');
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('팔로우 처리 실패:', err);
-      // 실패 시 프로필 재조회로 서버 상태와 강제 동기화
-      if (targetNickname) {
-        try {
-          const syncRes = await userApi.getProfile(targetNickname);
-          if (syncRes.resultCode?.includes('-S-') || syncRes.resultCode?.startsWith('200')) {
-            setProfile(syncRes.data);
-          }
-        } catch {
-          // 동기화 실패 시 기존 상태 유지
-        }
-      }
+      setProfile((p) =>
+        p ? { ...p, isFollowing: snapshot.isFollowing, followerCount: snapshot.followerCount } : p
+      );
+      alert('팔로우 처리에 실패했습니다.');
     } finally {
+      followToggleLockRef.current = false;
       setIsFollowProcessing(false);
+      window.setTimeout(() => {
+        suppressFollowEventForTargetIdRef.current = null;
+      }, 0);
     }
   };
 
@@ -214,7 +500,25 @@ const ProfilePage: React.FC = () => {
       <div style={{ textAlign: 'center', padding: '60px 0' }}>
         <AlertCircle size={48} color="#ed4956" style={{ margin: '0 auto 20px' }} />
         <p>{error}</p>
-        <button onClick={() => fetchProfile(targetNickname!, true)} style={{ marginTop: '10px', padding: '8px 16px', backgroundColor: '#0095f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>다시 시도</button>
+        <div style={{ marginTop: '16px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            style={{ padding: '8px 16px', backgroundColor: '#efefef', color: '#262626', border: '1px solid #dbdbdb', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+          >
+            홈으로
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              void fetchProfile(targetNickname!, true);
+            }}
+            style={{ padding: '8px 16px', backgroundColor: '#0095f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     </MainLayout>
   );
@@ -224,11 +528,12 @@ const ProfilePage: React.FC = () => {
   return (
     <MainLayout title={profile.nickname}>
       <header style={{ display: 'flex', gap: '40px', marginBottom: '44px' }}>
-        <img
-          src={resolveProfileImageUrl(profile.profileImageUrl)}
-          style={{ width: '150px', height: '150px', borderRadius: '50%', border: '1px solid #dbdbdb', objectFit: 'cover' }}
-          alt="profile"
-          onError={(e) => applyImageFallback(e, profile.profileImageUrl)}
+        <ProfileAvatar
+          authorUserId={profile.userId}
+          profileImageUrl={profile.profileImageUrl}
+          nickname={profile.nickname}
+          sizePx={150}
+          style={{ border: '1px solid #dbdbdb' }}
         />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
@@ -236,11 +541,11 @@ const ProfilePage: React.FC = () => {
             {isMe ? (
               <>
                 <button onClick={() => navigate('/profile/edit')} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>프로필 편집</button>
-                <LogOut size={22} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={() => { setLogout(); navigate('/login'); }} />
+                <LogOut size={22} style={{ cursor: 'pointer', color: '#ed4956' }} onClick={() => { void performClientLogout(navigate); }} />
               </>
             ) : (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <button onClick={handleFollowToggle} disabled={isFollowProcessing} style={{ padding: '6px 24px', backgroundColor: profile.isFollowing ? '#efefef' : '#0095f6', color: profile.isFollowing ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer', opacity: isFollowProcessing ? 0.7 : 1 }}>{isFollowProcessing ? '처리 중...' : (profile.isFollowing ? '팔로잉' : '팔로우')}</button>
+                <button onClick={handleFollowToggle} disabled={isFollowProcessing} style={{ padding: '6px 24px', backgroundColor: displayIsFollowingOthersProfile ? '#efefef' : '#0095f6', color: displayIsFollowingOthersProfile ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer', opacity: isFollowProcessing ? 0.85 : 1 }}>{displayIsFollowingOthersProfile ? '팔로잉' : '팔로우'}</button>
                 <button onClick={handleMessageClick} style={{ padding: '6px 16px', backgroundColor: '#efefef', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}>메시지 보내기</button>
                 {profile.isFollower && <span style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>나를 팔로우함</span>}
               </div>
@@ -248,8 +553,12 @@ const ProfilePage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: '40px', marginBottom: '20px' }}>
             <span>게시물 <strong>{profile.postCount}</strong></span>
-            <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>팔로워 <strong>{profile.followerCount}</strong></span>
-            <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로잉', id: profile.userId, type: 'followings' })}>팔로잉 <strong>{profile.followingCount}</strong></span>
+            <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>
+              팔로워 <strong>{profile.followerCount}</strong>
+            </span>
+            <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로잉', id: profile.userId, type: 'followings' })}>
+              팔로잉 <strong>{profile.followingCount}</strong>
+            </span>
           </div>
           <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '10px' }}>
             {profile.nickname}
@@ -442,7 +751,18 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
       </div>
-      {modalConfig && <UserListModal title={modalConfig.title} id={modalConfig.id} type={modalConfig.type} onClose={() => setModalConfig(null)} />}
+      {modalConfig && (
+        <UserListModal
+          title={modalConfig.title}
+          id={modalConfig.id}
+          type={modalConfig.type}
+          seedUsers={modalConfig.type === 'followers' ? followers : followings}
+          viewerFollowsProfileOwner={
+            modalConfig.type === 'followers' ? isMe || displayIsFollowingOthersProfile : true
+          }
+          onClose={() => setModalConfig(null)}
+        />
+      )}
     </MainLayout>
   );
 };
