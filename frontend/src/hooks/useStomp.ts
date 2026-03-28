@@ -2,6 +2,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { syncAuthTokensFromCookies } from '../util/authStorageSync';
+import { getCookie } from '../util/cookies';
+
+function resolveAccessTokenForStomp(): string {
+  syncAuthTokensFromCookies();
+  let t = localStorage.getItem('accessToken');
+  if (t && t !== 'null' && t !== 'undefined' && t.trim() !== '') return t.trim();
+  const c = getCookie('accessToken');
+  if (c && c !== 'null' && c !== 'undefined' && c.trim() !== '') return c.trim();
+  return '';
+}
 
 interface UseStompProps {
   endpoint: string;
@@ -18,12 +29,11 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
   }, [onConnect]);
 
   useEffect(() => {
+    const token = resolveAccessTokenForStomp();
     const socket = new SockJS(endpoint);
     const client = new Client({
       webSocketFactory: () => socket,
-      connectHeaders: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken')}`
-      },
+      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,

@@ -13,6 +13,7 @@ import { resolveDmAttachment } from '../../util/dmAttachment';
 import { dmMessageDedupeKey, normalizeDmMessagesFromApi } from '../../util/dmMessageDedupe';
 import { takePendingDmBatch } from '../../services/dmPendingSend';
 import { mergeServerWithShareBackup, persistShareBackup, pruneShareBackupByServer } from '../../services/dmSharePersistence';
+import { getReadMessageIdFromDmEvent, getTypingFieldsFromDmEvent } from '../../util/dmWebSocketPayload';
 import DmRoomInfoModal from '../../components/dm/DmRoomInfoModal';
 
 // --- 유틸리티: 스토리 만료 여부 체크 ---
@@ -308,7 +309,7 @@ const DmChatPage: React.FC = () => {
     }, 450);
 
     const wsHandler = (payload: { body: string }) => {
-      const event: WebSocketEventPayload<any> = JSON.parse(payload.body);
+      const event = JSON.parse(payload.body) as WebSocketEventPayload<any>;
       switch (event.type) {
         case 'message':
           if (event.data) {
@@ -332,15 +333,22 @@ const DmChatPage: React.FC = () => {
             }, 0);
           }
           break;
-        case 'typing':
-          if (event.data && event.data.userId !== userId) {
-            setTypingUser(event.data.status === 'start' ? '상대방이 입력 중...' : null);
+        case 'typing': {
+          const t = getTypingFieldsFromDmEvent(event);
+          if (t && t.userId !== userId) {
+            setTypingUser(t.status === 'start' ? '상대방이 입력 중...' : null);
           }
           break;
-        case 'read':
-          if (event.data && event.data.messageId) {
-            setLastReadIdByOpponent((prev) => Math.max(prev, event.data.messageId!));
+        }
+        case 'read': {
+          const mid = getReadMessageIdFromDmEvent(event);
+          if (mid != null) {
+            setLastReadIdByOpponent((prev) => Math.max(prev, mid));
           }
+          break;
+        }
+        case 'join':
+        case 'leave':
           break;
         default:
           break;

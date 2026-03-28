@@ -36,6 +36,15 @@ const BLACKLIST = new Set<string>();
 const ProfilePage: React.FC = () => {
   const { nickname: urlNickname } = useParams<{ nickname: string }>();
   const { nickname: myNickname, isLoggedIn, userId: myUserId, setSessionProfileImageUrl } = useAuthStore();
+
+  /** 프로필 주인의 활성 스토리 유무 + 스토리 피드 기준 미열람(무지개 링). 피드에 없으면 활성만 있어도 무지개로 유도 */
+  const [profileStoryRing, setProfileStoryRing] = useState<{
+    loaded: boolean;
+    hasActiveStories: boolean;
+    /** 피드 행이 있으면 그 isUnread, 없으면 null → 무지개 링 유지 */
+    feedUnread: boolean | null;
+  }>({ loaded: false, hasActiveStories: false, feedUnread: null });
+  const profileStoryRingGen = useRef(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -296,6 +305,45 @@ const ProfilePage: React.FC = () => {
   }, [targetNickname, fetchProfile, location.key, myUserId, isLoggedIn]);
 
   useEffect(() => {
+    if (!isLoggedIn || !profile?.userId) {
+      setProfileStoryRing({ loaded: false, hasActiveStories: false, feedUnread: null });
+      return;
+    }
+    const uid = Number(profile.userId);
+    if (!Number.isFinite(uid)) return;
+    const gen = ++profileStoryRingGen.current;
+    setProfileStoryRing({ loaded: false, hasActiveStories: false, feedUnread: null });
+    void (async () => {
+      try {
+        const [storiesRes, feedRes] = await Promise.all([
+          storyApi.getUserStories(uid),
+          storyApi.getFeed(),
+        ]);
+        if (gen !== profileStoryRingGen.current) return;
+        const okStories =
+          (storiesRes.resultCode?.includes('-S-') || storiesRes.resultCode?.startsWith('200')) &&
+          Array.isArray(storiesRes.data);
+        const nowMs = Date.now();
+        const notExpired = (storiesRes.data || []).filter((s) => {
+          if (!s.expiredAt) return true;
+          const t = Date.parse(s.expiredAt);
+          return !Number.isFinite(t) || t > nowMs;
+        });
+        const hasActive = okStories && notExpired.length > 0;
+        let feedUnread: boolean | null = null;
+        if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
+          const row = (feedRes.data || []).find((f) => Number(f.userId) === uid);
+          if (row) feedUnread = row.isUnread;
+        }
+        setProfileStoryRing({ loaded: true, hasActiveStories: hasActive, feedUnread });
+      } catch {
+        if (gen !== profileStoryRingGen.current) return;
+        setProfileStoryRing({ loaded: true, hasActiveStories: false, feedUnread: null });
+      }
+    })();
+  }, [isLoggedIn, profile?.userId, location.key]);
+
+  useEffect(() => {
     if (!targetNickname || !myNickname) return;
     const wasSelf = prevViewingSelfRef.current;
     const nowSelf = myNickname === targetNickname;
@@ -525,16 +573,78 @@ const ProfilePage: React.FC = () => {
 
   if (!profile) return null;
 
+  const showStoryRainbowRing =
+    profileStoryRing.loaded &&
+    profileStoryRing.hasActiveStories &&
+    profileStoryRing.feedUnread !== false;
+  const showStoryMutedRing =
+    profileStoryRing.loaded && profileStoryRing.hasActiveStories && profileStoryRing.feedUnread === false;
+
+  const openProfileStories = () => {
+    if (!profileStoryRing.hasActiveStories) return;
+    navigate(`/story/${profile.userId}`);
+  };
+
   return (
     <MainLayout title={profile.nickname}>
-      <header style={{ display: 'flex', gap: '40px', marginBottom: '44px' }}>
-        <ProfileAvatar
-          authorUserId={profile.userId}
-          profileImageUrl={profile.profileImageUrl}
-          nickname={profile.nickname}
-          sizePx={150}
-          style={{ border: '1px solid #dbdbdb' }}
-        />
+      <header style={{ display: 'flex', alignItems: 'flex-start', gap: '40px', marginBottom: '44px' }}>
+        {profileStoryRing.hasActiveStories ? (
+          <div
+            role="button"
+            tabIndex={0}
+            title="스토리 보기"
+            aria-label={`${profile.nickname}님의 스토리 보기`}
+            onClick={() => openProfileStories()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openProfileStories();
+              }
+            }}
+            style={{
+              boxSizing: 'border-box',
+              width: '154px',
+              height: '154px',
+              flexShrink: 0,
+              borderRadius: '50%',
+              padding: '2px',
+              background: showStoryRainbowRing
+                ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                : showStoryMutedRing
+                  ? '#dbdbdb'
+                  : '#dbdbdb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <div
+              style={{
+                width: '150px',
+                height: '150px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                backgroundColor: '#efefef',
+              }}
+            >
+              <ProfileAvatar
+                fillContainer
+                authorUserId={profile.userId}
+                profileImageUrl={profile.profileImageUrl}
+                nickname={profile.nickname}
+              />
+            </div>
+          </div>
+        ) : (
+          <ProfileAvatar
+            authorUserId={profile.userId}
+            profileImageUrl={profile.profileImageUrl}
+            nickname={profile.nickname}
+            sizePx={150}
+            style={{ border: '1px solid #dbdbdb', flexShrink: 0, alignSelf: 'flex-start' }}
+          />
+        )}
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: '300' }}>{profile.nickname}</span>

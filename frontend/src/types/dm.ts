@@ -52,7 +52,8 @@ export interface DmCreateGroupWithRoomListResponse {
 
 export interface WebSocketEventPayload<T> {
   type: 'message' | 'typing' | 'read' | 'join' | 'leave';
-  data: T;
+  /** `message` 는 서버가 항상 채움. `typing`/`read` 는 백엔드가 평면 필드만 보낼 수 있어 선택적 */
+  data?: T;
 }
 
 export interface TypingWsPayload {
