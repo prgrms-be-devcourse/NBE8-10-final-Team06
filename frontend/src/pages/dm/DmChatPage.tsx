@@ -13,6 +13,7 @@ import { resolveDmAttachment } from '../../util/dmAttachment';
 import { dmMessageDedupeKey, normalizeDmMessagesFromApi } from '../../util/dmMessageDedupe';
 import { takePendingDmBatch } from '../../services/dmPendingSend';
 import { mergeServerWithShareBackup, persistShareBackup, pruneShareBackupByServer } from '../../services/dmSharePersistence';
+import DmRoomInfoModal from '../../components/dm/DmRoomInfoModal';
 
 // --- 유틸리티: 스토리 만료 여부 체크 ---
 const checkIsExpired = (content: string, type: string) => {
@@ -125,7 +126,7 @@ const DmChatPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { userId } = useAuthStore();
-  const { rooms, markAsRead } = useDmStore();
+  const { rooms, markAsRead, setRooms } = useDmStore();
   
   // 현재 방 정보 찾기
   const currentRoom = rooms.find(r => r.roomId === Number(roomId));
@@ -139,6 +140,7 @@ const DmChatPage: React.FC = () => {
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [lastReadIdByOpponent, setLastReadIdByOpponent] = useState<number>(0);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
@@ -161,6 +163,18 @@ const DmChatPage: React.FC = () => {
   useEffect(() => {
     if (roomId) markAsRead(Number(roomId));
   }, [roomId, markAsRead]);
+
+  // 직접 URL 진입 등으로 스토어에 방 요약이 없을 때 목록 재조회
+  useEffect(() => {
+    if (!roomId) return;
+    const rid = Number(roomId);
+    if (useDmStore.getState().rooms.some((r) => r.roomId === rid)) return;
+    void dmApi.getRooms().then((res) => {
+      if (res.resultCode.startsWith('200')) {
+        setRooms(res.data);
+      }
+    });
+  }, [roomId, setRooms]);
 
   // 메시지 초기 로드 — sendReadEvent/isConnected에 묶이지 않음(불필요 재요청·세대 꼬임 방지)
   useEffect(() => {
@@ -419,7 +433,14 @@ const DmChatPage: React.FC = () => {
           >
             나가기
           </button>
-          <Info size={24} style={{ cursor: 'pointer' }} />
+          <button
+            type="button"
+            aria-label="채팅방 정보"
+            onClick={() => setShowRoomInfo(true)}
+            style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', color: '#262626' }}
+          >
+            <Info size={24} />
+          </button>
         </div>
       </header>
 
@@ -446,6 +467,8 @@ const DmChatPage: React.FC = () => {
           <button type="submit" disabled={!inputValue.trim() || !isConnected} style={{ background: 'none', border: 'none', color: inputValue.trim() ? '#0095f6' : '#b2dffc', fontWeight: 'bold', fontSize: '1rem' }}>보내기</button>
         </form>
       </footer>
+
+      <DmRoomInfoModal open={showRoomInfo} onClose={() => setShowRoomInfo(false)} room={currentRoom ?? null} />
     </div>
   );
 };

@@ -225,9 +225,10 @@ export interface CommentUpdateReq {
 export interface StoryViewerUserResponse {
   userId: Int64;
   nickname: string;
+  profileImageUrl: string | null;
   isLiked: boolean;
   viewedAt: IsoDateTime;
-  likedAt: IsoDateTime;
+  likedAt: IsoDateTime | null;
 }
 
 export interface StoryFeedResponse {
@@ -253,8 +254,8 @@ export interface StoryDetailResponse {
   taggedUserIds: Int64[];
   totalLikeCount: Int64;
   isLiked: boolean;
-  viewers: StoryViewerUserResponse[];
-  likers: StoryViewerUserResponse[];
+  viewers: StoryViewerUserResponse[] | null;
+  likers: StoryViewerUserResponse[] | null;
 }
 
 export interface StoryViewResponse {

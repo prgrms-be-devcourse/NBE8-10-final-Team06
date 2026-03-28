@@ -1,6 +1,8 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 import { shouldTreat403ResponseAsSessionExpired } from '../util/apiError';
+import { syncAuthTokensFromCookies } from '../util/authStorageSync';
+import { getCookie } from '../util/cookies';
 
 function clearSessionAndRedirectToLogin(reason: string) {
   console.error(`인증이 필요합니다 (${reason}). 세션을 종료하고 로그인 페이지로 이동합니다.`);
@@ -29,8 +31,23 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     return config;
   }
 
-  const token = localStorage.getItem('accessToken');
-  const apiKey = localStorage.getItem('apiKey');
+  syncAuthTokensFromCookies();
+
+  let token = localStorage.getItem('accessToken');
+  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+    const c = getCookie('accessToken');
+    if (c && c.trim() !== '' && c !== 'null' && c !== 'undefined') {
+      token = c.trim();
+    }
+  }
+
+  let apiKey = localStorage.getItem('apiKey');
+  if (!apiKey || apiKey === 'null' || apiKey === 'undefined' || apiKey.trim() === '') {
+    const ck = getCookie('apiKey');
+    if (ck && ck.trim() !== '' && ck !== 'null' && ck !== 'undefined') {
+      apiKey = ck.trim();
+    }
+  }
 
   if (config.headers) {
     if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {

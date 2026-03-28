@@ -1,20 +1,50 @@
 // src/pages/story/StoryViewer.tsx
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, X, Users, MoreHorizontal, Trash2, Send, Share2 } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import { dmApi } from '../../api/dm';
-import { StoryDetailResponse, StoryFeedResponse } from '../../types/story';
+import { StoryDetailResponse, StoryFeedResponse, StoryViewResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { setPendingDmBatch } from '../../services/dmPendingSend';
 import { buildStorySharePayload } from '../../util/dmDeepLinks';
 import { getApiErrorMessage } from '../../util/apiError';
+import { isRsDataSuccess } from '../../util/rsData';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 
 const STORY_DURATION = 5000;
+
+function applyStoryAfterLikeToggle(
+  story: StoryDetailResponse,
+  view: StoryViewResponse,
+  me: { userId: number; nickname: string; profileImageUrl: string | null }
+): StoryDetailResponse {
+  const isLiked = view.isLiked;
+  const totalLikeCount = view.totalLikeCount ?? story.totalLikeCount;
+
+  if (!Array.isArray(story.likers)) {
+    return { ...story, isLiked, totalLikeCount };
+  }
+
+  let likers = [...story.likers];
+  if (isLiked && !likers.some((u) => u.userId === me.userId)) {
+    likers.push({
+      userId: me.userId,
+      nickname: me.nickname,
+      profileImageUrl: me.profileImageUrl,
+      isLiked: true,
+      viewedAt: view.viewedAt,
+      likedAt: view.likedAt,
+    });
+  }
+  if (!isLiked) {
+    likers = likers.filter((u) => u.userId !== me.userId);
+  }
+  return { ...story, isLiked, totalLikeCount, likers };
+}
 
 const StoryViewer: React.FC = () => {
   const { userId: targetUserIdStr } = useParams<{ userId: string }>();
@@ -34,8 +64,10 @@ const StoryViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'views' | 'likes'>('views');
   const [replyText, setReplyText] = useState('');
   const [showDmShare, setShowDmShare] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const likeInFlightRef = useRef(false);
 
-  const { userId: loggedInUserId, nickname: loggedInNickname } = useAuthStore();
+  const { userId: loggedInUserId, nickname: loggedInNickname, profileImageUrl: myProfileImageUrl } = useAuthStore();
   const setRooms = useDmStore((s) => s.setRooms);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,7 +99,7 @@ const StoryViewer: React.FC = () => {
         if (res.resultCode.startsWith('200') && res.data.length > 0) {
           setStories(res.data);
           const firstStoryId = res.data[0]?.storyId;
-          if (firstStoryId) storyApi.recordView(firstStoryId);
+          if (firstStoryId) await storyApi.recordViewSafe(firstStoryId);
         } else {
           navigate('/');
         }
@@ -106,7 +138,7 @@ const StoryViewer: React.FC = () => {
     if (currentIndex < stories.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setProgress(0);
-      storyApi.recordView(stories[currentIndex + 1].storyId);
+      void storyApi.recordViewSafe(stories[currentIndex + 1].storyId);
     } else {
       const feedUserIds = feed.map(u => u.userId);
       let sequence = [...feedUserIds];
@@ -189,6 +221,38 @@ const StoryViewer: React.FC = () => {
       alert('오류 발생');
     }
   };
+
+  const handleToggleLike = useCallback(async () => {
+    const story = stories[currentIndex];
+    if (!story || likeInFlightRef.current) return;
+    if (loggedInUserId == null) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    likeInFlightRef.current = true;
+    setLikeBusy(true);
+    try {
+      const res = await storyApi.toggleLike(story.storyId);
+      if (!isRsDataSuccess(res) || res.data == null) {
+        alert(res.msg || '좋아요 처리에 실패했습니다.');
+        return;
+      }
+      const me = {
+        userId: loggedInUserId,
+        nickname: loggedInNickname?.trim() || `User ${loggedInUserId}`,
+        profileImageUrl: myProfileImageUrl ?? null,
+      };
+      const payload = res.data;
+      setStories((prev) =>
+        prev.map((s, i) => (i === currentIndex ? applyStoryAfterLikeToggle(s, payload, me) : s))
+      );
+    } catch (e: unknown) {
+      alert(getApiErrorMessage(e, '좋아요 처리에 실패했습니다.'));
+    } finally {
+      likeInFlightRef.current = false;
+      setLikeBusy(false);
+    }
+  }, [stories, currentIndex, loggedInUserId, loggedInNickname, myProfileImageUrl]);
 
   const currentStory = stories[currentIndex];
   const isOwner = loggedInUserId === currentStory?.userId;
@@ -326,7 +390,7 @@ const StoryViewer: React.FC = () => {
       {/* 하단 인터랙션 (답장하기 기능 추가) */}
       <div style={{ position: 'absolute', bottom: '20px', width: '95%', maxWidth: '400px', display: 'flex', alignItems: 'center', gap: '10px', padding: '0 10px' }}>
         {isOwner ? (
-          <div onClick={() => setShowStats(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '0.9rem', cursor: 'pointer' }}><Users size={20} /> 조회 {currentStory.viewers.length}명</div>
+          <div onClick={() => setShowStats(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '0.9rem', cursor: 'pointer' }}><Users size={20} /> 조회 {(currentStory.viewers ?? []).length}명</div>
         ) : (
           <form onSubmit={handleSendReply} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: '25px', padding: '5px 15px', border: '1px solid rgba(255,255,255,0.3)' }}>
             <input 
@@ -347,7 +411,23 @@ const StoryViewer: React.FC = () => {
         >
           <Share2 size={24} />
         </button>
-        <button onClick={() => storyApi.toggleLike(currentStory.storyId)} style={{ background: 'none', border: 'none', color: currentStory.isLiked ? '#ed4956' : '#fff' }}><Heart size={28} fill={currentStory.isLiked ? '#ed4956' : 'none'} /></button>
+        <button
+          type="button"
+          title={currentStory.isLiked ? '좋아요 취소' : '좋아요'}
+          aria-label={currentStory.isLiked ? '좋아요 취소' : '좋아요'}
+          onClick={() => void handleToggleLike()}
+          disabled={likeBusy}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: currentStory.isLiked ? '#ed4956' : '#fff',
+            cursor: likeBusy ? 'wait' : 'pointer',
+            opacity: likeBusy ? 0.7 : 1,
+            padding: '4px',
+          }}
+        >
+          <Heart size={28} fill={currentStory.isLiked ? '#ed4956' : 'none'} />
+        </button>
       </div>
 
       <DmShareModal
@@ -361,13 +441,13 @@ const StoryViewer: React.FC = () => {
         <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '50%', backgroundColor: '#fff', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', zIndex: 3000, padding: '20px', color: '#000' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div style={{ display: 'flex', gap: '20px', fontWeight: 'bold' }}>
-              <span onClick={() => setActiveTab('views')} style={{ borderBottom: activeTab === 'views' ? '2px solid #000' : 'none' }}>조회 {currentStory.viewers.length}</span>
-              <span onClick={() => setActiveTab('likes')} style={{ borderBottom: activeTab === 'likes' ? '2px solid #000' : 'none' }}>좋아요 {currentStory.likers.length}</span>
+              <span onClick={() => setActiveTab('views')} style={{ borderBottom: activeTab === 'views' ? '2px solid #000' : 'none' }}>조회 {(currentStory.viewers ?? []).length}</span>
+              <span onClick={() => setActiveTab('likes')} style={{ borderBottom: activeTab === 'likes' ? '2px solid #000' : 'none' }}>좋아요 {(currentStory.likers ?? []).length}</span>
             </div>
             <X onClick={() => setShowStats(false)} style={{ cursor: 'pointer' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {(activeTab === 'views' ? currentStory.viewers : currentStory.likers).map((user) => (
+            {(activeTab === 'views' ? (currentStory.viewers ?? []) : (currentStory.likers ?? [])).map((user) => (
               <div
                 key={user.userId}
                 role="button"

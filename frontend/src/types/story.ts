@@ -1,9 +1,13 @@
 import { MediaType } from './post';
 
+/** 백엔드 `StoryViewerUserResponse`와 동일 필드. `isLiked`·시각 필드는 목록 외 낙관적 갱신 등에서 생략 가능 */
 export interface StoryViewerUserResponse {
   userId: number;
   nickname: string;
   profileImageUrl: string | null;
+  isLiked?: boolean;
+  viewedAt?: string;
+  likedAt?: string | null;
 }
 
 export interface StoryFeedResponse {
@@ -26,8 +30,10 @@ export interface StoryDetailResponse {
   taggedUserIds: number[];
   totalLikeCount: number;
   isLiked: boolean;
-  viewers: StoryViewerUserResponse[];
-  likers: StoryViewerUserResponse[];
+  /** 작성자 본인 조회 시에만 채워짐; 그 외에는 null */
+  viewers: StoryViewerUserResponse[] | null;
+  /** 작성자 본인 조회 시에만 채워짐; 그 외에는 null */
+  likers: StoryViewerUserResponse[] | null;
 }
 
 export interface StoryViewResponse {

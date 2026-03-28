@@ -28,6 +28,15 @@ export const storyApi = {
     return res.data;
   },
 
+  /** 시청 기록 전송(베스트 에포트). 서버/네트워크 오류 시에도 예외를 던지지 않음 — 피어 재생 흐름용. */
+  recordViewSafe: async (storyId: number): Promise<void> => {
+    try {
+      await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`);
+    } catch {
+      /* 백엔드 5xx 등으로 실패해도 뷰어는 계속 동작 */
+    }
+  },
+
   // 스토리 좋아요 토글
   toggleLike: async (storyId: number): Promise<RsData<StoryViewResponse>> => {
     const res = await client.post<RsData<StoryViewResponse>>(`/story/${storyId}/like`);

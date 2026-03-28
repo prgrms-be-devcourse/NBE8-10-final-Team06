@@ -1,6 +1,7 @@
 // src/store/useAuthStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { syncAuthTokensFromCookies } from '../util/authStorageSync';
 import { useFollowLocalStore } from './useFollowLocalStore';
 import { useProfileImageCacheStore } from './useProfileImageCacheStore';
 
@@ -98,6 +99,7 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (_persisted, error) => {
         if (error) return;
+        syncAuthTokensFromCookies();
         const token = localStorage.getItem('accessToken');
         const ok =
           !!token &&

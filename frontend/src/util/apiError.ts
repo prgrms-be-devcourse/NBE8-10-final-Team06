@@ -44,13 +44,23 @@ export function getApiErrorMessage(
  *
  * 백엔드는 가능하면 만료·무효 토큰에 401을 쓰는 것이 권장됩니다.
  */
+/**
+ * HTTP 403 이지만 세션·토큰 문제로 로그아웃해야 할 때 true.
+ * - Spring Security 가 익명 사용자에게 띄우는 403(본문에 RsData resultCode 없음)은 만료·무효 JWT 와 동일하게 처리.
+ * - 서비스 레이어의 비즈니스 권한 거부(예: 403-F-1)는 false → 전역 로그아웃 안 함.
+ */
 export function shouldTreat403ResponseAsSessionExpired(data: unknown): boolean {
-  if (!data || typeof data !== "object") return false;
-  const code = (data as { resultCode?: unknown }).resultCode;
-  if (typeof code !== "string") return false;
-  const c = code.trim();
-  if (!c) return false;
-  if (c.startsWith("401")) return true;
-  if (/TOKEN|JWT|EXPIRED|UNAUTHORIZED|SESSION|REFRESH/i.test(c)) return true;
-  return false;
+  if (data == null) return true;
+  if (typeof data !== "object") return true;
+  const o = data as Record<string, unknown>;
+  const code = o.resultCode;
+  if (typeof code === "string" && code.trim()) {
+    const c = code.trim();
+    if (c.startsWith("403-")) return false;
+    if (c.startsWith("401")) return true;
+    if (/TOKEN|JWT|EXPIRED|UNAUTHORIZED|SESSION|REFRESH/i.test(c)) return true;
+    return false;
+  }
+  if (o.status === 403 || o.error === "Forbidden") return true;
+  return true;
 }
