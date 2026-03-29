@@ -21,6 +21,7 @@ import MainLayout from '../components/layout/MainLayout';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
 import { getApiErrorMessage } from '../util/apiError';
 import ProfileAvatar from '../components/common/ProfileAvatar';
+import TechRadarChart from '../components/profile/TechRadarChart';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
 
 const RESUME_MAP: Record<Resume, string> = {
@@ -783,15 +784,17 @@ const ProfilePage: React.FC = () => {
         )}
         {activeTab === 'tech' && (
           <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '12px' }}>
-            <h3 style={{ marginBottom: '20px', fontSize: '1rem', fontWeight: 'bold' }}>기술 스택 숙련도</h3>
-            {profile.topTechScores && profile.topTechScores.length > 0 ? profile.topTechScores.map(tech => (
-              <div key={tech.techName} style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}><strong>{tech.techName}</strong><span style={{ color: '#0095f6', fontWeight: 'bold' }}>{tech.score} pt</span></div>
-                <div style={{ width: '100%', height: '10px', backgroundColor: '#efefef', borderRadius: '5px', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min((tech.score / 500) * 100, 100)}%`, height: '100%', backgroundColor: '#0095f6', transition: 'width 1s ease-in-out' }} />
-                </div>
+            <h3 style={{ marginBottom: '8px', fontSize: '1rem', fontWeight: 'bold' }}>기술 스택 숙련도</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#8e8e8e' }}>
+              각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
+            </p>
+            {profile.topTechScores && profile.topTechScores.length > 0 ? (
+              <TechRadarChart scores={profile.topTechScores} maxScore={100} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p>
               </div>
-            )) : <div style={{ textAlign: 'center', padding: '40px 0' }}><p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p></div>}
+            )}
           </div>
         )}
         {activeTab === 'archive' && (
