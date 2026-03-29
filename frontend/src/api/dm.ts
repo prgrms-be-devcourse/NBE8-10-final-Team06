@@ -16,7 +16,9 @@ export const dmApi = {
   // 메시지 이력 조회 (Cursor 페이징)
   getMessages: (roomId: number, cursor?: number, size: number = 15) => {
     const params = new URLSearchParams();
-    if (cursor) params.append('cursor', cursor.toString());
+    if (cursor !== undefined && cursor !== null) {
+      params.append('cursor', String(cursor));
+    }
     params.append('size', size.toString());
     
     return client.get<RsData<DmMessageSliceResponse>>(`/dm/rooms/${roomId}/messages?${params.toString()}`)

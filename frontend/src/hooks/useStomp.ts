@@ -22,6 +22,11 @@ interface UseStompProps {
 export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
   const clientRef = useRef<Client | null>(null);
   const onConnectRef = useRef<(() => void) | undefined>(undefined);
+  const pendingSubsRef = useRef<
+    { destination: string; callback: (message: IMessage) => void; id: number }[]
+  >([]);
+  const pendingSubSeqRef = useRef(0);
+  const pendingPubsRef = useRef<{ destination: string; body: unknown }[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
@@ -38,6 +43,16 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
       onConnect: () => {
+        const pending = [...pendingSubsRef.current];
+        pendingSubsRef.current = [];
+        pending.forEach(({ destination, callback }) => {
+          client.subscribe(destination, callback);
+        });
+        const pubs = [...pendingPubsRef.current];
+        pendingPubsRef.current = [];
+        pubs.forEach(({ destination, body }) => {
+          client.publish({ destination, body: JSON.stringify(body) });
+        });
         setIsConnected(true);
         onConnectRef.current?.();
       },
@@ -56,6 +71,8 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
     clientRef.current = client;
 
     return () => {
+      pendingSubsRef.current = [];
+      pendingPubsRef.current = [];
       if (client.active) {
         client.deactivate();
       }
@@ -63,18 +80,28 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
   }, [endpoint]);
 
   const subscribe = useCallback((destination: string, callback: (message: IMessage) => void) => {
-    if (!clientRef.current || !clientRef.current.connected) return;
-    return clientRef.current.subscribe(destination, callback);
+    const c = clientRef.current;
+    if (!c) return undefined;
+    if (c.connected) {
+      return c.subscribe(destination, callback);
+    }
+    const sid = ++pendingSubSeqRef.current;
+    pendingSubsRef.current.push({ destination, callback, id: sid });
+    return {
+      unsubscribe: () => {
+        pendingSubsRef.current = pendingSubsRef.current.filter((p) => p.id !== sid);
+      },
+    };
   }, []);
 
-  const publish = useCallback((destination: string, body: any) => {
-    // 연결이 활성화되어 있을 때만 전송하고, 실패 시에는 조용히 넘김 (경고 제거)
-    if (clientRef.current && clientRef.current.connected && clientRef.current.active) {
-      clientRef.current.publish({
-        destination,
-        body: JSON.stringify(body)
-      });
+  const publish = useCallback((destination: string, body: unknown) => {
+    const c = clientRef.current;
+    if (c && c.connected && c.active) {
+      c.publish({ destination, body: JSON.stringify(body) });
+      return;
     }
+    // 연결 직전·일시 끊김 시 메시지가 유실되지 않도록 큐에 쌓았다가 onConnect 에서 전송
+    pendingPubsRef.current.push({ destination, body });
   }, []);
 
   return { isConnected, subscribe, publish };

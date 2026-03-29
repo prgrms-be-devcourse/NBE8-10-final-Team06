@@ -22,6 +22,8 @@ interface AuthState {
   setSessionProfileImageUrl: (url: string | null) => void;
   /** 닉네임만 바꿀 때 — accessToken·apiKey는 건드리지 않음(403 방지) */
   setSessionNickname: (nickname: string) => void;
+  /** /auth/me 등으로 확인한 실제 로그인 id — 저장소·DM 표시 정합성용 */
+  setSessionUserId: (userId: number) => void;
   setLogout: () => void;
 }
 
@@ -74,6 +76,11 @@ export const useAuthStore = create<AuthState>()(
       setSessionNickname: (nickname) => {
         localStorage.setItem('nickname', nickname);
         set({ nickname });
+      },
+
+      setSessionUserId: (userId) => {
+        localStorage.setItem('userId', String(userId));
+        set({ userId });
       },
 
       setSessionProfileImageUrl: (url) => set({ profileImageUrl: url }),

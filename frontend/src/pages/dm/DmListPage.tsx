@@ -4,11 +4,25 @@ import { ArrowLeft, Edit, MessageSquare, X, Check } from 'lucide-react';
 import { dmApi } from '../../api/dm';
 import { userApi } from '../../api/user';
 import { useDmStore } from '../../store/useDmStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import BottomNav from '../../components/layout/BottomNav';
 import { UserSearchResponse } from '../../types/user';
+import type { DmRoomSummaryResponse } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 
+function roomListTitle(room: DmRoomSummaryResponse, myUserId: number | null): string {
+  if (room.isGroup) return room.roomName || '그룹 채팅';
+  // GET /dm/rooms 요약은 본인을 participants 에서 제외하므로 1:1 에서 단일 요소가 곧 상대
+  if (room.participants.length === 1) {
+    return room.participants[0]?.nickname ?? room.roomName ?? '채팅';
+  }
+  const my = myUserId != null ? Number(myUserId) : NaN;
+  const other = room.participants.find((p) => Number(p.userId) !== my);
+  return other?.nickname ?? room.roomName ?? '채팅';
+}
+
 const DmListPage: React.FC = () => {
+  const myUserId = useAuthStore((s) => s.userId);
   const { rooms, setRooms, markAsRead } = useDmStore();
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -162,32 +176,40 @@ const DmListPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ padding: '10px 0' }}>
-            {rooms.map(room => (
-              <div key={room.roomId} onClick={() => { markAsRead(room.roomId); navigate(`/dm/${room.roomId}`); }} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', cursor: 'pointer', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, minWidth: 0 }}>
-                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                    {room.participants[0] ? (
-                      <ProfileAvatar
-                        fillContainer
-                        authorUserId={room.participants[0].userId}
-                        profileImageUrl={room.participants[0].profileImageUrl}
-                        nickname={room.participants[0].nickname}
-                      />
-                    ) : (
-                      <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{room.roomName ? room.roomName[0].toUpperCase() : '?'}</span>
-                    )}
+            {rooms.map((room) => {
+              const peer =
+                !room.isGroup && room.participants.length === 1
+                  ? room.participants[0]
+                  : !room.isGroup && myUserId != null
+                    ? room.participants.find((p) => Number(p.userId) !== Number(myUserId))
+                    : room.participants[0];
+              return (
+                <div key={room.roomId} onClick={() => { markAsRead(room.roomId); navigate(`/dm/${room.roomId}`); }} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', cursor: 'pointer', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, minWidth: 0 }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                      {peer ? (
+                        <ProfileAvatar
+                          fillContainer
+                          authorUserId={peer.userId}
+                          profileImageUrl={peer.profileImageUrl}
+                          nickname={peer.nickname}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{room.roomName ? room.roomName[0].toUpperCase() : '?'}</span>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#262626' }}>{roomListTitle(room, myUserId)}</div>
+                      <div style={{ fontSize: '0.85rem', color: room.unreadCount > 0 ? '#262626' : '#8e8e8e', fontWeight: room.unreadCount > 0 ? '700' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{room.lastMessage?.content || '대화 내용이 없습니다.'}</div>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#262626' }}>{room.roomName}</div>
-                    <div style={{ fontSize: '0.85rem', color: room.unreadCount > 0 ? '#262626' : '#8e8e8e', fontWeight: room.unreadCount > 0 ? '700' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{room.lastMessage?.content || '대화 내용이 없습니다.'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {room.unreadCount > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0095f6' }} />}
+                    <button onClick={(e) => handleLeaveRoom(e, room.roomId, room.isGroup)} style={{ color: '#ed4956', background: 'none', border: '1px solid #ed4956', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer' }}>나가기</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {room.unreadCount > 0 && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0095f6' }} />}
-                  <button onClick={(e) => handleLeaveRoom(e, room.roomId, room.isGroup)} style={{ color: '#ed4956', background: 'none', border: '1px solid #ed4956', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer' }}>나가기</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

@@ -1,7 +1,10 @@
-import type { RsData } from '../types/common';
+/** 백엔드 RsData.resultCode 성공 판별 (200-S-1 등) */
+export function isRsSuccess(resultCode: string | undefined | null): boolean {
+  if (!resultCode) return false;
+  return resultCode.startsWith('200') || resultCode.includes('-S-');
+}
 
-/** Spring RsData 성공 코드 (예: 200-0, …-S-…) */
-export function isRsDataSuccess(res: Pick<RsData<unknown>, 'resultCode'> | undefined | null): boolean {
-  const c = res?.resultCode;
-  return !!(c?.includes('-S-') || c?.startsWith('200'));
+/** RsData 전체 객체에 대한 성공 판별 (기존 호출부 호환) */
+export function isRsDataSuccess(res: { resultCode?: string | null } | null | undefined): boolean {
+  return isRsSuccess(res?.resultCode ?? null);
 }

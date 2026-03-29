@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Loader2 } from 'lucide-react';
 import { userApi } from '../../api/user';
 import { dmApi } from '../../api/dm';
+import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { UserSearchResponse } from '../../types/user';
@@ -25,13 +26,22 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<UserSearchResponse[]>([]);
   const [submittingId, setSubmittingId] = useState<number | null>(null);
+  /** JWT 기준 실제 로그인 id — 스토어 userId와 불일치 시 자기 자신 오인 방지 */
+  const [resolvedSelfId, setResolvedSelfId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) {
       setKeyword('');
       setResults([]);
       setSubmittingId(null);
+      setResolvedSelfId(null);
+      return;
     }
+    void authApi.me().then((res) => {
+      if (res.resultCode?.startsWith('200') || res.resultCode?.includes('-S-')) {
+        setResolvedSelfId(Number(res.data.id));
+      }
+    });
   }, [open]);
 
   useEffect(() => {
@@ -56,7 +66,20 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
 
   const handlePick = useCallback(
     async (user: UserSearchResponse) => {
-      if (myUserId != null && user.userId === myUserId) {
+      let selfId = resolvedSelfId;
+      if (selfId == null) {
+        try {
+          const meRes = await authApi.me();
+          if (meRes.resultCode?.startsWith('200') || meRes.resultCode?.includes('-S-')) {
+            selfId = Number(meRes.data.id);
+          }
+        } catch {
+          /* 아래 스토어 id로 폴백 */
+        }
+      }
+      const storeSelf = myUserId != null ? Number(myUserId) : null;
+      const effectiveSelf = selfId ?? storeSelf;
+      if (effectiveSelf != null && Number(user.userId) === effectiveSelf) {
         alert('자기 자신에게는 보낼 수 없습니다.');
         return;
       }
@@ -81,7 +104,7 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
         setSubmittingId(null);
       }
     },
-    [payloads, myUserId, navigate, onClose, setRooms]
+    [payloads, myUserId, resolvedSelfId, navigate, onClose, setRooms]
   );
 
   if (!open) return null;
@@ -131,7 +154,10 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
         </div>
         <div style={{ overflowY: 'auto', flex: 1, minHeight: '200px' }}>
           {results
-            .filter((u) => myUserId == null || u.userId !== myUserId)
+            .filter((u) => {
+              const self = resolvedSelfId ?? (myUserId != null ? Number(myUserId) : null);
+              return self == null || Number(u.userId) !== self;
+            })
             .map((u) => (
               <button
                 key={u.userId}
@@ -156,7 +182,11 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
                 {submittingId === u.userId && <Loader2 className="animate-spin" size={18} style={{ marginLeft: 'auto' }} />}
               </button>
             ))}
-          {keyword.trim() && results.filter((u) => myUserId == null || u.userId !== myUserId).length === 0 && (
+          {keyword.trim() &&
+            results.filter((u) => {
+              const self = resolvedSelfId ?? (myUserId != null ? Number(myUserId) : null);
+              return self == null || Number(u.userId) !== self;
+            }).length === 0 && (
             <p style={{ padding: '24px', textAlign: 'center', color: '#8e8e8e', fontSize: '0.9rem' }}>검색 결과가 없습니다.</p>
           )}
         </div>
