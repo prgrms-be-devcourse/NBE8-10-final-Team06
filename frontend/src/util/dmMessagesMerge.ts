@@ -5,6 +5,16 @@ import { dmMessageDedupeKey } from './dmMessageDedupe';
  * 최신 페이지(getMessages 기본)만으로 받은 메시지를 기존 목록에 합친다.
  * 이미 위로 스크롤해 불러온 과거 메시지(id가 이번 배치에 없음)는 그대로 둔다.
  */
+function summarizeMergeMessages(label: string, list: DmMessageResponse[]) {
+  return {
+    label,
+    length: list.length,
+    ids: list.map((m) => m.id),
+    senderIds: list.map((m) => m.senderId),
+    keys: list.map((m) => dmMessageDedupeKey(m)),
+  };
+}
+
 export function mergePollSliceIntoMessages(
   prev: DmMessageResponse[],
   incomingChronological: DmMessageResponse[]
@@ -28,7 +38,17 @@ export function mergePollSliceIntoMessages(
     byId.set(m.id, m);
   }
 
-  return [...byId.values(), ...stillPending].sort(
+  const merged = [...byId.values(), ...stillPending].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[DM mergePollSlice]', {
+      prev: summarizeMergeMessages('prev', prev),
+      incoming: summarizeMergeMessages('incoming', incomingChronological),
+      merged: summarizeMergeMessages('merged', merged),
+    });
+  }
+
+  return merged;
 }

@@ -1,9 +1,50 @@
 // src/hooks/useStomp.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Client, IMessage } from '@stomp/stompjs';
+import { Client, IMessage, type IFrame } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { syncAuthTokensFromCookies } from '../util/authStorageSync';
 import { getCookie } from '../util/cookies';
+
+/** DM 디버그 패널용 — CONNECT 토큰 유무·STOMP ERROR·WS 종료 시각 (토큰 원문은 넣지 않음) */
+export type StompClientDiagnostics = {
+  lastConnectAttemptAt: string | null;
+  connectHeadersHadToken: boolean;
+  tokenLength: number;
+  lastConnectedAt: string | null;
+  lastStompError: {
+    command: string;
+    headerMessage?: string;
+    headers: Record<string, string>;
+    body: string;
+    at: string;
+  } | null;
+  lastWebSocketClose: {
+    code: number;
+    reason: string;
+    wasClean: boolean;
+    at: string;
+  } | null;
+};
+
+const initialDiagnostics: StompClientDiagnostics = {
+  lastConnectAttemptAt: null,
+  connectHeadersHadToken: false,
+  tokenLength: 0,
+  lastConnectedAt: null,
+  lastStompError: null,
+  lastWebSocketClose: null,
+};
+
+function frameHeadersToRecord(headers: IFrame['headers']): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (headers && typeof headers === 'object') {
+    for (const k of Object.keys(headers)) {
+      const v = (headers as Record<string, unknown>)[k];
+      out[k] = v == null ? '' : String(v);
+    }
+  }
+  return out;
+}
 
 function resolveAccessTokenForStomp(): string {
   syncAuthTokensFromCookies();
@@ -17,9 +58,15 @@ function resolveAccessTokenForStomp(): string {
 interface UseStompProps {
   endpoint: string;
   onConnect?: () => void;
+  /**
+   * 값이 바뀌면 STOMP 클라이언트를 새로 만든다. CONNECT 시 JWT(Authorization·accessToken)를 다시 심기 위함.
+   * 서버는 CONNECT 로 Principal 을 세션에 두고 SEND 마다 SecurityContext 를 복원하므로 DM message/read 가 동작한다.
+   * 토큰이 늦게 생기면 인증 없이 붙은 연검이 남지 않도록 reconnectKey 로 재연결한다.
+   */
+  reconnectKey?: string;
 }
 
-export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
+export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompProps) => {
   const clientRef = useRef<Client | null>(null);
   const onConnectRef = useRef<(() => void) | undefined>(undefined);
   const pendingSubsRef = useRef<
@@ -28,17 +75,32 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
   const pendingSubSeqRef = useRef(0);
   const pendingPubsRef = useRef<{ destination: string; body: unknown }[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [stompDiagnostics, setStompDiagnostics] = useState<StompClientDiagnostics>(initialDiagnostics);
 
   useEffect(() => {
     onConnectRef.current = onConnect;
   }, [onConnect]);
 
   useEffect(() => {
+    setIsConnected(false);
     const token = resolveAccessTokenForStomp();
-    const socket = new SockJS(endpoint);
+    const connectHeaders: Record<string, string> = {};
+    if (token) {
+      connectHeaders.Authorization = `Bearer ${token}`;
+      // StompAuthChannelInterceptor: Authorization 없을 때 accessToken 네이티브 헤더 폴백
+      connectHeaders.accessToken = token;
+    }
+
+    setStompDiagnostics({
+      ...initialDiagnostics,
+      lastConnectAttemptAt: new Date().toISOString(),
+      connectHeadersHadToken: !!token,
+      tokenLength: token.length,
+    });
+
     const client = new Client({
-      webSocketFactory: () => socket,
-      connectHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+      webSocketFactory: () => new SockJS(endpoint),
+      connectHeaders,
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -54,15 +116,40 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
           client.publish({ destination, body: JSON.stringify(body) });
         });
         setIsConnected(true);
+        setStompDiagnostics((d) => ({
+          ...d,
+          lastConnectedAt: new Date().toISOString(),
+          lastStompError: null,
+        }));
         onConnectRef.current?.();
       },
       onDisconnect: () => {
         setIsConnected(false);
       },
-      onStompError: (frame) => {
+      onStompError: (frame: IFrame) => {
+        setStompDiagnostics((d) => ({
+          ...d,
+          lastStompError: {
+            command: frame.command,
+            headerMessage: frame.headers?.message,
+            headers: frameHeadersToRecord(frame.headers),
+            body: frame.body ?? '',
+            at: new Date().toISOString(),
+          },
+        }));
         setIsConnected(false);
       },
-      onWebSocketClose: () => {
+      onWebSocketClose: (evt: Event) => {
+        const e = evt as CloseEvent;
+        setStompDiagnostics((d) => ({
+          ...d,
+          lastWebSocketClose: {
+            code: typeof e.code === 'number' ? e.code : 0,
+            reason: e.reason ?? '',
+            wasClean: !!e.wasClean,
+            at: new Date().toISOString(),
+          },
+        }));
         setIsConnected(false);
       }
     });
@@ -77,7 +164,7 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
         client.deactivate();
       }
     };
-  }, [endpoint]);
+  }, [endpoint, reconnectKey]);
 
   const subscribe = useCallback((destination: string, callback: (message: IMessage) => void) => {
     const c = clientRef.current;
@@ -104,5 +191,5 @@ export const useStomp = ({ endpoint, onConnect }: UseStompProps) => {
     pendingPubsRef.current.push({ destination, body });
   }, []);
 
-  return { isConnected, subscribe, publish };
+  return { isConnected, subscribe, publish, stompDiagnostics };
 };

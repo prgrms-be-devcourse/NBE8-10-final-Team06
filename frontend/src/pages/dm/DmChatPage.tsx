@@ -1,46 +1,52 @@
 // src/pages/dm/DmChatPage.tsx
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info, Image as ImageIcon, PlayCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { dmApi } from '../../api/dm';
 import { authApi } from '../../api/auth';
-import { storyApi } from '../../api/story';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { useStomp } from '../../hooks/useStomp';
 import type { SignupResponse } from '../../types/auth';
-import {
-  DmMessageResponse,
-  MessageType,
-  WebSocketEventPayload,
-  type DmMessageSliceResponse,
-  type DmSendMessageRequest,
-} from '../../types/dm';
+import { DmMessageResponse, MessageType, type DmMessageSliceResponse, type DmSendMessageRequest } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
-import { resolveDmAttachment } from '../../util/dmAttachment';
+import { DmChatMessageRow } from '../../components/dm/DmChatMessageRow';
+import { DmTypingBubbleRow } from '../../components/dm/DmTypingBubbleRow';
 import {
-  dmMessageDedupeKey,
-  isDmMessageLikelyMine,
+  computeDmMessageIsMe,
+  isDmTypingBubbleMine,
+  isResolvedDmUserId,
   normalizeDmMessagesFromApi,
+  toDmPositiveUserId,
 } from '../../util/dmMessageDedupe';
-import { takePendingDmBatch } from '../../services/dmPendingSend';
 import { mergeServerWithShareBackup, persistShareBackup, pruneShareBackupByServer } from '../../services/dmSharePersistence';
+import { fetchDmFirstPageIfStillInRoom, fetchDmPollMergeIfStillInRoom } from '../../util/dmRoomServerReconcile';
 import {
-  extractDmMessageFromStompBody,
-  getReadMessageIdFromDmEvent,
-  getTypingFieldsFromDmEvent,
-  parseDmMessagePayload,
-  parseDmWebSocketJson,
-  parseWrappedDmMessageEvent,
-  stompMessageBodyToString,
-} from '../../util/dmWebSocketPayload';
+  buildDmStompMessageBody,
+  dmStompAppJoin,
+  dmStompAppLeave,
+  dmStompAppMessage,
+  dmStompAppRead,
+  dmStompAppTyping,
+} from '../../util/dmStompDestinations';
 import { isRsSuccess } from '../../util/rsData';
 import { mergePollSliceIntoMessages } from '../../util/dmMessagesMerge';
 import { readJwtSubAsUserId } from '../../util/jwtUserId';
+import { syncAuthTokensFromCookies } from '../../util/authStorageSync';
 import DmRoomInfoModal from '../../components/dm/DmRoomInfoModal';
+import { useDmRoomStomp } from '../../hooks/useDmRoomStomp';
+import {
+  DM_CLIENT_TYPING_START_REFRESH_MS,
+  DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS,
+} from '../../util/dmTypingClient';
+import { debugAgentLogA7f850 } from '../../util/debugAgentLogA7f850';
 
-/** 채팅창 REST 폴링 주기(ms) — STOMP 누락 시에도 메시지 동기화 */
-const DM_POLL_INTERVAL_MS = 400;
+/**
+ * 채팅창 REST 폴링(백업). 이전 400ms 고정은 네트워크 탭에 연속 요청처럼 보이고 부하가 커서,
+ * STOMP 연결 시에는 긴 간격만 두고, WS 미연결 시에만 더 자주 맞춘다.
+ */
+const DM_POLL_INTERVAL_CONNECTED_MS = 12_000;
+const DM_POLL_INTERVAL_DISCONNECTED_MS = 4_000;
 
 /** /auth/me data.id 와 일부 환경의 userId 별칭 */
 function readMeUserId(data: SignupResponse): number | null {
@@ -51,126 +57,33 @@ function readMeUserId(data: SignupResponse): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// --- 유틸리티: 스토리 만료 여부 체크 ---
-const checkIsExpired = (content: string, type: string) => {
-  if (type !== 'STORY') return false;
-  const match = content.match(/v=(\d+)/);
-  if (!match) return false;
-  const createdTime = parseInt(match[1]);
-  const now = Date.now();
-  const createdMillis = createdTime < 10000000000 ? createdTime * 1000 : createdTime;
-  return (now - createdMillis) > 24 * 60 * 60 * 1000;
-};
-
-/** 서버 목록에 아직 없는 임시(음수 id) 메시지는 유지해 공유 카드가 잠깐 보였다 사라지지 않게 함 */
-const mergeServerMessagesWithOptimistic = (
-  prev: DmMessageResponse[],
-  serverChronological: DmMessageResponse[]
-): DmMessageResponse[] => {
-  const optimistic = prev.filter((m) => m.id < 0);
-  if (optimistic.length === 0) return serverChronological;
-  const serverKeys = new Set(serverChronological.map((m) => dmMessageDedupeKey(m)));
-  const stillPending = optimistic.filter((o) => !serverKeys.has(dmMessageDedupeKey(o)));
-  if (stillPending.length === 0) return serverChronological;
-  return [...serverChronological, ...stillPending].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
-};
-
-// --- 첨부 카드 컴포넌트 ---
-const AttachmentCard = ({ type, id, isValid, onClick }: { type: 'post' | 'story', id: string, isValid: boolean, onClick: () => void }) => {
-  const isExpired = !isValid;
-  return (
-    <div onClick={isExpired ? undefined : onClick} style={{ width: '240px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #dbdbdb', cursor: isExpired ? 'default' : 'pointer', backgroundColor: isExpired ? '#fafafa' : '#fff', marginTop: '5px', opacity: isExpired ? 0.6 : 1, position: 'relative' }}>
-      <div style={{ height: '140px', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', filter: isExpired ? 'grayscale(1)' : 'none' }}>
-        {type === 'post' ? <ImageIcon size={40} color="#8e8e8e" /> : <PlayCircle size={40} color="#0095f6" />}
-        {isExpired && (
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <AlertCircle size={32} color="#ed4956" />
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ed4956' }}>만료된 콘텐츠</span>
-          </div>
-        )}
-        <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '0.7rem', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold' }}>
-          {type === 'post' ? '게시물' : '스토리'}
-        </div>
-      </div>
-      <div style={{ padding: '12px', borderTop: '1px solid #efefef' }}>
-        <div style={{ fontSize: '0.85rem', color: isExpired ? '#8e8e8e' : '#262626', fontWeight: '600' }}>
-          {isExpired ? '볼 수 없는 콘텐츠입니다' : (type === 'post' ? '게시물 보기' : '스토리 보기')}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- 메시지 아이템 컴포넌트 ---
-const MessageItem = ({ msg, isMe, navigate, showReadStatus }: { msg: DmMessageResponse; isMe: boolean; navigate: ReturnType<typeof useNavigate>; showReadStatus: boolean; }) => {
-  const attachmentData = resolveDmAttachment(msg);
-  const isValid = msg.valid && !checkIsExpired(msg.content, attachmentData?.type === 'story' ? 'STORY' : attachmentData?.type === 'post' ? 'POST' : '');
-
-  const openAttachment = async () => {
-    if (!attachmentData) return;
-    if (attachmentData.type === 'post') {
-      navigate(`/post/${attachmentData.id}`);
-      return;
-    }
-    const storyId = Number(attachmentData.id);
-    if (!Number.isFinite(storyId)) return;
-    const authorFallback = msg.content.match(/(?:^|[?&])u=(\d+)/);
-    const fallbackUserId = authorFallback ? Number(authorFallback[1]) : NaN;
-    try {
-      const res = await storyApi.recordView(storyId);
-      const ok = res.resultCode?.startsWith('200') || res.resultCode?.includes('-S-');
-      if (ok && res.data?.userId != null) {
-        navigate(`/story/${res.data.userId}`);
-        return;
-      }
-    } catch {
-      /* 시청 기록 API 실패 시 공유 링크의 작성자 id로 스토리 피드 진입 */
-    }
-    if (Number.isFinite(fallbackUserId) && fallbackUserId > 0) {
-      navigate(`/story/${fallbackUserId}`);
-      return;
-    }
-    alert('스토리를 열 수 없습니다.');
-  };
-
-  return (
-    <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: '16px' }}>
-      <div style={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', flexDirection: isMe ? 'row' : 'row-reverse' }}>
-          {isMe && (
-            <span style={{ fontSize: '0.7rem', color: '#0095f6', fontWeight: 'bold', visibility: showReadStatus ? 'hidden' : 'visible' }}>1</span>
-          )}
-          {!attachmentData ? (
-            <div style={{ padding: '12px 16px', borderRadius: '22px', fontSize: '0.95rem', backgroundColor: isMe ? '#efefef' : '#fff', border: isMe ? 'none' : '1px solid #dbdbdb', color: '#262626', wordBreak: 'break-word' }}>
-              {msg.content}
-            </div>
-          ) : (
-            <AttachmentCard type={attachmentData.type as 'post' | 'story'} id={attachmentData.id} isValid={isValid} onClick={() => { void openAttachment(); }} />
-          )}
-        </div>
-        <span style={{ fontSize: '0.65rem', color: '#8e8e8e', marginTop: '4px', padding: '0 4px' }}>
-          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      </div>
-    </div>
-  );
-};
-
 const DmChatPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { userId, setSessionUserId, nickname: myNickname } = useAuthStore();
+  const { userId, setSessionUserId, nickname: myNickname, isLoggedIn } = useAuthStore();
   /** JWT sub + /auth/me 로 확정한 본인 id — 스토어 userId 오염·me 지연 시에도 말풍선·typing 이 맞게 */
   const [selfIdFromJwt, setSelfIdFromJwt] = useState<number | null>(() => readJwtSubAsUserId());
-  const effectiveSelfId = useMemo(() => {
-    if (selfIdFromJwt != null && Number.isFinite(selfIdFromJwt)) return selfIdFromJwt;
-    const fromToken = readJwtSubAsUserId();
+  /** `/auth/me` 의 숫자 id 만 별도 보관 — JWT sub 와 불일치해도 타이핑 에코·상대 추론에 서버 기준을 쓴다 */
+  const [authMeNumericId, setAuthMeNumericId] = useState<number | null>(null);
+  /** 양의 정수 확정 시에만 숫자, 미확정은 null (NaN 을 쓰지 않아 말풍선 폴백 꼬임 방지) */
+  const effectiveSelfId = useMemo((): number | null => {
+    const fromJwt = toDmPositiveUserId(selfIdFromJwt);
+    if (fromJwt != null) return fromJwt;
+    const fromToken = toDmPositiveUserId(readJwtSubAsUserId());
     if (fromToken != null) return fromToken;
-    if (userId != null && Number.isFinite(Number(userId))) return Number(userId);
-    return Number.NaN;
+    return toDmPositiveUserId(userId);
   }, [selfIdFromJwt, userId]);
+  /**
+   * STOMP 타이핑 에코 억제용 본인 id — 스토어 userId 는 제외(상대 id 로 오염되면 상대 typing 이 전부 막힘).
+   * 순서: /auth/me → selfIdFromJwt → JWT sub
+   */
+  const selfIdForTypingEcho = useMemo((): number | null => {
+    return (
+      toDmPositiveUserId(authMeNumericId) ??
+      toDmPositiveUserId(selfIdFromJwt) ??
+      toDmPositiveUserId(readJwtSubAsUserId())
+    );
+  }, [authMeNumericId, selfIdFromJwt]);
   const myUserIdNum = effectiveSelfId;
   const myNickNorm = myNickname?.trim().toLowerCase() ?? '';
   const { rooms, markAsRead, setRooms } = useDmStore();
@@ -186,7 +99,7 @@ const DmChatPage: React.FC = () => {
     if (!currentRoom) return null;
     if (currentRoom.isGroup) return currentRoom.participants[0] ?? null;
     const parts = currentRoom.participants;
-    const selfIdOk = Number.isFinite(myUserIdNum);
+    const selfIdOk = myUserIdNum != null;
 
     const notSelfByNick = (p: (typeof parts)[0]) => {
       const pn = p.nickname?.trim().toLowerCase() ?? '';
@@ -217,11 +130,84 @@ const DmChatPage: React.FC = () => {
     return nick && nick.length > 0 ? nick : '채팅';
   }, [currentRoom, headerPeer]);
 
+  /** 메시지·타이핑 말풍선 공통 — `computeDmMessageIsMe` 의 마지막 senderId 비교에 사용 */
+  const dmBubbleCtx = useMemo(
+    () => ({
+      isGroup: currentRoom?.isGroup ?? false,
+      opponentUserId: headerPeer?.userId,
+    }),
+    [currentRoom?.isGroup, headerPeer?.userId]
+  );
+
+  const typingOpponentNickname = useMemo((): string | null => {
+    if (!currentRoom || currentRoom.isGroup) return headerPeer?.nickname?.trim() ?? null;
+    if (headerPeer?.nickname?.trim()) return headerPeer.nickname.trim();
+    const selfGuess = selfIdForTypingEcho;
+    const parts = currentRoom.participants;
+    if (selfGuess != null) {
+      const other = parts.find((p) => toDmPositiveUserId(p.userId) !== selfGuess);
+      if (other?.nickname?.trim()) return other.nickname.trim();
+    }
+    return parts[0]?.nickname?.trim() ?? null;
+  }, [currentRoom, headerPeer, selfIdForTypingEcho]);
+
   const [messages, setMessages] = useState<DmMessageResponse[]>([]);
   const [inputValue, setInputValue] = useState('');
-  /** 상대 typing — 말풍선 영역에 표시 */
-  const [opponentTypingLabel, setOpponentTypingLabel] = useState<string | null>(null);
+  /** STOMP typing 이벤트 — 말풍선 좌우는 렌더 시 `senderId`(userId) 로 `computeDmMessageIsMe` 와 동일 규칙 적용 */
+  const [remoteTyping, setRemoteTyping] = useState<{ userId: number; text: string } | null>(null);
   const [isMeTyping, setIsMeTyping] = useState(false);
+  /**
+   * 로컬 타이핑 중 본인 STOMP 에코만 숨김.
+   * 타이핑 payload 의 userId 가 `/auth/me` 와 맞거나 JWT(`effectiveSelfId`) 와 맞는 경우가 있어 둘 다 에코 후보로 본다.
+   */
+  const showPeerTypingFromRemote = useMemo(() => {
+    if (!remoteTyping) return false;
+    if (!isMeTyping) return true;
+    const remoteU = toDmPositiveUserId(remoteTyping.userId);
+    if (remoteU == null) return true;
+    const echoMe = toDmPositiveUserId(selfIdForTypingEcho);
+    const jwtSelf = toDmPositiveUserId(myUserIdNum);
+    if (echoMe != null && remoteU === echoMe) return false;
+    if (jwtSelf != null && remoteU === jwtSelf) return false;
+    return true;
+  }, [remoteTyping, isMeTyping, myUserIdNum, selfIdForTypingEcho]);
+
+  // #region agent log
+  useEffect(() => {
+    if (!remoteTyping) return;
+    if (!showPeerTypingFromRemote) {
+      debugAgentLogA7f850({
+        runId: 'verify',
+        hypothesisId: 'H-hidden',
+        location: 'DmChatPage:remoteTypingFiltered',
+        message: 'remoteTyping set but peer row hidden',
+        data: {
+          remoteUserId: remoteTyping.userId,
+          selfIdForTypingEcho,
+          myUserIdNum,
+          isMeTyping,
+        },
+      });
+    }
+  }, [remoteTyping, showPeerTypingFromRemote, selfIdForTypingEcho, myUserIdNum, isMeTyping]);
+
+  useEffect(() => {
+    if (!showPeerTypingFromRemote || !remoteTyping) return;
+    debugAgentLogA7f850({
+      runId: 'h-ui',
+      hypothesisId: 'H-ui',
+      location: 'DmChatPage:showPeerTypingFromRemote',
+      message: 'peer typing row visible',
+      data: {
+        remoteUserId: remoteTyping.userId,
+        selfIdForTypingEcho,
+        myUserIdNum,
+        isMeTyping,
+      },
+    });
+  }, [showPeerTypingFromRemote, remoteTyping, selfIdForTypingEcho, myUserIdNum, isMeTyping]);
+  // #endregion
+
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -235,13 +221,35 @@ const DmChatPage: React.FC = () => {
       if (!isRsSuccess(res.resultCode) || res.data == null) return;
       const apiId = readMeUserId(res.data);
       if (apiId == null) return;
+      setAuthMeNumericId(apiId);
       setSelfIdFromJwt((prev) => (prev === apiId ? prev : apiId));
     });
   }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const topObserverRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /**
+   * 상대 원격 타이핑이 켜지면 항상 맨 아래로(타이핑 행이 스크롤 밖에 남는 재현 방지).
+   * 로컬 타이핑만 켜진 경우엔 하단 근처일 때만 스크롤.
+   */
+  useLayoutEffect(() => {
+    if (!showPeerTypingFromRemote && !isMeTyping) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    /** 상대 타이핑 행은 목록 맨 아래에 붙으므로, 하단 근처 조건 없이 내려야 뷰에 들어옴(이전 100px 조건으로는 안 보이는 재현 가능). */
+    if (showPeerTypingFromRemote) {
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    const nearBottomPx = 100;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (dist <= nearBottomPx) el.scrollTop = el.scrollHeight;
+  }, [showPeerTypingFromRemote, isMeTyping]);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 서버로 `start` 를 보낸 세션 — 전송·방 이동 시 `stop` 필요 여부 판별 */
+  const typingSessionActiveRef = useRef(false);
+  /** 서버 TYPING_IDLE_MS(3s) 리셋용: 마지막 `start` 전송 시각 */
+  const lastTypingStartSentAtRef = useRef(0);
   const optimisticMsgIdRef = useRef(-1);
   /** getMessages 응답 적용 전에 더 최신 요청이 있으면 무시 (초기 로드가 플러시 결과를 덮어쓰는 것 방지) */
   const messagesRefreshGenRef = useRef(0);
@@ -255,14 +263,44 @@ const DmChatPage: React.FC = () => {
   const effectiveSelfIdRef = useRef(effectiveSelfId);
   effectiveSelfIdRef.current = effectiveSelfId;
 
-  const { isConnected, subscribe, publish } = useStomp({ endpoint: '/ws' });
+  /** STOMP 타이핑 에코 억제 — 페이지에서 계산한 본인 id (me 우선) */
+  const typingEchoSelfUserIdRef = useRef<number | null>(null);
+  typingEchoSelfUserIdRef.current = selfIdForTypingEcho;
+  /** STOMP 타이핑 말풍선 닉 폴백 — participants 에 typing user 가 없을 때 */
+  const opponentTypingNicknameRef = useRef<string | null>(null);
+  opponentTypingNicknameRef.current = typingOpponentNickname;
+
+  /** 쿠키→localStorage 동기화 직후 토큰을 잡기 위해 몇 차례 리렌더 — useStomp reconnectKey 갱신 */
+  const [stompTokenRescan, setStompTokenRescan] = useState(0);
+  useEffect(() => {
+    const timeouts = [0, 120, 400].map((ms) =>
+      window.setTimeout(() => {
+        setStompTokenRescan((n) => n + 1);
+      }, ms)
+    );
+    return () => timeouts.forEach((id) => window.clearTimeout(id));
+  }, []);
+
+  const stompReconnectKey = useMemo(() => {
+    syncAuthTokensFromCookies();
+    const t = (localStorage.getItem('accessToken') ?? '').trim();
+    const tail = t.length > 12 ? t.slice(-16) : t;
+    return `${isLoggedIn ? 1 : 0}:${userId ?? ''}:${tail}`;
+  }, [isLoggedIn, userId, stompTokenRescan]);
+
+  const { isConnected, subscribe, publish } = useStomp({
+    endpoint: '/ws',
+    reconnectKey: stompReconnectKey,
+  });
 
   const mergeFreshSliceIntoMessages = useCallback((rid: number, slice: DmMessageSliceResponse) => {
     const normalized = normalizeDmMessagesFromApi(slice.messages ?? []);
     pruneShareBackupByServer(rid, normalized);
     const chronological = [...normalized].reverse();
     const merged = mergeServerWithShareBackup(rid, chronological);
-    setMessages((prev) => mergeServerMessagesWithOptimistic(prev, merged));
+    // mergePollSliceIntoMessages: REST 첫 페이지에 아직 없는 STOMP 실시간 메시지·스크롤로 불러온 과거 id 를 유지
+    // (이전 mergeServerMessagesWithOptimistic 은 낙관적 메시지가 없을 때 목록 전체를 slice 로 덮어 상대 메시지가 증발함)
+    setMessages((prev) => mergePollSliceIntoMessages(prev, merged));
     setNextCursor(slice.nextCursor);
     setHasNext(slice.hasNext);
   }, []);
@@ -270,8 +308,10 @@ const DmChatPage: React.FC = () => {
   const sendReadEvent = useCallback(
     (messageId: number) => {
       const actor = effectiveSelfIdRef.current;
-      if (!isConnected || messageId <= 0 || !Number.isFinite(actor)) return;
-      publish(`/app/dm/${roomId}/read`, { roomId: Number(roomId), userId: actor, messageId });
+      const ridStr = roomId;
+      if (!isConnected || messageId <= 0 || !isResolvedDmUserId(actor) || !ridStr) return;
+      const rid = Number(ridStr);
+      publish(dmStompAppRead(rid), { roomId: rid, userId: actor, messageId });
     },
     [isConnected, roomId, publish]
   );
@@ -301,6 +341,7 @@ const DmChatPage: React.FC = () => {
       if (!isRsSuccess(res.resultCode) || res.data == null) return;
       const apiId = readMeUserId(res.data);
       if (apiId == null) return;
+      setAuthMeNumericId(apiId);
       setSelfIdFromJwt(apiId);
       const storeId = useAuthStore.getState().userId;
       if (storeId == null || Number(storeId) !== apiId) {
@@ -313,6 +354,38 @@ const DmChatPage: React.FC = () => {
       });
     });
   }, [roomId, setSessionUserId, setRooms]);
+
+  const prevRoomIdStrForTypingRef = useRef<string | undefined>(undefined);
+  // `roomId` 가 바뀔 때만 이전 방에 typing stop + 로컬 타이머 정리 (`isConnected` 변화만으로는 초기화하지 않음)
+  useEffect(() => {
+    const was = prevRoomIdStrForTypingRef.current;
+    const roomChanged = was !== undefined && was !== roomId;
+
+    if (roomChanged && roomId) {
+      const prevNum = Number(was);
+      const actor = effectiveSelfIdRef.current;
+      if (
+        isConnected &&
+        Number.isFinite(prevNum) &&
+        isResolvedDmUserId(actor) &&
+        typingSessionActiveRef.current
+      ) {
+        publish(dmStompAppTyping(prevNum), { roomId: prevNum, userId: actor, status: 'stop' });
+      }
+    }
+
+    if (roomChanged) {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      typingSessionActiveRef.current = false;
+      lastTypingStartSentAtRef.current = 0;
+      setIsMeTyping(false);
+    }
+
+    prevRoomIdStrForTypingRef.current = roomId;
+  }, [roomId, isConnected, publish]);
 
   // 메시지 초기 로드 — sendReadEvent/isConnected에 묶이지 않음(불필요 재요청·세대 꼬임 방지)
   useEffect(() => {
@@ -337,27 +410,35 @@ const DmChatPage: React.FC = () => {
     });
   }, [roomId, mergeFreshSliceIntoMessages]);
 
-  // STOMP 실시간이 누락돼도 REST로 동기화 — 초기 로드 완료를 기다리지 않음(상대 메시지 지연 완화). visibility 로는 막지 않음(백그라운드 탭에서도 동기화).
+  // STOMP 실시간이 누락돼도 REST로 동기화(저빈도 백업). 백그라운드 탭에서는 요청 생략, 포그라운드 복귀 시 1회 동기화.
   useEffect(() => {
     if (!roomId) return;
     const rid = Number(roomId);
+    const intervalMs = isConnected ? DM_POLL_INTERVAL_CONNECTED_MS : DM_POLL_INTERVAL_DISCONNECTED_MS;
+
     const tick = () => {
       if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-      void dmApi.getMessages(rid).then((res) => {
-        if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-        if (!isRsSuccess(res.resultCode) || !res.data) return;
-        const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-        pruneShareBackupByServer(rid, normalized);
-        const incoming = [...normalized].reverse();
-        setMessages((prev) => mergePollSliceIntoMessages(prev, incoming));
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetchDmPollMergeIfStillInRoom(rid, roomIdRef, setMessages, {
+        beforeMerge: (r, normalized) => pruneShareBackupByServer(r, normalized),
+        afterMerge: (incoming) => {
+          if (incoming.length > 0) setIsLoading(false);
+        },
       });
     };
+
     tick();
-    const intervalId = window.setInterval(tick, DM_POLL_INTERVAL_MS);
+    const intervalId = window.setInterval(tick, intervalMs);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [roomId]);
+  }, [roomId, isConnected]);
 
   // 무한 스크롤 (이전 메시지 로드)
   const loadMoreMessages = useCallback(async () => {
@@ -403,237 +484,60 @@ const DmChatPage: React.FC = () => {
     return () => observer.disconnect();
   }, [loadMoreMessages]);
 
-  const toOptimisticDmMessages = (batch: DmSendMessageRequest[], sender: number): DmMessageResponse[] => {
-    const createdAt = new Date().toISOString();
-    return batch.map((pl, i) => ({
-      id: -(i + 1),
-      type: pl.type as MessageType,
-      content: pl.content,
-      thumbnail: pl.thumbnail ?? null,
-      valid: true,
-      createdAt,
-      senderId: sender,
-    }));
-  };
+  /**
+   * STOMP `/topic/dm.{roomId}` 구독·토픽 이벤트 처리·대기 전송 플러시.
+   * 서버는 CONNECT JWT 를 세션에 묶고 SEND 마다 SecurityContext 를 복원하므로 message/read 가 실시간으로 맞는다.
+   */
+  useDmRoomStomp({
+    roomId,
+    isConnected,
+    subscribe,
+    publish,
+    effectiveSelfIdRef,
+    typingEchoSelfUserIdRef,
+    roomIdRef,
+    typingPollDebounceRef,
+    scrollRef,
+    messagesRefreshGenRef,
+    sendReadEventRef,
+    mergeFreshSliceIntoMessages,
+    setMessages,
+    setIsLoading,
+    setRemoteTyping,
+    setLastReadIdByOpponent,
+    opponentTypingNicknameRef,
+    typingSessionActiveRef,
+  });
 
-  // STOMP 연결된 뒤에만 join / 구독 (미연결 시 subscribe 실패로 실시간 메시지 누락 방지)
+  /** 입장/퇴장은 본인 id 가 있을 때만 송신 (구독과 분리) */
   useEffect(() => {
-    if (!isConnected || !roomId) {
-      return () => {};
-    }
+    if (!isConnected || !roomId) return;
     const rid = Number(roomId);
     const actorId = effectiveSelfIdRef.current;
-    if (!Number.isFinite(actorId)) {
-      return () => {};
-    }
+    if (!isResolvedDmUserId(actorId)) return;
 
-    publish(`/app/dm/${rid}/join`, { roomId: rid, userId: actorId });
-
-    const flushTimer = window.setTimeout(() => {
-      const batch = takePendingDmBatch(rid);
-      if (!batch?.length) return;
-
-      persistShareBackup(rid, actorId, batch);
-
-      setIsLoading(false);
-      setMessages((prev) => {
-        const withoutTemp = prev.filter((m) => m.id >= 0);
-        return [...withoutTemp, ...toOptimisticDmMessages(batch, actorId)];
-      });
-
-      batch.forEach((pl) => publish(`/app/dm/${rid}/message`, pl));
-
-      messagesRefreshGenRef.current += 1;
-      const gen = messagesRefreshGenRef.current;
-      window.setTimeout(() => {
-        void dmApi.getMessages(rid).then((res) => {
-          if (gen !== messagesRefreshGenRef.current) return;
-          if (isRsSuccess(res.resultCode) && res.data) {
-            mergeFreshSliceIntoMessages(rid, res.data);
-            const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-            if (normalized.length > 0) {
-              sendReadEventRef.current(normalized[0].id);
-            }
-          }
-        });
-      }, 700);
-
-      setTimeout(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }, 0);
-    }, 450);
-
-    const onDmTopicMessage = (payloadBody: string) => {
-      const newMsg = extractDmMessageFromStompBody(payloadBody);
-      if (newMsg) {
-        pruneShareBackupByServer(rid, [newMsg]);
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === newMsg.id)) return prev;
-          const fp = dmMessageDedupeKey(newMsg);
-          const withoutMatchingTemp = prev.filter(
-            (m) => m.id >= 0 || dmMessageDedupeKey(m) !== fp
-          );
-          return [...withoutMatchingTemp, newMsg].sort(
-            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
-        });
-        const selfNow = effectiveSelfIdRef.current;
-        if (Number.isFinite(selfNow) && Number(newMsg.senderId) !== selfNow) {
-          sendReadEventRef.current(newMsg.id);
-        }
-        setTimeout(() => {
-          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }, 0);
-        return;
-      }
-
-      let event: WebSocketEventPayload<unknown>;
-      let parsedRoot: unknown;
-      try {
-        parsedRoot = parseDmWebSocketJson(payloadBody);
-        if (parsedRoot == null || typeof parsedRoot !== 'object') return;
-        event = parsedRoot as WebSocketEventPayload<unknown>;
-      } catch {
-        return;
-      }
-
-      const eventKind = String(event.type ?? '').toLowerCase();
-      switch (eventKind) {
-        case 'message': {
-          const fallbackMsg =
-            parseWrappedDmMessageEvent(parsedRoot) ?? parseDmMessagePayload(event.data);
-          if (!fallbackMsg) break;
-          pruneShareBackupByServer(rid, [fallbackMsg]);
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === fallbackMsg.id)) return prev;
-            const fp = dmMessageDedupeKey(fallbackMsg);
-            const withoutMatchingTemp = prev.filter(
-              (m) => m.id >= 0 || dmMessageDedupeKey(m) !== fp
-            );
-            return [...withoutMatchingTemp, fallbackMsg].sort(
-              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
-          });
-          const selfNow2 = effectiveSelfIdRef.current;
-          if (Number.isFinite(selfNow2) && Number(fallbackMsg.senderId) !== selfNow2) {
-            sendReadEventRef.current(fallbackMsg.id);
-          }
-          setTimeout(() => {
-            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-          }, 0);
-          break;
-        }
-        case 'typing': {
-          const t = getTypingFieldsFromDmEvent(event);
-          if (!t) break;
-          const typingUid = Number(t.userId);
-          if (!Number.isFinite(typingUid) || typingUid <= 0) break;
-
-          const roomSnap = useDmStore.getState().rooms.find((r) => r.roomId === rid);
-          const selfNow = effectiveSelfIdRef.current;
-
-          const runTypingPollDebounced = () => {
-            if (t.status !== 'start') return;
-            if (typingPollDebounceRef.current) window.clearTimeout(typingPollDebounceRef.current);
-            typingPollDebounceRef.current = window.setTimeout(() => {
-              typingPollDebounceRef.current = null;
-              if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-              void dmApi.getMessages(rid).then((res) => {
-                if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-                if (!isRsSuccess(res.resultCode) || !res.data) return;
-                const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-                pruneShareBackupByServer(rid, normalized);
-                const incoming = [...normalized].reverse();
-                setMessages((prev) => mergePollSliceIntoMessages(prev, incoming));
-              });
-            }, 280);
-          };
-
-          if (roomSnap?.isGroup) {
-            if (Number.isFinite(selfNow) && typingUid === selfNow) break;
-            const nick =
-              roomSnap.participants?.find((p) => Number(p.userId) === typingUid)?.nickname?.trim() ||
-              '상대방';
-            setOpponentTypingLabel(t.status === 'start' ? `${nick}님이 입력 중...` : null);
-            runTypingPollDebounced();
-            break;
-          }
-
-          const parts = roomSnap?.participants ?? [];
-          // 1:1에서 participant 1명만 오는 경우(상대만) — selfNow 오염과 무관하게 먼저 처리
-          if (parts.length === 1 && typingUid === Number(parts[0].userId)) {
-            const nick = parts[0].nickname?.trim() || '상대방';
-            setOpponentTypingLabel(t.status === 'start' ? `${nick}님이 입력 중...` : null);
-            runTypingPollDebounced();
-            break;
-          }
-
-          if (Number.isFinite(selfNow) && typingUid === selfNow) break;
-
-          // 1:1: 본인이 아닌 typing 은 상대로 표시(participants 2명·비어 있음 등)
-          if (Number.isFinite(selfNow) && typingUid !== selfNow) {
-            const nick =
-              parts.find((p) => Number(p.userId) === typingUid)?.nickname?.trim() ||
-              parts.find((p) => Number(p.userId) !== selfNow)?.nickname?.trim() ||
-              '상대방';
-            setOpponentTypingLabel(t.status === 'start' ? `${nick}님이 입력 중...` : null);
-            runTypingPollDebounced();
-            break;
-          }
-
-          break;
-        }
-        case 'read': {
-          const mid = getReadMessageIdFromDmEvent(event);
-          if (mid != null) {
-            setLastReadIdByOpponent((prev) => Math.max(prev, mid));
-          }
-          break;
-        }
-        case 'join':
-        case 'leave':
-          break;
-        default:
-          break;
-      }
-    };
-
-    const subscription = subscribe(`/topic/dm.${rid}`, (frame) => {
-      const payloadBody = stompMessageBodyToString(frame);
-      if (!payloadBody) return;
-      onDmTopicMessage(payloadBody);
-    });
-
-    const pollSoon = window.setTimeout(() => {
-      if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-      void dmApi.getMessages(rid).then((res) => {
-        if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-        if (!isRsSuccess(res.resultCode) || !res.data) return;
-        const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-        pruneShareBackupByServer(rid, normalized);
-        const incoming = [...normalized].reverse();
-        setMessages((prev) => mergePollSliceIntoMessages(prev, incoming));
-      });
-    }, 250);
+    publish(dmStompAppJoin(rid), { roomId: rid, userId: actorId });
 
     return () => {
-      window.clearTimeout(flushTimer);
-      window.clearTimeout(pollSoon);
-      if (typingPollDebounceRef.current) {
-        window.clearTimeout(typingPollDebounceRef.current);
-        typingPollDebounceRef.current = null;
+      const leaveId = effectiveSelfIdRef.current;
+      if (isResolvedDmUserId(leaveId)) {
+        publish(dmStompAppLeave(rid), { roomId: rid, userId: leaveId });
       }
-      setOpponentTypingLabel(null);
-      publish(`/app/dm/${rid}/leave`, { roomId: rid, userId: actorId });
-      subscription?.unsubscribe();
     };
-  }, [isConnected, roomId, userId, selfIdFromJwt, effectiveSelfId, subscribe, publish, mergeFreshSliceIntoMessages]);
+  }, [isConnected, roomId, effectiveSelfId, publish]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
     const actor = effectiveSelfIdRef.current;
-    if (!Number.isFinite(actor)) return;
+    if (!isResolvedDmUserId(actor)) {
+      console.error('[DM] handleSendMessage: 본인 userId 를 확정할 수 없어 전송하지 않습니다.', {
+        effectiveSelfIdRef: effectiveSelfIdRef.current,
+        effectiveSelfId,
+      });
+      alert('로그인 사용자 정보를 확인할 수 없습니다. 잠시 후 다시 시도하거나 다시 로그인해 주세요.');
+      return;
+    }
     const content = inputValue.trim();
     const tempId = optimisticMsgIdRef.current--;
     setMessages((prev) => [
@@ -650,37 +554,83 @@ const DmChatPage: React.FC = () => {
     ]);
     setInputValue('');
     const rid = Number(roomId);
-    persistShareBackup(rid, actor, [{ type: 'TEXT', content, thumbnail: null }]);
-    publish(`/app/dm/${rid}/message`, { type: 'TEXT', content, thumbnail: null });
+    const sendPl: DmSendMessageRequest = { type: 'TEXT', content, thumbnail: null };
+    persistShareBackup(rid, actor, [sendPl]);
+    const destination = dmStompAppMessage(rid);
+    const stompBody = buildDmStompMessageBody(sendPl);
+    publish(destination, stompBody);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (typingSessionActiveRef.current && isResolvedDmUserId(actor)) {
+      publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+      console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
+      typingSessionActiveRef.current = false;
+      lastTypingStartSentAtRef.current = 0;
+    }
     setIsMeTyping(false);
-    [400, 1200, 2800].forEach((ms) => {
-      window.setTimeout(() => {
-        if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-        void dmApi.getMessages(rid).then((res) => {
-          if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
-          if (isRsSuccess(res.resultCode) && res.data) {
-            mergeFreshSliceIntoMessages(rid, res.data);
-          }
-        });
-      }, ms);
-    });
+    /** STOMP `message` 수신이 1차 동기화 — 한 번 REST 로 낙관적 id·서버 스냅샷 정합만 맞춘다 */
+    window.setTimeout(() => {
+      fetchDmFirstPageIfStillInRoom(rid, roomIdRef, (slice) => mergeFreshSliceIntoMessages(rid, slice));
+    }, 700);
     // 하단 이동
     setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 0);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const nextVal = e.target.value;
+    setInputValue(nextVal);
     const actor = effectiveSelfIdRef.current;
-    if (!Number.isFinite(actor)) return;
+    const rid = roomId != null ? Number(roomId) : NaN;
+    if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
+
+    if (nextVal.trim() === '') {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingSessionActiveRef.current) {
+        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
+      }
+      setIsMeTyping(false);
+      return;
+    }
+
+    const typingDest = dmStompAppTyping(rid);
+    const typingBody = { roomId: rid, userId: actor, status: 'start' as const };
+    const now = Date.now();
+
     if (!isMeTyping) {
       setIsMeTyping(true);
-      publish(`/app/dm/${roomId}/typing`, { roomId: Number(roomId), userId: actor, status: 'start' });
+      publish(typingDest, typingBody);
+      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
+      typingSessionActiveRef.current = true;
+      lastTypingStartSentAtRef.current = now;
+    } else if (
+      typingSessionActiveRef.current &&
+      now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
+    ) {
+      // 백엔드는 마지막 start 기준 3초 후 자동 stop — 연속 입력 중에도 주기적으로 start 로 타이머 리셋
+      publish(typingDest, typingBody);
+      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
+      lastTypingStartSentAtRef.current = now;
     }
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       setIsMeTyping(false);
-      publish(`/app/dm/${roomId}/typing`, { roomId: Number(roomId), userId: actor, status: 'stop' });
-    }, 2000);
+      if (typingSessionActiveRef.current) {
+        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'idle_timeout' });
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
+      }
+      typingTimeoutRef.current = null;
+    }, DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS);
   };
 
   const handleLeaveRoom = async () => {
@@ -738,54 +688,44 @@ const DmChatPage: React.FC = () => {
         </div>
       </header>
 
-      <main ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+      <main
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* 상단 무한 스크롤 관찰 포인트 */}
         <div ref={topObserverRef} style={{ height: '10px' }} />
         {isFetchingMore && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px' }}><Loader2 className="animate-spin" size={20} color="#8e8e8e" /></div>}
-        
+
         {isLoading && messages.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#8e8e8e', marginTop: '20px' }}>로드 중...</p>
         ) : (
           messages.map((msg, idx) => (
-            <MessageItem
+            <DmChatMessageRow
               key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
               msg={msg}
-              isMe={isDmMessageLikelyMine(msg, myUserIdNum, {
-                isGroup: currentRoom?.isGroup ?? false,
-                opponentUserId: headerPeer?.userId,
-              })}
-              navigate={navigate}
+              isMe={computeDmMessageIsMe(msg, myUserIdNum, dmBubbleCtx)}
               showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
             />
           ))
         )}
 
-        {opponentTypingLabel && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '10px' }}>
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: '22px',
-                backgroundColor: '#fff',
-                border: '1px solid #dbdbdb',
-                fontSize: '0.85rem',
-                color: '#8e8e8e',
-                fontStyle: 'italic',
-                maxWidth: '75%',
-              }}
-            >
-              {opponentTypingLabel}
-            </div>
-          </div>
-        )}
-
-        {isMeTyping && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-            <div style={{ padding: '8px 12px', borderRadius: '15px', backgroundColor: '#efefef', fontSize: '0.8rem', color: '#8e8e8e', fontStyle: 'italic' }}>
-              입력 중...
-            </div>
-          </div>
-        )}
+        {/* 원격 타이핑: `showPeerTypingFromRemote` 가 켜진 경우만 렌더하므로 항상 상대 말풍선(왼쪽·회색). isDmTypingBubbleMine 은 본인 id 미확정 시 1:1 추론에서 오판할 수 있음. */}
+        {showPeerTypingFromRemote && remoteTyping ? (
+          <DmTypingBubbleRow text={remoteTyping.text} isMe={false} />
+        ) : null}
+        {isMeTyping && isResolvedDmUserId(myUserIdNum) ? (
+          <DmTypingBubbleRow
+            text="입력 중..."
+            isMe={isDmTypingBubbleMine(myUserIdNum, myUserIdNum, dmBubbleCtx)}
+          />
+        ) : null}
       </main>
 
       <footer style={{ padding: '20px' }}>
