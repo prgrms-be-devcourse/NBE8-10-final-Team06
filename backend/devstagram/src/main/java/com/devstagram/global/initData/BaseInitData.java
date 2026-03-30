@@ -1,8 +1,5 @@
 package com.devstagram.global.initData;
 
-import com.devstagram.domain.technology.entity.UserTechScore;
-import com.devstagram.domain.technology.repository.UserTechScoreRepository;
-import com.devstagram.domain.user.repository.FollowRepository;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,20 +34,20 @@ import com.devstagram.domain.story.repository.StoryTagRepository;
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.TechCategory;
 import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.domain.user.service.AuthService;
 import com.devstagram.domain.user.service.FollowService;
 import com.devstagram.global.enumtype.MediaType;
-import com.devstagram.domain.technology.entity.UserTechScore;
-import com.devstagram.domain.technology.repository.UserTechScoreRepository;
-import com.devstagram.domain.user.repository.FollowRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -146,28 +143,28 @@ public class BaseInitData implements ApplicationRunner {
     private void createUsers() {
         // 1. 닉네임 배열 (10명)
         String[] nicknames = {
-                "admin", "user1", "user2", "user3", "user4",
-                "user5", "user6", "user7", "user8", "user9"
+            "admin", "user1", "user2", "user3", "user4",
+            "user5", "user6", "user7", "user8", "user9"
         };
 
         // 2. 이메일 배열 (10명)
         String[] emails = {
-                "admin@test.com", "user1@test.com", "user2@test.com", "user3@test.com", "user4@test.com",
-                "user5@test.com", "user6@test.com", "user7@test.com", "user8@test.com", "user9@test.com"
+            "admin@test.com", "user1@test.com", "user2@test.com", "user3@test.com", "user4@test.com",
+            "user5@test.com", "user6@test.com", "user7@test.com", "user8@test.com", "user9@test.com"
         };
 
         // 3. 이력/경력 상태 배열 (다양하게 섞음)
         Resume[] resumes = {
-                Resume.SENIOR,       // admin
-                Resume.JUNIOR,       // user1
-                Resume.UNDERGRADUATE, // user2
-                Resume.INTERMEDIATE,  // user3
-                Resume.SENIOR,       // user4
-                Resume.JUNIOR,       // user5
-                Resume.INTERMEDIATE,  // user6
-                Resume.SENIOR,       // user7
-                Resume.UNDERGRADUATE, // user8
-                Resume.JUNIOR        // user9
+            Resume.SENIOR, // admin
+            Resume.JUNIOR, // user1
+            Resume.UNDERGRADUATE, // user2
+            Resume.INTERMEDIATE, // user3
+            Resume.SENIOR, // user4
+            Resume.JUNIOR, // user5
+            Resume.INTERMEDIATE, // user6
+            Resume.SENIOR, // user7
+            Resume.UNDERGRADUATE, // user8
+            Resume.JUNIOR // user9
         };
 
         // 4. 데이터 생성 루프
@@ -179,8 +176,7 @@ public class BaseInitData implements ApplicationRunner {
                     LocalDate.of(1990 + (i % 10), (i % 12) + 1, (i % 28) + 1), // 생년월일 분산
                     i % 2 == 0 ? Gender.MALE : Gender.FEMALE, // 성별 교차
                     "https://github.com/" + nicknames[i], // 깃허브 주소
-                    resumes[i]
-            ));
+                    resumes[i]));
         }
     }
 

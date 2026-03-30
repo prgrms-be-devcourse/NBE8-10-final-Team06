@@ -2,13 +2,12 @@ package com.devstagram.domain.technology.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QPostTechnology is a Querydsl query type for PostTechnology
@@ -26,13 +25,13 @@ public class QPostTechnology extends EntityPathBase<PostTechnology> {
 
     public final QTechCategory category;
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final com.devstagram.domain.post.entity.QPost post;
@@ -58,9 +57,11 @@ public class QPostTechnology extends EntityPathBase<PostTechnology> {
     public QPostTechnology(Class<? extends PostTechnology> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.category = inits.isInitialized("category") ? new QTechCategory(forProperty("category")) : null;
-        this.post = inits.isInitialized("post") ? new com.devstagram.domain.post.entity.QPost(forProperty("post"), inits.get("post")) : null;
-        this.technology = inits.isInitialized("technology") ? new QTechnology(forProperty("technology"), inits.get("technology")) : null;
+        this.post = inits.isInitialized("post")
+                ? new com.devstagram.domain.post.entity.QPost(forProperty("post"), inits.get("post"))
+                : null;
+        this.technology = inits.isInitialized("technology")
+                ? new QTechnology(forProperty("technology"), inits.get("technology"))
+                : null;
     }
-
 }
-

@@ -2,13 +2,12 @@ package com.devstagram.domain.post.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QPostMedia is a Querydsl query type for PostMedia
@@ -24,14 +23,15 @@ public class QPostMedia extends EntityPathBase<PostMedia> {
 
     public final com.devstagram.global.entity.QBaseEntity _super = new com.devstagram.global.entity.QBaseEntity(this);
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
-    public final EnumPath<com.devstagram.global.enumtype.MediaType> mediaType = createEnum("mediaType", com.devstagram.global.enumtype.MediaType.class);
+    public final EnumPath<com.devstagram.global.enumtype.MediaType> mediaType =
+            createEnum("mediaType", com.devstagram.global.enumtype.MediaType.class);
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final QPost post;
@@ -60,6 +60,4 @@ public class QPostMedia extends EntityPathBase<PostMedia> {
         super(type, metadata, inits);
         this.post = inits.isInitialized("post") ? new QPost(forProperty("post"), inits.get("post")) : null;
     }
-
 }
-

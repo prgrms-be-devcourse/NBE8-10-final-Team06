@@ -2,13 +2,12 @@ package com.devstagram.domain.comment.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QCommentLike is a Querydsl query type for CommentLike
@@ -46,9 +45,10 @@ public class QCommentLike extends EntityPathBase<CommentLike> {
 
     public QCommentLike(Class<? extends CommentLike> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
-        this.comment = inits.isInitialized("comment") ? new QComment(forProperty("comment"), inits.get("comment")) : null;
-        this.user = inits.isInitialized("user") ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
+        this.comment =
+                inits.isInitialized("comment") ? new QComment(forProperty("comment"), inits.get("comment")) : null;
+        this.user = inits.isInitialized("user")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user"))
+                : null;
     }
-
 }
-

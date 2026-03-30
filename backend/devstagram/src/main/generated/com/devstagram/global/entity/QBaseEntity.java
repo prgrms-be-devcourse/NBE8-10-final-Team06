@@ -2,12 +2,11 @@ package com.devstagram.global.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
 
 /**
  * QBaseEntity is a Querydsl query type for BaseEntity
@@ -19,11 +18,13 @@ public class QBaseEntity extends EntityPathBase<BaseEntity> {
 
     public static final QBaseEntity baseEntity = new QBaseEntity("baseEntity");
 
-    public final DateTimePath<java.time.LocalDateTime> createdAt = createDateTime("createdAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> createdAt =
+            createDateTime("createdAt", java.time.LocalDateTime.class);
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
-    public final DateTimePath<java.time.LocalDateTime> modifiedAt = createDateTime("modifiedAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> modifiedAt =
+            createDateTime("modifiedAt", java.time.LocalDateTime.class);
 
     public QBaseEntity(String variable) {
         super(BaseEntity.class, forVariable(variable));
@@ -36,6 +37,4 @@ public class QBaseEntity extends EntityPathBase<BaseEntity> {
     public QBaseEntity(PathMetadata metadata) {
         super(BaseEntity.class, metadata);
     }
-
 }
-

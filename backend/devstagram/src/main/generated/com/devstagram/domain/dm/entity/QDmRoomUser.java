@@ -2,13 +2,12 @@ package com.devstagram.domain.dm.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QDmRoomUser is a Querydsl query type for DmRoomUser
@@ -51,8 +50,8 @@ public class QDmRoomUser extends EntityPathBase<DmRoomUser> {
     public QDmRoomUser(Class<? extends DmRoomUser> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.dmRoom = inits.isInitialized("dmRoom") ? new QDmRoom(forProperty("dmRoom")) : null;
-        this.user = inits.isInitialized("user") ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
+        this.user = inits.isInitialized("user")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user"))
+                : null;
     }
-
 }
-

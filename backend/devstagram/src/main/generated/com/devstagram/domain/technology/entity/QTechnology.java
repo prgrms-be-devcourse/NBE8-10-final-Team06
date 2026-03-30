@@ -2,13 +2,12 @@ package com.devstagram.domain.technology.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QTechnology is a Querydsl query type for Technology
@@ -28,15 +27,15 @@ public class QTechnology extends EntityPathBase<Technology> {
 
     public final StringPath color = createString("color");
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
     public final StringPath iconUrl = createString("iconUrl");
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final StringPath name = createString("name");
@@ -61,6 +60,4 @@ public class QTechnology extends EntityPathBase<Technology> {
         super(type, metadata, inits);
         this.category = inits.isInitialized("category") ? new QTechCategory(forProperty("category")) : null;
     }
-
 }
-

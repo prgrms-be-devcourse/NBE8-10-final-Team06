@@ -2,13 +2,12 @@ package com.devstagram.domain.post.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QPost is a Querydsl query type for Post
@@ -28,22 +27,33 @@ public class QPost extends EntityPathBase<Post> {
 
     public final StringPath content = createString("content");
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
     public final BooleanPath isDeleted = createBoolean("isDeleted");
 
     public final NumberPath<Long> likeCount = createNumber("likeCount", Long.class);
 
-    public final ListPath<PostMedia, QPostMedia> mediaList = this.<PostMedia, QPostMedia>createList("mediaList", PostMedia.class, QPostMedia.class, PathInits.DIRECT2);
+    public final ListPath<PostMedia, QPostMedia> mediaList =
+            this.<PostMedia, QPostMedia>createList("mediaList", PostMedia.class, QPostMedia.class, PathInits.DIRECT2);
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
-    public final SetPath<com.devstagram.domain.technology.entity.PostTechnology, com.devstagram.domain.technology.entity.QPostTechnology> techTags = this.<com.devstagram.domain.technology.entity.PostTechnology, com.devstagram.domain.technology.entity.QPostTechnology>createSet("techTags", com.devstagram.domain.technology.entity.PostTechnology.class, com.devstagram.domain.technology.entity.QPostTechnology.class, PathInits.DIRECT2);
+    public final SetPath<
+                    com.devstagram.domain.technology.entity.PostTechnology,
+                    com.devstagram.domain.technology.entity.QPostTechnology>
+            techTags = this
+                    .<com.devstagram.domain.technology.entity.PostTechnology,
+                            com.devstagram.domain.technology.entity.QPostTechnology>
+                            createSet(
+                                    "techTags",
+                                    com.devstagram.domain.technology.entity.PostTechnology.class,
+                                    com.devstagram.domain.technology.entity.QPostTechnology.class,
+                                    PathInits.DIRECT2);
 
     public final StringPath thumbnailUrl = createString("thumbnailUrl");
 
@@ -69,8 +79,8 @@ public class QPost extends EntityPathBase<Post> {
 
     public QPost(Class<? extends Post> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
-        this.user = inits.isInitialized("user") ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
+        this.user = inits.isInitialized("user")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user"))
+                : null;
     }
-
 }
-

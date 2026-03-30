@@ -2,12 +2,11 @@ package com.devstagram.domain.story.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
 
 /**
  * QStoryMedia is a Querydsl query type for StoryMedia
@@ -19,11 +18,13 @@ public class QStoryMedia extends EntityPathBase<StoryMedia> {
 
     public static final QStoryMedia storyMedia = new QStoryMedia("storyMedia");
 
-    public final DateTimePath<java.time.LocalDateTime> createdAt = createDateTime("createdAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> createdAt =
+            createDateTime("createdAt", java.time.LocalDateTime.class);
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
-    public final EnumPath<com.devstagram.global.enumtype.MediaType> mediaType = createEnum("mediaType", com.devstagram.global.enumtype.MediaType.class);
+    public final EnumPath<com.devstagram.global.enumtype.MediaType> mediaType =
+            createEnum("mediaType", com.devstagram.global.enumtype.MediaType.class);
 
     public final StringPath sourceUrl = createString("sourceUrl");
 
@@ -38,6 +39,4 @@ public class QStoryMedia extends EntityPathBase<StoryMedia> {
     public QStoryMedia(PathMetadata metadata) {
         super(StoryMedia.class, metadata);
     }
-
 }
-

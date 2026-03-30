@@ -2,13 +2,12 @@ package com.devstagram.domain.comment.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QComment is a Querydsl query type for Comment
@@ -26,17 +25,17 @@ public class QComment extends EntityPathBase<Comment> {
 
     public final StringPath content = createString("content");
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
     public final BooleanPath isDeleted = createBoolean("isDeleted");
 
     public final NumberPath<Long> likeCount = createNumber("likeCount", Long.class);
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final QComment parent;
@@ -66,9 +65,11 @@ public class QComment extends EntityPathBase<Comment> {
     public QComment(Class<? extends Comment> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.parent = inits.isInitialized("parent") ? new QComment(forProperty("parent"), inits.get("parent")) : null;
-        this.post = inits.isInitialized("post") ? new com.devstagram.domain.post.entity.QPost(forProperty("post"), inits.get("post")) : null;
-        this.user = inits.isInitialized("user") ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
+        this.post = inits.isInitialized("post")
+                ? new com.devstagram.domain.post.entity.QPost(forProperty("post"), inits.get("post"))
+                : null;
+        this.user = inits.isInitialized("user")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user"))
+                : null;
     }
-
 }
-

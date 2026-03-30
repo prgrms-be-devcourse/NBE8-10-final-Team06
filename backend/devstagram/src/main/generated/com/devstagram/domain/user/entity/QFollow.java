@@ -2,13 +2,12 @@ package com.devstagram.domain.user.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QFollow is a Querydsl query type for Follow
@@ -24,15 +23,15 @@ public class QFollow extends EntityPathBase<Follow> {
 
     public final com.devstagram.global.entity.QBaseEntity _super = new com.devstagram.global.entity.QBaseEntity(this);
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
     public final QUser fromUser;
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final QUser toUser;
@@ -55,9 +54,8 @@ public class QFollow extends EntityPathBase<Follow> {
 
     public QFollow(Class<? extends Follow> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
-        this.fromUser = inits.isInitialized("fromUser") ? new QUser(forProperty("fromUser"), inits.get("fromUser")) : null;
+        this.fromUser =
+                inits.isInitialized("fromUser") ? new QUser(forProperty("fromUser"), inits.get("fromUser")) : null;
         this.toUser = inits.isInitialized("toUser") ? new QUser(forProperty("toUser"), inits.get("toUser")) : null;
     }
-
 }
-

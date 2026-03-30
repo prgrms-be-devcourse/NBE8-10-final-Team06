@@ -2,13 +2,12 @@ package com.devstagram.domain.dm.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QDm is a Querydsl query type for Dm
@@ -26,15 +25,15 @@ public class QDm extends EntityPathBase<Dm> {
 
     public final StringPath content = createString("content");
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
 
     public final QDmRoom dmRoom;
 
-    //inherited
+    // inherited
     public final NumberPath<Long> id = _super.id;
 
-    //inherited
+    // inherited
     public final DateTimePath<java.time.LocalDateTime> modifiedAt = _super.modifiedAt;
 
     public final com.devstagram.domain.user.entity.QUser sender;
@@ -64,8 +63,8 @@ public class QDm extends EntityPathBase<Dm> {
     public QDm(Class<? extends Dm> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.dmRoom = inits.isInitialized("dmRoom") ? new QDmRoom(forProperty("dmRoom")) : null;
-        this.sender = inits.isInitialized("sender") ? new com.devstagram.domain.user.entity.QUser(forProperty("sender"), inits.get("sender")) : null;
+        this.sender = inits.isInitialized("sender")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("sender"), inits.get("sender"))
+                : null;
     }
-
 }
-

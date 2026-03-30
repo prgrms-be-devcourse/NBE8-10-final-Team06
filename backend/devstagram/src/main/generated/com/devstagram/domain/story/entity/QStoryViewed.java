@@ -2,13 +2,12 @@ package com.devstagram.domain.story.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QStoryViewed is a Querydsl query type for StoryViewed
@@ -26,13 +25,15 @@ public class QStoryViewed extends EntityPathBase<StoryViewed> {
 
     public final BooleanPath isLiked = createBoolean("isLiked");
 
-    public final DateTimePath<java.time.LocalDateTime> likedAt = createDateTime("likedAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> likedAt =
+            createDateTime("likedAt", java.time.LocalDateTime.class);
 
     public final QStory story;
 
     public final com.devstagram.domain.user.entity.QUser user;
 
-    public final DateTimePath<java.time.LocalDateTime> viewedAt = createDateTime("viewedAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> viewedAt =
+            createDateTime("viewedAt", java.time.LocalDateTime.class);
 
     public QStoryViewed(String variable) {
         this(StoryViewed.class, forVariable(variable), INITS);
@@ -53,8 +54,8 @@ public class QStoryViewed extends EntityPathBase<StoryViewed> {
     public QStoryViewed(Class<? extends StoryViewed> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.story = inits.isInitialized("story") ? new QStory(forProperty("story"), inits.get("story")) : null;
-        this.user = inits.isInitialized("user") ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user")) : null;
+        this.user = inits.isInitialized("user")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("user"), inits.get("user"))
+                : null;
     }
-
 }
-

@@ -2,13 +2,12 @@ package com.devstagram.domain.story.entity;
 
 import static com.querydsl.core.types.PathMetadataFactory.*;
 
-import com.querydsl.core.types.dsl.*;
-
-import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
-import com.querydsl.core.types.Path;
-import com.querydsl.core.types.dsl.PathInits;
 
+import com.querydsl.core.types.Path;
+import com.querydsl.core.types.PathMetadata;
+import com.querydsl.core.types.dsl.*;
+import com.querydsl.core.types.dsl.PathInits;
 
 /**
  * QStoryTag is a Querydsl query type for StoryTag
@@ -22,7 +21,8 @@ public class QStoryTag extends EntityPathBase<StoryTag> {
 
     public static final QStoryTag storyTag = new QStoryTag("storyTag");
 
-    public final DateTimePath<java.time.LocalDateTime> createdAt = createDateTime("createdAt", java.time.LocalDateTime.class);
+    public final DateTimePath<java.time.LocalDateTime> createdAt =
+            createDateTime("createdAt", java.time.LocalDateTime.class);
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
@@ -49,8 +49,8 @@ public class QStoryTag extends EntityPathBase<StoryTag> {
     public QStoryTag(Class<? extends StoryTag> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
         this.story = inits.isInitialized("story") ? new QStory(forProperty("story"), inits.get("story")) : null;
-        this.target = inits.isInitialized("target") ? new com.devstagram.domain.user.entity.QUser(forProperty("target"), inits.get("target")) : null;
+        this.target = inits.isInitialized("target")
+                ? new com.devstagram.domain.user.entity.QUser(forProperty("target"), inits.get("target"))
+                : null;
     }
-
 }
-

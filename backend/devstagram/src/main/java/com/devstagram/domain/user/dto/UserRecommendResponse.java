@@ -1,6 +1,7 @@
 package com.devstagram.domain.user.dto;
 
 import com.devstagram.domain.user.entity.User;
+
 import lombok.Builder;
 import lombok.Getter;
 
