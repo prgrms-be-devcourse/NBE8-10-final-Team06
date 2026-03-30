@@ -15,7 +15,7 @@ public record ReplyInfoRes(
         LocalDateTime createdAt,
         LocalDateTime modifiedAt,
         long likeCount) {
-    public ReplyInfoRes(Comment comment,boolean isLiked, Long currentMemberId) {
+    public ReplyInfoRes(Comment comment, boolean isLiked, Long currentMemberId) {
         this(
                 comment.getId(),
                 comment.getUser().getId(),

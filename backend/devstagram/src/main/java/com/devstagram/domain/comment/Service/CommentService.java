@@ -115,9 +115,7 @@ public class CommentService {
 
         Set<Long> likedCommentIds = getLikedCommentIds(memberId, replies.getContent());
 
-        return replies.map(reply ->
-                new ReplyInfoRes(reply, likedCommentIds.contains(reply.getId()), memberId)
-        );
+        return replies.map(reply -> new ReplyInfoRes(reply, likedCommentIds.contains(reply.getId()), memberId));
     }
 
     @Transactional
