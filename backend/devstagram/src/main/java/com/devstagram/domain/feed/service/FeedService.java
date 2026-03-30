@@ -98,7 +98,7 @@ public class FeedService {
         follows.stream().map(Follow::getFromUser).forEach(targetSet::add);
 
         // 게시글의 기술 태그(PostTechnology) 기반 관심 유저들 추가
-        List<User> techInterestedUsers = techScoreService.findUsersByTechTags(post.getTechTags());
+        List<User> techInterestedUsers = techScoreService.findUsersByTechTags(new ArrayList<>(post.getTechTags()));
         targetSet.addAll(techInterestedUsers);
 
         // 작성자 본인은 피드 배달 대상에서 제외
