@@ -12,7 +12,7 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 import { getAuthHeaders, pickUser, BASE_URL } from '../helpers/auth.js';
-import { newPostPayload, newCommentPayload } from '../helpers/data.js';
+import { newPostFormData, newCommentPayload } from '../helpers/data.js';
 
 // ──── 커스텀 메트릭 ────
 const loginDuration = new Trend('custom_login_duration', true);
@@ -92,13 +92,13 @@ export default function () {
 
     sleep(0.5);
 
-    // 3. 게시글 작성
+    // 3. 게시글 작성 (multipart/form-data: request 파트 + files 파트)
     group('03_post_create', () => {
         const start = Date.now();
         const res = http.post(
             `${BASE_URL}/api/posts`,
-            JSON.stringify(newPostPayload()),
-            { headers: authHeaders, tags: { name: 'post_create' } }
+            newPostFormData(),
+            { headers: { Authorization: authHeaders.Authorization }, tags: { name: 'post_create' } }
         );
         postCreateDuration.add(Date.now() - start);
         requestCount.add(1);

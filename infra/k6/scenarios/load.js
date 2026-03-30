@@ -20,7 +20,7 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 import { pickUser, BASE_URL } from '../helpers/auth.js';
-import { newPostPayload, newCommentPayload, sleepRange } from '../helpers/data.js';
+import { newPostFormData, newCommentPayload, sleepRange } from '../helpers/data.js';
 
 // ──── 커스텀 메트릭 ────
 const loginDuration = new Trend('custom_login_duration', true);
@@ -119,8 +119,8 @@ export default function () {
             const start = Date.now();
             const res = http.post(
                 `${BASE_URL}/api/posts`,
-                JSON.stringify(newPostPayload()),
-                { headers, tags: { name: 'post_create' } }
+                newPostFormData(),
+                { headers: { Authorization: headers.Authorization }, tags: { name: 'post_create' } }
             );
             postDuration.add(Date.now() - start);
             totalRequests.add(1);

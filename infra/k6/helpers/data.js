@@ -2,6 +2,13 @@
  * 부하 테스트용 공통 데이터 헬퍼
  */
 
+import http from 'k6/http';
+import encoding from 'k6/encoding';
+
+// 1×1 투명 PNG (base64) - 파일 업로드 API 테스트용 더미 이미지
+const DUMMY_PNG_B64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
 /** 랜덤 정수 [min, max) */
 export function randInt(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
@@ -17,11 +24,24 @@ export function randStr(n) {
     return result;
 }
 
-/** 게시글 생성 Payload */
-export function newPostPayload() {
-    return {
+/**
+ * 게시글 생성 multipart/form-data 페이로드
+ *
+ * POST /api/posts 는 @RequestPart("request") + @RequestPart("files") 를 요구합니다.
+ * k6 http.post()에 이 객체를 그대로 전달하면 Content-Type 이 자동으로
+ * multipart/form-data 로 설정됩니다.
+ * Authorization 헤더만 별도로 넘기고 Content-Type 은 지정하지 마세요.
+ */
+export function newPostFormData() {
+    const requestJson = JSON.stringify({
         title: `부하테스트 제목 ${randStr(6)}`,
         content: `k6 부하테스트 내용입니다. ${randStr(20)}`,
+    });
+    const pngBytes = encoding.b64decode(DUMMY_PNG_B64, 'std', 'b');
+
+    return {
+        request: http.file(requestJson, 'request.json', 'application/json'),
+        files: http.file(pngBytes, 'test.png', 'image/png'),
     };
 }
 

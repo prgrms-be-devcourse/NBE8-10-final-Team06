@@ -3,3 +3,7 @@
 .terraform/
 secrets.tf
 terraform.tfstate*
+
+### Local dev data ###
+uploads/
+data/
