@@ -1,22 +1,26 @@
 package com.devstagram.domain.feed.service;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
+import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.technology.service.TechScoreService;
+import com.devstagram.domain.user.entity.Follow;
+import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.RedisZSetCommands;
+import org.springframework.data.redis.connection.zset.Aggregate;
+import org.springframework.data.redis.connection.zset.Weights;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.post.entity.Post;
-import com.devstagram.domain.technology.service.TechScoreService;
-import com.devstagram.domain.user.entity.User;
-import com.devstagram.domain.user.repository.FollowRepository;
 
-import lombok.RequiredArgsConstructor;
+
+import java.time.Duration;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,123 +31,156 @@ public class FeedService {
     private final FollowRepository followRepository;
     private final TechScoreService techScoreService;
 
-    private static final double MINUTE = 60_000.0;
-    private static final double HOUR = 3_600_000.0;
-    private static final double DAY = 86_400_000.0;
+    private static final String USER_FEED_PREFIX = "feed:user:";
+    private static final String GLOBAL_FEED_KEY = "posts:global:scores";
+    private static final int MAX_FEED_SIZE = 500;
+    private static final short TECH_MATCH_THRESHOLD = 50;
+    private static final int TOP_K_LIMIT = 1000;
 
-    private static final short MIN_SCORE = 50;
-
-    private static final String FEED_KEY_PREFIX = "feed:user:";
-    private static final int MAX_FEED_SIZE = 500; // 유저당 정예 멤버 500개 유지
-
-    /**
-     * 통합된 타겟 유저들에게 게시글 배달
-     * @param post 작성된 게시글
-     * @param targetUsers 배달 대상 (팔로워 + 기술 관심 유저 통합 리스트)
-     */
+    // 업로드된 게시글을 개인 피드에 등록
     @Async("feedTaskExecutor")
-    public void deliverPostToFeeds(Post post, List<User> targetUsers) {
+    public void deliverPostToFeeds(Post post) {
+
+        // 팔로워들과 기술태그 일치 사용자들을 먼저 set해서 가져옴
+        List<User> targetUsers = findTargetUsersForPost(post);
+
+        String postId = String.valueOf(post.getId());
+
+        // 기술태그인지 팔로우 계정인지 확인해서 점수 산정
         for (User user : targetUsers) {
-            // 개별 유저마다 '나와의 관계'에 따른 점수를 계산해야 하므로 체크 로직 필요
-            // Tip: 이 체크 로직은 Redis나 메모리 캐시를 활용하면 더 빠릅니다.
             boolean isFollower = checkIfFollower(post.getUser(), user);
             boolean isTechMatched = checkIfTechMatched(post, user);
 
             double score = scoringStrategy.calculateScore(post, isFollower, isTechMatched);
-            pushToZSet(post, user, score);
+            pushToUserFeed(user.getId(), postId, score);
         }
     }
 
-    private void pushToZSet(Post post, User user, double score) {
-        String key = FEED_KEY_PREFIX + user.getId();
-        String postId = String.valueOf(post.getId());
-
+    // 사용자 개별 전용 피드를 구축 (500개 제한)
+    private void pushToUserFeed(Long userId, String postId, double score) {
+        String key = USER_FEED_PREFIX + userId;
         redisTemplate.opsForZSet().add(key, postId, score);
 
-        // Capping 로직 유지
+        // 큐 크기 제한
         Long size = redisTemplate.opsForZSet().size(key);
         if (size != null && size > MAX_FEED_SIZE) {
             redisTemplate.opsForZSet().removeRange(key, 0, size - MAX_FEED_SIZE - 1);
         }
     }
 
-    // FeedService.java 내부
-    @Transactional(readOnly = true)
-    public List<Long> getRankedPostIds(Long userId, Pageable pageable) {
-        String key = FEED_KEY_PREFIX + userId;
-        long start = pageable.getOffset();
-        long end = start + pageable.getPageSize() - 1;
 
-        // 점수 높은 순(내림차순)으로 ID 추출
-        Set<String> postIds = redisTemplate.opsForZSet().reverseRange(key, start, end);
-
-        if (postIds == null || postIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return postIds.stream().map(Long::valueOf).toList();
-    }
-
-    @Async("feedTaskExecutor")
-    public void removePostFromFeeds(Long postId, List<User> followers) {
-        String StringPostId = String.valueOf(postId);
-
-        // 나를 팔로우했던 사람들의 우체통에서만 지워도 충분합니다.
-        for (User follower : followers) {
-            String key = FEED_KEY_PREFIX + follower.getId();
-            redisTemplate.opsForZSet().remove(key, StringPostId);
-        }
-
-        // 작성자 본인의 피드에서도 지워줍니다.
-        // (본인 글도 피드에 보이게 설계했다면 필요함)
-    }
-
-    /**
-     * [수정] 좋아요 발생 시 통합된 타겟 유저들의 점수 실시간 업데이트
-     * @param post 대상 게시글
-     * @param targetUsers 점수 수정 대상 (팔로워 + 기술 관심 유저 통합 리스트)
-     * @param isIncrement true(증가), false(감소)
-     */
-    @Async("feedTaskExecutor")
-    public void updatePostScoreInFeeds(Post post, List<User> targetUsers, boolean isIncrement) {
-        double delta = isIncrement ? MINUTE : -MINUTE;
-        String postId = String.valueOf(post.getId());
-
-        for (User user : targetUsers) {
-            String key = FEED_KEY_PREFIX + user.getId();
-            // ZINCRBY: 해당 postId가 ZSet에 있을 때만 점수가 변동됨
-            redisTemplate.opsForZSet().incrementScore(key, postId, delta);
-        }
-
-        // 작성자 본인의 피드 점수도 별도 처리 (targetUsers에 본인이 포함 안 되었을 경우)
-        String ownerKey = FEED_KEY_PREFIX + post.getUser().getId();
-        redisTemplate.opsForZSet().incrementScore(ownerKey, postId, delta);
-    }
-
-    /**
-     * 팔로우 여부 확인
-     * (성능을 위해 Redis에 팔로우 관계가 저장되어 있다면 Redis를 우선 조회하는 것이 좋습니다)
-     */
+    // 팔로우 중인 계정인지 확인
     private boolean checkIfFollower(User author, User reader) {
         if (author.getId().equals(reader.getId())) return false;
-        // FollowRepository를 통해 DB 조회 (또는 Redis Set 조회)
         return followRepository.existsByFromUserIdAndToUserId(reader.getId(), author.getId());
     }
 
-    /**
-     * 기술 태그 일치 여부 확인
-     * 게시글의 태그 중 하나라도 유저의 관심 태그(점수 보유 태그)에 포함되는지 확인
-     */
+
+    // 기술태그가 일치하는지 확인
     private boolean checkIfTechMatched(Post post, User reader) {
-        // 게시글의 기술 ID 목록
         Set<Long> postTechIds = post.getTechTags().stream()
                 .map(pt -> pt.getTechnology().getId())
                 .collect(Collectors.toSet());
 
-        // 유저가 점수를 보유한(관심 있는) 기술 ID 목록 조회 (TechScoreService 이용)
-        Set<Long> userInterestedTechIds = techScoreService.getInterestedTechIds(reader.getId(), MIN_SCORE);
+        Set<Long> interestedTechIds = techScoreService.getInterestedTechIds(reader.getId(), TECH_MATCH_THRESHOLD);
+        return !Collections.disjoint(postTechIds, interestedTechIds);
+    }
 
-        // 교집합이 있는지 확인
-        return !Collections.disjoint(postTechIds, userInterestedTechIds);
+    // 사용자 공통 글로벌 점수에 등록
+    public void registerPostToGlobalFeed(Post post) {
+
+        double baseScore = scoringStrategy.calculateScore(post, false, false);
+
+        redisTemplate.opsForZSet().add(GLOBAL_FEED_KEY, String.valueOf(post.getId()), baseScore);
+    }
+
+    // 팔로워들과 기술태그 겹치는 사람들을 합친 set을 보냄
+    public List<User> findTargetUsersForPost(Post post) {
+        // 중복 방지를 위한 Set 생성
+        Set<User> targetSet = new HashSet<>();
+
+        // 나(작성자)를 팔로우하는 사람들 조회 및 추가
+        List<Follow> follows = followRepository.findAllByToUserId(post.getUser().getId());
+        follows.stream()
+                .map(Follow::getFromUser)
+                .forEach(targetSet::add);
+
+        // 게시글의 기술 태그(PostTechnology) 기반 관심 유저들 추가
+        List<User> techInterestedUsers = techScoreService.findUsersByTechTags(post.getTechTags());
+        targetSet.addAll(techInterestedUsers);
+
+        // 작성자 본인은 피드 배달 대상에서 제외
+        targetSet.remove(post.getUser());
+
+        return new ArrayList<>(targetSet);
+    }
+
+    @Async("feedTaskExecutor")
+    public void removePostFromFeeds(Long postId, List<Long> targetUserIds, Long authorId) {
+        String stringPostId = String.valueOf(postId);
+
+        // 글로벌 피드에서 즉시 제거
+        redisTemplate.opsForZSet().remove(GLOBAL_FEED_KEY, stringPostId);
+
+        // 타겟 유저들 주머니에서 제거
+        for (Long targetId : targetUserIds) {
+            redisTemplate.opsForZSet().remove(USER_FEED_PREFIX + targetId, stringPostId);
+        }
+
+        // 작성자 본인 주머니에서도 제거
+        redisTemplate.opsForZSet().remove(USER_FEED_PREFIX + authorId, stringPostId);
+    }
+
+    // 좋아요 증감을 통한 글로벌 피드 점수 수정
+    @Async("feedTaskExecutor")
+    public void updatePostScoreInGlobalFeed(Post post, boolean isIncrement) {
+        String postId = String.valueOf(post.getId());
+
+        // 가중치 가져오기
+        double delta = scoringStrategy.getLikeDelta(isIncrement);
+
+        // 글로벌 보관함 점수 업데이트
+        redisTemplate.opsForZSet().incrementScore(GLOBAL_FEED_KEY, postId, delta);
+
+        // 최신 인기글 상위 1,000개만 남기고 나머지는 제거
+        Long size = redisTemplate.opsForZSet().size(GLOBAL_FEED_KEY);
+        if (size != null && size > TOP_K_LIMIT) {
+            redisTemplate.opsForZSet().removeRange(GLOBAL_FEED_KEY, 0, size - TOP_K_LIMIT - 1);
+        }
+    }
+
+    // 개인 피드와 글로벌 피드를 일정한 비율로 혼합
+    public Map<Long, Double> getHybridFeedWithScores(Long memberId, Pageable pageable) {
+
+        String userFeedKey = USER_FEED_PREFIX + memberId;
+        String tempKey = "temp:feed:" + memberId;        // 계산을 위한 임시 장부
+
+        // Redis ZUNION 실행
+        // 두 점수를 동등한 비율로 합산한다는 뜻
+        redisTemplate.opsForZSet().unionAndStore(userFeedKey, GLOBAL_FEED_KEY, tempKey);
+
+        // 임시 키에 30초 정도 TTL 설정 (만약 삭제 로직이 실패해도 메모리를 보호하기 위함)
+        redisTemplate.expire(tempKey, Duration.ofSeconds(30));
+
+        // 합산된 결과에서 페이지네이션 범위만큼 추출 (역순 정렬)
+        Set<ZSetOperations.TypedTuple<String>> pagedResults = redisTemplate.opsForZSet()
+                .reverseRangeWithScores(
+                        tempKey,
+                        pageable.getOffset(),
+                        pageable.getOffset() + pageable.getPageSize() - 1
+                );
+
+        // 계산이 끝난 임시 키 즉시 삭제
+        redisTemplate.delete(tempKey);
+
+        // 결과 반환 (ID와 점수 매핑)
+        if (pagedResults == null) return Collections.emptyMap();
+
+        return pagedResults.stream().collect(Collectors.toMap(
+                t -> Long.parseLong(t.getValue()),
+                t -> t.getScore(),
+                (v1, v2) -> v1,
+                LinkedHashMap::new
+        ));
     }
 }

@@ -20,11 +20,12 @@ public record PostFeedRes(
         boolean isLiked,
         boolean isScrapped,
         boolean isMine,
+        double feedScore,
         String profileImageUrl,
         Long likeCount,
         Long commentCount,
         LocalDateTime createdAt) {
-    public static PostFeedRes from(Post post, boolean isLiked, boolean isScrapped, Long currentMemberId) {
+    public static PostFeedRes from(Post post, boolean isLiked, boolean isScrapped, Long currentMemberId, double score) {
         return PostFeedRes.builder()
                 .id(post.getId())
                 .authorId(post.getUser().getId())
@@ -36,6 +37,7 @@ public record PostFeedRes(
                 .isLiked(isLiked)
                 .isScrapped(isScrapped)
                 .isMine(currentMemberId != null && post.getUser().getId().equals(currentMemberId))
+                .feedScore(score)
                 .profileImageUrl(post.getUser().getProfileImageUrl())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())

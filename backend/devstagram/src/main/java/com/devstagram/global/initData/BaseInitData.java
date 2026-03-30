@@ -1,15 +1,14 @@
 package com.devstagram.global.initData;
 
 import java.time.LocalDate;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.comment.Service.CommentService;
@@ -70,6 +69,7 @@ public class BaseInitData implements ApplicationRunner {
     private final TechCategoryRepository techCategoryRepository;
     private final FeedService feedService;
     private final TechScoreService techScoreService;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     @Transactional
@@ -79,16 +79,15 @@ public class BaseInitData implements ApplicationRunner {
         initData();
     }
 
-    private void initData() {
+    private void initData() throws Exception {
         createTechMasterData();
         createUsers();
         createFollows();
+
         createPosts();
         createStories();
         createInteractions();
         createDms();
-        createFeedScoringScenario();
-        createNormalPost();
     }
 
     private void createTechMasterData() {
@@ -353,79 +352,92 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createFeedScoringScenario() {
-        // 1. 유저 확보
-        User admin = userRepository.findByEmail("admin@test.com").get(); // 나 (피드 조회 주체)
-        User user4 = userRepository.findByEmail("user4@test.com").get(); // 팔로우 안 함, 기술 일치 안 함
-        User user5 = userRepository.findByEmail("user5@test.com").get(); // 팔로우 안 함, 기술 일치 안 함
+        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
+        User user5 = userRepository.findByEmail("user5@test.com").orElseThrow();
+        Technology java = technologyRepository.findAll().get(0); // Java
 
-        Technology java = technologyRepository.findAll().stream()
-                .filter(t -> t.getName().equals("Java"))
-                .findFirst()
-                .get();
+        // 1. 기술 점수 미리 세팅
+        techScoreService.increaseScore(admin, java, "POST");
 
-        // 2. [조건 A: 기술 관심사] admin에게 Java 점수 부여 (60점 -> 기준 50점 초과)
-        // admin이 Java 글을 3번 썼다고 가정 (POST 가중치 20점 * 3)
-        for (int i = 0; i < 3; i++) {
-            techScoreService.increaseScore(admin, java, "POST");
-        }
-
-        // 3. 테스트용 게시글 3개 생성 (작성 시간은 거의 동일하게)
-
-        // [게시글 1] 일반인(user4)이 쓴 아무 관련 없는 글 -> 점수 보너스 없음 (Base Score만 가짐)
-        Post normalPost = postRepository.save(Post.builder()
-                .user(user4)
-                .title("점수 보너스 없는 일반글")
-                .content("조금 뒤에 밀려날 운명")
-                .build());
-
-        // [게시글 2] 내가 팔로우한 user1이 쓴 글 -> 팔로우 보너스 (+12시간)
-        User user1 = userRepository.findByEmail("user1@test.com").get();
-        Post followPost = postRepository.save(Post.builder()
-                .user(user1)
-                .title("팔로우 보너스 적용글")
-                .content("내 친구의 소식")
-                .build());
-
-        // [게시글 3] 팔로우 안 한 user5가 쓴 'Java' 관련 글 -> 기술 보너스 (+24시간)
-        Post techPost = Post.builder()
-                .user(user5)
-                .title("기술 보너스 적용글")
-                .content("Java 신기술 정보")
-                .build();
+        // 2. 게시글 생성 (postService.createPost를 호출하면 배달까지 한 번에 됨)
+        // 만약 직접 Repository를 쓴다면 아래처럼 호출
+        Post techPost = Post.builder().user(user5).title("Java 신기술").content("내용").build();
         addTagToPost(techPost, java);
         postRepository.save(techPost);
 
-        // 4. Redis 배달 강제 트리거 (테스트 환경에 따라 PostService.createPost를 거치지 않고 저장했다면 명시적 호출 필요)
-        // postService.createPost 로직을 사용했다면 자동 배달되겠지만,
-        // 직접 save했다면 feedService.deliverPostToFeeds를 여기서 호출해줍니다.
-        feedService.deliverPostToFeeds(normalPost, List.of(admin));
-        feedService.deliverPostToFeeds(followPost, List.of(admin));
-        feedService.deliverPostToFeeds(techPost, List.of(admin));
+        // [수정] 이제 post만 던지면 됨 (타겟은 FeedService가 알아서 계산)
+        feedService.registerPostToGlobalFeed(techPost);
+        feedService.deliverPostToFeeds(techPost);
     }
 
     private void createNormalPost() {
-        // 1. 나와 관계없는 유저 선택 (user4는 admin이 팔로우 안 함)
         User stranger = userRepository.findByEmail("user4@test.com").orElseThrow();
+        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
 
-        // 2. 태그가 아예 없는 '순수 일반글' 생성
+        // 테스트를 위해 잠시 팔로우 관계를 맺어줍니다.
+        followService.follow(admin.getId(), stranger.getId());
+
         Post normalPost = Post.builder()
                 .user(stranger)
                 .title("가중치 없는 일반 게시글")
-                .content("이 글은 팔로우 보너스도, 기술 보너스도 없습니다.")
+                .content("이제 admin의 팔로우 피드에 자연스럽게 노출됩니다.")
                 .build();
 
         postRepository.save(normalPost);
 
-        // 3. 미디어 추가 (선택사항)
-        postMediaRepository.save(PostMedia.builder()
-                .post(normalPost)
-                .sourceUrl("https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800")
-                .mediaType(MediaType.jpg)
-                .sequence((short) 1)
-                .build());
-
-        // 4. [중요] Redis 배달 (admin에게만 배달하여 테스트)
-        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
-        feedService.deliverPostToFeeds(normalPost, List.of(admin));
+        // FeedService의 표준 메서드 호출 (인자값은 post 하나!)
+        feedService.registerPostToGlobalFeed(normalPost);
+        feedService.deliverPostToFeeds(normalPost);
     }
+
+    private void createTechInterestScenario() {
+        // 1. 유저 및 기술 데이터 확보 (기존 ID 참고)
+        User user1 = userRepository.findByEmail("user1@test.com").orElseThrow();
+        User user2 = userRepository.findByEmail("user2@test.com").orElseThrow();
+        User author = userRepository.findByEmail("user5@test.com").orElseThrow();
+
+        // 공유해주신 테이블 데이터 기반 ID 추출
+        Technology java = technologyRepository.findById(1L).orElseThrow();
+        Technology spring = technologyRepository.findById(2L).orElseThrow();
+        Technology aws = technologyRepository.findById(4L).orElseThrow();
+        Technology docker = technologyRepository.findById(5L).orElseThrow();
+
+        // 2. 관심사 차별화 세팅 (충분한 가중치를 위해 30회 반복)
+        for (int i = 0; i < 30; i++) {
+            // user1: Java, Spring Boot (Backend)
+            techScoreService.increaseScore(user1, java, "POST");
+            techScoreService.increaseScore(user1, spring, "POST");
+
+            // user2: AWS, Docker (Infra)
+            techScoreService.increaseScore(user2, aws, "POST");
+            techScoreService.increaseScore(user2, docker, "POST");
+        }
+
+        // 3. 테스트용 타겟 게시글 생성 및 배달
+
+        // [Backend용 글] Java 태그 포함
+        Post javaPost = Post.builder().user(author).title("2026년 Java 백엔드 로드맵").content("Java/Spring 중심").build();
+        addTagToPost(javaPost, java);
+        postRepository.save(javaPost);
+        feedService.registerPostToGlobalFeed(javaPost);
+        feedService.deliverPostToFeeds(javaPost);
+
+        // [Infra용 글] AWS 태그 포함
+        Post infraPost = Post.builder().user(author).title("AWS와 Docker를 활용한 CI/CD").content("인프라 중심").build();
+        addTagToPost(infraPost, aws);
+        postRepository.save(infraPost);
+        feedService.registerPostToGlobalFeed(infraPost);
+        feedService.deliverPostToFeeds(infraPost);
+    }
+
+    private void boostPostToGlobalTop(Long postId) {
+        String postIdStr = String.valueOf(postId);
+        // 하이브리드 조회 방식에서는 글로벌 점수만 압도적으로 높으면 모든 유저에게 1등으로 보임
+        double superScore = 100_000_000_000.0;
+
+        // FeedService의 정해진 글로벌 키 사용 ("posts:global:scores")
+        redisTemplate.opsForZSet().add("posts:global:scores", postIdStr, superScore);
+        System.out.println(">>> [SUCCESS] ID " + postId + "번 게시글을 글로벌 전역 1등으로 설정했습니다.");
+    }
+
 }
