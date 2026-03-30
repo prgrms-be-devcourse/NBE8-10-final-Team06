@@ -1,9 +1,6 @@
 package com.devstagram.domain.post.service;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
@@ -19,6 +16,7 @@ import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.dto.*;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostLike;
@@ -33,6 +31,7 @@ import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.exception.ServiceException;
@@ -54,20 +53,50 @@ public class PostService {
     private final TechScoreService techScoreService;
     private final TechnologyRepository technologyRepository;
     private final PostScrapRepository postScrapRepository;
+    private final FeedService feedService;
+    private final FollowRepository followRepository;
     private final CommentLikeRepository commentLikeRepository;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
 
-        // TODO: 피드 정책 수립 후 반영.
+        // 글로벌 + 개인 1대1 비율 혼합 피드
+        Map<Long, Double> rankedScoreMap = feedService.getHybridFeedWithScores(memberId, pageable);
 
-        Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+        // redis 기반 정렬된 ID 목록
+        List<Long> rankedIds = new ArrayList<>(rankedScoreMap.keySet());
 
+        if (rankedIds.isEmpty()) {
+            // 데이터가 없는 경우 최신순 Fallback
+            Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+            return convertToFeedRes(posts, memberId, Collections.emptyMap());
+        }
+
+        // 뽑아낸 ID들로 게시글 인스턴스들 가져오기
+        List<Post> postList = postRepository.findAllByIdIn(rankedIds);
+
+        // Redis가 정해준 ID 순서대로 재정렬
+        postList.sort(Comparator.comparingInt(post -> rankedIds.indexOf(post.getId())));
+
+        // 5. Slice 객체 생성
+        boolean hasNext = rankedIds.size() >= pageable.getPageSize();
+        Slice<Post> posts = new SliceImpl<>(postList, pageable, hasNext);
+
+        return convertToFeedRes(posts, memberId, rankedScoreMap);
+    }
+
+    /**
+     * 피드 조회를 위한 DTO 변환 공통 로직
+     */
+    private Slice<PostFeedRes> convertToFeedRes(Slice<Post> posts, Long memberId, Map<Long, Double> scoreMap) {
         Set<Long> likedPostIds = getLikedPostIds(memberId, posts.getContent());
-        Set<Long> ScrappedPostIds = getScrappedPostIds(memberId, posts.getContent());
+        Set<Long> scrappedPostIds = getScrappedPostIds(memberId, posts.getContent());
 
-        return posts.map(post -> PostFeedRes.from(
-                post, likedPostIds.contains(post.getId()), ScrappedPostIds.contains(post.getId()), memberId));
+        return posts.map(post -> {
+            double score = scoreMap.getOrDefault(post.getId(), 0.0);
+            return PostFeedRes.from(
+                    post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), memberId, score);
+        });
     }
 
     private Set<Long> getLikedPostIds(Long memberId, List<Post> posts) {
@@ -140,13 +169,14 @@ public class PostService {
 
             for (Technology tech : techs) {
 
-                post.addTechTag(tech); // Post 엔티티 내 리스트에 추가
+                post.addTechTag(tech);
 
-                // 3. 유저 기술 점수 업데이트 (POST 가중치 적용)
+                // 글쓴이의 기술 점수 업데이트 (POST 가중치 적용)
                 techScoreService.increaseScore(user, tech, "POST");
             }
         }
 
+        // 미디어 처리
         if (files != null && !files.isEmpty()) {
 
             fileValidator.validateImages(files);
@@ -167,6 +197,12 @@ public class PostService {
             }
         }
         userRepository.increasePostCount(userId);
+
+        // 사용자 공통 글로벌 피드에 등록 (좋아요)
+        feedService.registerPostToGlobalFeed(post);
+
+        // 사용자 개인 피드에 등록 (기술 태그, 팔로우)
+        feedService.deliverPostToFeeds(post);
 
         return post.getId();
     }
@@ -197,7 +233,7 @@ public class PostService {
 
         post.update(req.title(), req.content());
 
-        // 기술 태그 변경 및 점수 반영
+        // 글쓴이의 기술 태그 변경 및 점수 반영
         if (req.techIds() != null) {
 
             List<Technology> oldTechs = post.getTechTags().stream()
@@ -258,39 +294,43 @@ public class PostService {
         if (post.isDeleted()) {
             throw new ServiceException("404-P-2", "이미 삭제된 게시글입니다.");
         }
-
         if (!post.getUser().getId().equals(userId)) {
             throw new ServiceException("403-U-2", "삭제 권한이 없습니다.");
         }
 
-        commentRepository.deleteRepliesByPostId(postId);
-        commentRepository.deleteParentsByPostId(postId);
+        // 1. [최적화] User 엔티티 통째가 아니라 ID 리스트만 뽑아서 비동기로 넘깁니다.
+        List<Long> targetUserIds = feedService.findTargetUsersForPost(post).stream()
+                .map(User::getId)
+                .toList();
 
-        // 기술 태그 점수 차감 및 매핑 제거
+        // 2. 기술 점수 회수 (영속성 컨텍스트 활용)
         if (!post.getTechTags().isEmpty()) {
             post.getTechTags()
-                    .forEach(postTech ->
-                            techScoreService.decreaseScore(post.getUser(), postTech.getTechnology(), "POST"));
-
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "POST"));
             post.getTechTags().clear();
         }
 
-        // 미디어 파일 삭제 준비
+        commentRepository.deleteParentsByPostId(postId);
+        commentRepository.deleteRepliesByPostId(postId);
+
+        // 3. 파일 및 DB 상태 변경
         List<String> fileNames =
                 post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
-
         post.softDelete();
-
         userRepository.decreasePostCount(userId);
 
+        // 4. Redis 정리 위임 (ID 리스트만 전달)
+        feedService.removePostFromFeeds(postId, targetUserIds, userId);
+
+        // 5. 물리 파일 삭제
         fileNames.forEach(storageService::delete);
     }
 
     @Transactional
     public boolean togglePostLike(Long postId, Long memberId) {
+        User actor = userRepository.getReferenceById(memberId);
 
-        User user = userRepository.getReferenceById(memberId);
-
+        // 비관적 락 등을 활용해 게시글 조회
         Post post = postRepository
                 .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
@@ -298,26 +338,28 @@ public class PostService {
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
 
         if (existingLike.isPresent()) {
-
+            // 좋아요 취소 로직
             postLikeRepository.delete(existingLike.get());
             postRepository.decrementLikeCount(postId);
 
-            // 기술 점수 차감
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+            // 행위자의 기술 점수 차감
+            post.getTechTags().forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "LIKE"));
+
+            // 글로벌 피드 점수 차감
+            feedService.updatePostScoreInGlobalFeed(post, false);
 
             return false;
         } else {
-
-            PostLike newLike = PostLike.builder().user(user).post(post).build();
-
+            // 좋아요 등록 로직
+            PostLike newLike = PostLike.builder().user(actor).post(post).build();
             postLikeRepository.save(newLike);
             postRepository.incrementLikeCount(postId);
 
-            // 기술 점수 부여
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "LIKE"));
+            // 행위자의 기술 점수 부여
+            post.getTechTags().forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "LIKE"));
 
+            // 글로벌 피드 점수 증가
+            feedService.updatePostScoreInGlobalFeed(post, true);
             return true;
         }
     }
@@ -335,7 +377,7 @@ public class PostService {
     @Transactional
     public boolean toggleScrap(Long postId, Long memberId) {
 
-        User user = userRepository.getReferenceById(memberId);
+        User actor = userRepository.getReferenceById(memberId);
 
         Post post = postRepository
                 .findByIdWithLock(postId)
@@ -347,18 +389,17 @@ public class PostService {
 
         Optional<PostScrap> scrapOpt = postScrapRepository.findByUserIdAndPostId(memberId, postId);
 
+        // 행위자의 기술 태그 점수 증감 로직
         if (scrapOpt.isPresent()) {
             postScrapRepository.deleteByUserIdAndPostId(memberId, postId);
 
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+            post.getTechTags().forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "SCRAP"));
 
             return false; // 스크랩 취소
         } else {
-            postScrapRepository.save(PostScrap.builder().user(user).post(post).build());
+            postScrapRepository.save(PostScrap.builder().user(actor).post(post).build());
 
-            post.getTechTags()
-                    .forEach(pt -> techScoreService.increaseScore(post.getUser(), pt.getTechnology(), "SCRAP"));
+            post.getTechTags().forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "SCRAP"));
 
             return true; // 스크랩 성공
         }
@@ -380,6 +421,6 @@ public class PostService {
         Set<Long> scrappedPostIds = postScrapRepository.findAllPostIdsByUserIdAndPostIds(userId, postIds);
 
         return scrappedPosts.map(post -> PostFeedRes.from(
-                post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), userId));
+                post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), userId, 0.0));
     }
 }

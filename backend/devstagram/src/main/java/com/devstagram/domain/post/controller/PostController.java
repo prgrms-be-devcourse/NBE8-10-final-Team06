@@ -74,9 +74,8 @@ public class PostController {
     @GetMapping
     public RsData<Slice<PostFeedRes>> getPosts(
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
-            @AuthenticationPrincipal SecurityUser user) {
-
-        Slice<PostFeedRes> feed = postService.getPostFeed(user.getId(), pageable);
+            @AuthenticationPrincipal SecurityUser securityUser) {
+        Slice<PostFeedRes> feed = postService.getPostFeed(securityUser.getId(), pageable);
 
         return RsData.success("피드 조회 성공", feed);
     }

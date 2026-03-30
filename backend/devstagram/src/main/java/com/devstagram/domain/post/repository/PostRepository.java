@@ -1,5 +1,6 @@
 package com.devstagram.domain.post.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             + // 실제 기술 정보 (Technology)
             "where p.id = :id and p.isDeleted = false")
     Optional<Post> findPostWithDetails(@Param("id") Long id);
+
+    List<Post> findAllByIdIn(List<Long> ids);
 
     Slice<Post> findAllByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 }
