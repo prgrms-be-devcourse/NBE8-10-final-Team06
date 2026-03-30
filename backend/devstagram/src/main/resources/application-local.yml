@@ -13,8 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      # 테이블은 자동 생성하되 데이터는 보존
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

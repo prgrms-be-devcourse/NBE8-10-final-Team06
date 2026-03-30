@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "tech_category")
 @Getter
+@AttributeOverride(name = "id", column = @Column(name = "category_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class TechCategory extends BaseEntity {
 

@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
                     columnNames = {"user_id", "tech_id"})
         })
 @Getter
+@AttributeOverride(name = "id", column = @Column(name = "user_tech_score_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserTechScore extends BaseEntity {
 

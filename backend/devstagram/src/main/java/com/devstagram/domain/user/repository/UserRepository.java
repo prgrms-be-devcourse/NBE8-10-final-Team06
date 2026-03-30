@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 import com.devstagram.domain.user.entity.User;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long>, UserRecommendationRepository {
 
     Optional<User> findByEmailAndIsDeletedFalse(String email);
 

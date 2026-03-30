@@ -14,6 +14,7 @@ import lombok.*;
 @Getter
 @Builder
 @AllArgsConstructor
+@AttributeOverride(name = "id", column = @Column(name = "tech_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Technology extends BaseEntity {
 
