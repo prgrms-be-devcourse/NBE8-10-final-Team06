@@ -125,6 +125,7 @@ class CommentServiceTest {
     void getReplies_paging_success() {
         // [given]
         Long parentId = 1L;
+        Long memberId = 1L;
         Pageable pageable = PageRequest.of(0, 5);
         Comment parent = createComment(parentId, "부모", null, null, null);
         List<Comment> replies = new ArrayList<>();
@@ -140,7 +141,7 @@ class CommentServiceTest {
                 .willReturn(slice);
 
         // [when]
-        Slice<ReplyInfoRes> result = commentService.getRepliesByCommentId(parentId, 0);
+        Slice<ReplyInfoRes> result = commentService.getRepliesByCommentId(memberId, parentId, 0);
 
         // [then]
         assertThat(result.getContent()).hasSize(5);
