@@ -8,16 +8,16 @@ const BASE_URL = __ENV.BASE_URL || 'https://devstagram.site';
  * 실제 테스트 전 seed 스크립트로 생성 필요
  */
 export const TEST_USERS = [
-    { email: 'test01@devstagram.com', password: 'Test1234!!' },
-    { email: 'test02@devstagram.com', password: 'Test1234!!' },
-    { email: 'test03@devstagram.com', password: 'Test1234!!' },
-    { email: 'test04@devstagram.com', password: 'Test1234!!' },
-    { email: 'test05@devstagram.com', password: 'Test1234!!' },
-    { email: 'test06@devstagram.com', password: 'Test1234!!' },
-    { email: 'test07@devstagram.com', password: 'Test1234!!' },
-    { email: 'test08@devstagram.com', password: 'Test1234!!' },
-    { email: 'test09@devstagram.com', password: 'Test1234!!' },
-    { email: 'test10@devstagram.com', password: 'Test1234!!' },
+    { email: 'k6test01@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test02@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test03@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test04@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test05@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test06@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test07@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test08@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test09@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test10@devstagram.com', password: 'Test1234Pw' },
 ];
 
 /**
