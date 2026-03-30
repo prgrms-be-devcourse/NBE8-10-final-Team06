@@ -14,7 +14,8 @@ public record CommentInfoRes(
         String profileImageUrl,
         LocalDateTime createdAt,
         LocalDateTime modifiedAt,
-        long replyCount) {
+        long replyCount,
+        long likeCount) {
     public CommentInfoRes(Comment comment, boolean isLiked, Long currentMemberId) {
         this(
                 comment.getId(),
@@ -26,6 +27,7 @@ public record CommentInfoRes(
                 comment.getUser().getProfileImageUrl(),
                 comment.getCreatedAt(),
                 comment.getModifiedAt(),
-                comment.getReplyCount());
+                comment.getReplyCount(),
+                comment.getLikeCount());
     }
 }
