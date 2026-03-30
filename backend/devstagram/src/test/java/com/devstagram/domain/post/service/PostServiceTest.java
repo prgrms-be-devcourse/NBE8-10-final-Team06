@@ -22,6 +22,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.dto.PostCreateReq;
 import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
@@ -70,6 +71,9 @@ class PostServiceTest {
 
     @Mock
     private CommentLikeRepository commentLikeRepository;
+
+    @Mock
+    private FeedService feedService;
 
     @Test
     @DisplayName("[게시글 작성 성공]")
