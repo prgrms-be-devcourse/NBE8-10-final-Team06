@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.devstagram.domain.technology.entity.PostTechnology;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
@@ -104,13 +104,11 @@ public class TechScoreService {
         }
 
         // 1. PostTechnology 엔티티 리스트에서 Technology ID들만 추출
-        List<Long> techIds = postTechTags.stream()
-                .map(pt -> pt.getTechnology().getId())
-                .toList();
+        List<Long> techIds =
+                postTechTags.stream().map(pt -> pt.getTechnology().getId()).toList();
 
         // 2. 해당 기술 ID들 중 하나라도 '50점 이상'의 점수를 가진 유저들을 중복 없이 조회
         // (UserTechScoreRepository에 추가한 쿼리 메서드 호출)
         return userTechScoreRepository.findUsersByTechIdsAndScoreGreaterThanEqual(techIds, 50);
     }
-
 }

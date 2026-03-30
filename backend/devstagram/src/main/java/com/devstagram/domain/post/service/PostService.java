@@ -30,7 +30,6 @@ import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
-import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
@@ -96,12 +95,7 @@ public class PostService {
         return posts.map(post -> {
             double score = scoreMap.getOrDefault(post.getId(), 0.0);
             return PostFeedRes.from(
-                    post,
-                    likedPostIds.contains(post.getId()),
-                    scrappedPostIds.contains(post.getId()),
-                    memberId,
-                    score
-            );
+                    post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), memberId, score);
         });
     }
 
@@ -293,7 +287,8 @@ public class PostService {
     @Transactional
     public void deletePost(Long userId, Long postId) {
 
-        Post post = postRepository.findById(postId)
+        Post post = postRepository
+                .findById(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
         if (post.isDeleted()) {
@@ -310,13 +305,14 @@ public class PostService {
 
         // 2. 기술 점수 회수 (영속성 컨텍스트 활용)
         if (!post.getTechTags().isEmpty()) {
-            post.getTechTags().forEach(pt ->
-                    techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "POST"));
+            post.getTechTags()
+                    .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "POST"));
             post.getTechTags().clear();
         }
 
         // 3. 파일 및 DB 상태 변경
-        List<String> fileNames = post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
+        List<String> fileNames =
+                post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
         post.softDelete();
         userRepository.decreasePostCount(userId);
 
@@ -332,7 +328,8 @@ public class PostService {
         User actor = userRepository.getReferenceById(memberId);
 
         // 비관적 락 등을 활용해 게시글 조회
-        Post post = postRepository.findByIdWithLock(postId)
+        Post post = postRepository
+                .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
@@ -343,8 +340,7 @@ public class PostService {
             postRepository.decrementLikeCount(postId);
 
             // 행위자의 기술 점수 차감
-            post.getTechTags().forEach(pt ->
-                    techScoreService.decreaseScore(actor, pt.getTechnology(), "LIKE"));
+            post.getTechTags().forEach(pt -> techScoreService.decreaseScore(actor, pt.getTechnology(), "LIKE"));
 
             // 글로벌 피드 점수 차감
             feedService.updatePostScoreInGlobalFeed(post, false);
@@ -357,8 +353,7 @@ public class PostService {
             postRepository.incrementLikeCount(postId);
 
             // 행위자의 기술 점수 부여
-            post.getTechTags().forEach(pt ->
-                    techScoreService.increaseScore(actor, pt.getTechnology(), "LIKE"));
+            post.getTechTags().forEach(pt -> techScoreService.increaseScore(actor, pt.getTechnology(), "LIKE"));
 
             // 글로벌 피드 점수 증가
             feedService.updatePostScoreInGlobalFeed(post, true);

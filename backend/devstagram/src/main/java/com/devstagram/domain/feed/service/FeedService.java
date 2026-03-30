@@ -1,26 +1,22 @@
 package com.devstagram.domain.feed.service;
 
+import java.time.Duration;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.Follow;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.FollowRepository;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.connection.RedisZSetCommands;
-import org.springframework.data.redis.connection.zset.Aggregate;
-import org.springframework.data.redis.connection.zset.Weights;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-
-
-import java.time.Duration;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,13 +64,11 @@ public class FeedService {
         }
     }
 
-
     // 팔로우 중인 계정인지 확인
     private boolean checkIfFollower(User author, User reader) {
         if (author.getId().equals(reader.getId())) return false;
         return followRepository.existsByFromUserIdAndToUserId(reader.getId(), author.getId());
     }
-
 
     // 기술태그가 일치하는지 확인
     private boolean checkIfTechMatched(Post post, User reader) {
@@ -101,9 +95,7 @@ public class FeedService {
 
         // 나(작성자)를 팔로우하는 사람들 조회 및 추가
         List<Follow> follows = followRepository.findAllByToUserId(post.getUser().getId());
-        follows.stream()
-                .map(Follow::getFromUser)
-                .forEach(targetSet::add);
+        follows.stream().map(Follow::getFromUser).forEach(targetSet::add);
 
         // 게시글의 기술 태그(PostTechnology) 기반 관심 유저들 추가
         List<User> techInterestedUsers = techScoreService.findUsersByTechTags(post.getTechTags());
@@ -153,7 +145,7 @@ public class FeedService {
     public Map<Long, Double> getHybridFeedWithScores(Long memberId, Pageable pageable) {
 
         String userFeedKey = USER_FEED_PREFIX + memberId;
-        String tempKey = "temp:feed:" + memberId;        // 계산을 위한 임시 장부
+        String tempKey = "temp:feed:" + memberId; // 계산을 위한 임시 장부
 
         // Redis ZUNION 실행
         // 두 점수를 동등한 비율로 합산한다는 뜻
@@ -163,12 +155,10 @@ public class FeedService {
         redisTemplate.expire(tempKey, Duration.ofSeconds(30));
 
         // 합산된 결과에서 페이지네이션 범위만큼 추출 (역순 정렬)
-        Set<ZSetOperations.TypedTuple<String>> pagedResults = redisTemplate.opsForZSet()
+        Set<ZSetOperations.TypedTuple<String>> pagedResults = redisTemplate
+                .opsForZSet()
                 .reverseRangeWithScores(
-                        tempKey,
-                        pageable.getOffset(),
-                        pageable.getOffset() + pageable.getPageSize() - 1
-                );
+                        tempKey, pageable.getOffset(), pageable.getOffset() + pageable.getPageSize() - 1);
 
         // 계산이 끝난 임시 키 즉시 삭제
         redisTemplate.delete(tempKey);
@@ -176,11 +166,8 @@ public class FeedService {
         // 결과 반환 (ID와 점수 매핑)
         if (pagedResults == null) return Collections.emptyMap();
 
-        return pagedResults.stream().collect(Collectors.toMap(
-                t -> Long.parseLong(t.getValue()),
-                t -> t.getScore(),
-                (v1, v2) -> v1,
-                LinkedHashMap::new
-        ));
+        return pagedResults.stream()
+                .collect(Collectors.toMap(
+                        t -> Long.parseLong(t.getValue()), t -> t.getScore(), (v1, v2) -> v1, LinkedHashMap::new));
     }
 }

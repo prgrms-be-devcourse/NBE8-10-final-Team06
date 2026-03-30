@@ -1,9 +1,10 @@
 package com.devstagram.domain.feed.service;
 
-import com.devstagram.domain.post.entity.Post;
+import java.time.ZoneId;
+
 import org.springframework.stereotype.Component;
 
-import java.time.ZoneId;
+import com.devstagram.domain.post.entity.Post;
 
 @Component
 public class FeedScoringStrategy {
@@ -22,7 +23,8 @@ public class FeedScoringStrategy {
      */
     public double calculateScore(Post post, boolean isFollower, boolean isTechMatched) {
 
-        long postMillis = post.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long postMillis =
+                post.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         double score = (double) (postMillis - BASE_TIME) / 60_000.0;
 
         if (isTechMatched) {

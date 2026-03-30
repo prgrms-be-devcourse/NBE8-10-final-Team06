@@ -356,16 +356,13 @@ public class BaseInitData implements ApplicationRunner {
         User user5 = userRepository.findByEmail("user5@test.com").orElseThrow();
         Technology java = technologyRepository.findAll().get(0); // Java
 
-        // 1. 기술 점수 미리 세팅
         techScoreService.increaseScore(admin, java, "POST");
 
-        // 2. 게시글 생성 (postService.createPost를 호출하면 배달까지 한 번에 됨)
-        // 만약 직접 Repository를 쓴다면 아래처럼 호출
-        Post techPost = Post.builder().user(user5).title("Java 신기술").content("내용").build();
+        Post techPost =
+                Post.builder().user(user5).title("Java 신기술").content("내용").build();
         addTagToPost(techPost, java);
         postRepository.save(techPost);
 
-        // [수정] 이제 post만 던지면 됨 (타겟은 FeedService가 알아서 계산)
         feedService.registerPostToGlobalFeed(techPost);
         feedService.deliverPostToFeeds(techPost);
     }
@@ -374,7 +371,6 @@ public class BaseInitData implements ApplicationRunner {
         User stranger = userRepository.findByEmail("user4@test.com").orElseThrow();
         User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
 
-        // 테스트를 위해 잠시 팔로우 관계를 맺어줍니다.
         followService.follow(admin.getId(), stranger.getId());
 
         Post normalPost = Post.builder()
@@ -385,24 +381,20 @@ public class BaseInitData implements ApplicationRunner {
 
         postRepository.save(normalPost);
 
-        // FeedService의 표준 메서드 호출 (인자값은 post 하나!)
         feedService.registerPostToGlobalFeed(normalPost);
         feedService.deliverPostToFeeds(normalPost);
     }
 
     private void createTechInterestScenario() {
-        // 1. 유저 및 기술 데이터 확보 (기존 ID 참고)
         User user1 = userRepository.findByEmail("user1@test.com").orElseThrow();
         User user2 = userRepository.findByEmail("user2@test.com").orElseThrow();
         User author = userRepository.findByEmail("user5@test.com").orElseThrow();
 
-        // 공유해주신 테이블 데이터 기반 ID 추출
         Technology java = technologyRepository.findById(1L).orElseThrow();
         Technology spring = technologyRepository.findById(2L).orElseThrow();
         Technology aws = technologyRepository.findById(4L).orElseThrow();
         Technology docker = technologyRepository.findById(5L).orElseThrow();
 
-        // 2. 관심사 차별화 세팅 (충분한 가중치를 위해 30회 반복)
         for (int i = 0; i < 30; i++) {
             // user1: Java, Spring Boot (Backend)
             techScoreService.increaseScore(user1, java, "POST");
@@ -413,17 +405,21 @@ public class BaseInitData implements ApplicationRunner {
             techScoreService.increaseScore(user2, docker, "POST");
         }
 
-        // 3. 테스트용 타겟 게시글 생성 및 배달
-
-        // [Backend용 글] Java 태그 포함
-        Post javaPost = Post.builder().user(author).title("2026년 Java 백엔드 로드맵").content("Java/Spring 중심").build();
+        Post javaPost = Post.builder()
+                .user(author)
+                .title("2026년 Java 백엔드 로드맵")
+                .content("Java/Spring 중심")
+                .build();
         addTagToPost(javaPost, java);
         postRepository.save(javaPost);
         feedService.registerPostToGlobalFeed(javaPost);
         feedService.deliverPostToFeeds(javaPost);
 
-        // [Infra용 글] AWS 태그 포함
-        Post infraPost = Post.builder().user(author).title("AWS와 Docker를 활용한 CI/CD").content("인프라 중심").build();
+        Post infraPost = Post.builder()
+                .user(author)
+                .title("AWS와 Docker를 활용한 CI/CD")
+                .content("인프라 중심")
+                .build();
         addTagToPost(infraPost, aws);
         postRepository.save(infraPost);
         feedService.registerPostToGlobalFeed(infraPost);
@@ -432,12 +428,9 @@ public class BaseInitData implements ApplicationRunner {
 
     private void boostPostToGlobalTop(Long postId) {
         String postIdStr = String.valueOf(postId);
-        // 하이브리드 조회 방식에서는 글로벌 점수만 압도적으로 높으면 모든 유저에게 1등으로 보임
         double superScore = 100_000_000_000.0;
 
-        // FeedService의 정해진 글로벌 키 사용 ("posts:global:scores")
         redisTemplate.opsForZSet().add("posts:global:scores", postIdStr, superScore);
         System.out.println(">>> [SUCCESS] ID " + postId + "번 게시글을 글로벌 전역 1등으로 설정했습니다.");
     }
-
 }
