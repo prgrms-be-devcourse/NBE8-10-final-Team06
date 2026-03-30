@@ -95,8 +95,8 @@ class PostRepositoryTest {
         PageRequest pageRequest = PageRequest.of(0, 2);
 
         // when
-        Slice<Post> result = postRepository.findAllByOrderByCreatedAtDesc(pageRequest);
-        Slice<Post> second = postRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(1, 2));
+        Slice<Post> result = postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageRequest);
+        Slice<Post> second = postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(PageRequest.of(1, 2));
 
         // then: setUp의 testPost(스크랩 대상 글)까지 포함해 총 4개 게시글
         // createdAt이 동일 시각이면 정렬 순서가 비결정적일 수 있음 → 제목 집합·페이지 크기로만 검증

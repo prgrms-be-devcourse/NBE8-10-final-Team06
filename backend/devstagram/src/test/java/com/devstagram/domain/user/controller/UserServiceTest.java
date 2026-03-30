@@ -274,7 +274,8 @@ class UserServiceTest {
         given(userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser)).willReturn(Collections.emptyList());
 
         // 게시글 목록 모킹
-        given(postRepository.findAllByUserIdOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class)))
+        given(postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(
+                        eq(targetUser.getId()), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(Collections.emptyList(), pageable, false));
 
         // 유저 조회 모킹 (Fetch Join 버전)
@@ -292,6 +293,7 @@ class UserServiceTest {
         assertThat(response.isFollowing()).isTrue(); // 팔로우 중인지 확인
 
         verify(userRepository).findByNicknameWithInfo(nickname);
-        verify(postRepository).findAllByUserIdOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class));
+        verify(postRepository)
+                .findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class));
     }
 }

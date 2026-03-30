@@ -68,12 +68,12 @@ public class PostService {
 
         if (rankedIds.isEmpty()) {
             // 데이터가 없는 경우 최신순 Fallback
-            Slice<Post> posts = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+            Slice<Post> posts = postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
             return convertToFeedRes(posts, memberId, Collections.emptyMap());
         }
 
         // 뽑아낸 ID들로 게시글 인스턴스들 가져오기
-        List<Post> postList = postRepository.findAllByIdIn(rankedIds);
+        List<Post> postList = postRepository.findAllByIdInAndIsDeletedFalse(rankedIds);
 
         // Redis가 정해준 ID 순서대로 재정렬
         postList.sort(Comparator.comparingInt(post -> rankedIds.indexOf(post.getId())));
