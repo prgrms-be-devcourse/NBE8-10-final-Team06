@@ -1,6 +1,8 @@
 package com.devstagram.domain.post.repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -18,6 +20,11 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     Optional<PostLike> findByPostIdAndUserId(Long postId, Long userId);
 
     void deleteByPostIdAndUserId(Long postId, Long userId);
+
+    boolean existsByPostIdAndUserId(Long postId, Long userId);
+
+    @Query("SELECT pl.post.id FROM PostLike pl WHERE pl.user.id = :userId AND pl.post.id IN :postIds")
+    Set<Long> findAllPostIdsByUserIdAndPostIds(@Param("userId") Long userId, @Param("postIds") List<Long> postIds);
 
     @Query("SELECT new com.devstagram.domain.post.dto.PostLikerRes(u.id, u.nickname) "
             + "FROM PostLike pl "

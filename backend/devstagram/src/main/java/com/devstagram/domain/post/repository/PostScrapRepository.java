@@ -1,6 +1,8 @@
 package com.devstagram.domain.post.repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,4 +26,9 @@ public interface PostScrapRepository extends JpaRepository<PostScrap, Long> {
                     + "ORDER BY s.createdAt DESC",
             countQuery = "SELECT count(s) FROM PostScrap s " + "WHERE s.user.id = :userId AND s.post.isDeleted = false")
     Page<Post> findActivePostsByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    boolean existsByPostIdAndUserId(Long postId, Long userId);
+
+    @Query("SELECT pl.post.id FROM PostScrap pl WHERE pl.user.id = :userId AND pl.post.id IN :postIds")
+    Set<Long> findAllPostIdsByUserIdAndPostIds(@Param("userId") Long userId, @Param("postIds") List<Long> postIds);
 }

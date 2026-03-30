@@ -1,6 +1,9 @@
 package com.devstagram.domain.comment.Service;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -69,7 +72,7 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public Slice<CommentInfoRes> getCommentsByPostId(Long postId, int pageNumber) {
+    public Slice<CommentInfoRes> getCommentsByPostId(Long memberId, Long postId, int pageNumber) {
 
         Post post =
                 postRepository.findById(postId).orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
@@ -81,7 +84,19 @@ public class CommentService {
 
         Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
 
-        return comments.map(CommentInfoRes::new);
+        Set<Long> likedCommentIds = getLikedCommentIds(memberId, comments.getContent());
+
+        // 5. DTO 변환 시 isLiked 주입 (람다 사용)
+        return comments.map(
+                comment -> new CommentInfoRes(comment, likedCommentIds.contains(comment.getId()), memberId));
+    }
+
+    private Set<Long> getLikedCommentIds(Long memberId, List<Comment> comments) {
+        if (memberId == null || comments.isEmpty()) {
+            return Collections.emptySet();
+        }
+        List<Long> commentIds = comments.stream().map(Comment::getId).toList();
+        return commentLikeRepository.findAllCommentIdsByUserIdAndCommentIds(memberId, commentIds);
     }
 
     @Transactional(readOnly = true)

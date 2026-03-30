@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,11 +21,14 @@ import org.springframework.data.domain.SliceImpl;
 
 import com.devstagram.domain.dm.dto.DmMessageSliceResponse;
 import com.devstagram.domain.dm.entity.Dm;
+import com.devstagram.domain.dm.entity.DmRoom;
+import com.devstagram.domain.dm.entity.DmRoomUser;
 import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
 import com.devstagram.domain.post.repository.PostRepository;
+import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
@@ -74,17 +78,22 @@ class DmServiceTest {
 
         when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(true);
 
+        User sender = mock(User.class);
+        when(sender.getId()).thenReturn(10L);
+
         Dm dm3 = mock(Dm.class);
         when(dm3.getId()).thenReturn(3L);
         when(dm3.getType()).thenReturn(MessageType.TEXT);
         when(dm3.getContent()).thenReturn("c3");
         when(dm3.isValid()).thenReturn(true);
+        when(dm3.getSender()).thenReturn(sender);
 
         Dm dm2 = mock(Dm.class);
         when(dm2.getId()).thenReturn(2L);
         when(dm2.getType()).thenReturn(MessageType.TEXT);
         when(dm2.getContent()).thenReturn("c2");
         when(dm2.isValid()).thenReturn(true);
+        when(dm2.getSender()).thenReturn(sender);
 
         Slice<Dm> slice = new SliceImpl<>(List.of(dm3, dm2), PageRequest.of(0, 2), true);
 
@@ -107,11 +116,15 @@ class DmServiceTest {
 
         when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(1L, 1L)).thenReturn(true);
 
+        User sender = mock(User.class);
+        when(sender.getId()).thenReturn(10L);
+
         Dm dm9 = mock(Dm.class);
         when(dm9.getId()).thenReturn(9L);
         when(dm9.getType()).thenReturn(MessageType.TEXT);
         when(dm9.getContent()).thenReturn("c9");
         when(dm9.isValid()).thenReturn(true);
+        when(dm9.getSender()).thenReturn(sender);
 
         Slice<Dm> slice = new SliceImpl<>(List.of(dm9), PageRequest.of(0, 1), false);
         when(dmRepository.findByDmRoom_IdAndIdLessThanOrderByIdDesc(eq(1L), eq(10L), any(PageRequest.class)))
@@ -123,5 +136,82 @@ class DmServiceTest {
         assertThat(res.messages()).hasSize(1);
         assertThat(res.hasNext()).isFalse();
         assertThat(res.nextCursor()).isNull();
+    }
+
+    @Test
+    void leave1v1Room_success() {
+        Long userId = 1L;
+        Long roomId = 100L;
+
+        DmRoomUser roomUser = mock(DmRoomUser.class);
+        DmRoom room = mock(DmRoom.class);
+
+        when(dmRoomUserRepository.findByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(Optional.of(roomUser));
+        when(roomUser.getDmRoom()).thenReturn(room);
+        when(room.getIsGroup()).thenReturn(false);
+
+        dmService.leave1v1Room(userId, roomId);
+
+        verify(dmRepository).deleteByDmRoom_Id(roomId);
+        verify(dmRoomUserRepository).deleteByDmRoom_Id(roomId);
+        verify(dmRoomRepository).delete(room);
+    }
+
+    @Test
+    void leaveGroupRoom_withOtherUsers_success() {
+        Long userId = 1L;
+        Long roomId = 100L;
+
+        DmRoomUser roomUser = mock(DmRoomUser.class);
+        DmRoom room = mock(DmRoom.class);
+        User user = mock(User.class);
+
+        when(dmRoomUserRepository.findByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(Optional.of(roomUser));
+        when(roomUser.getDmRoom()).thenReturn(room);
+        when(room.getIsGroup()).thenReturn(true);
+        when(roomUser.getUser()).thenReturn(user);
+        when(user.getNickname()).thenReturn("testUser");
+
+        when(dmRoomUserRepository.countByDmRoom_Id(roomId)).thenReturn(2L);
+        when(dmRoomRepository.findById(roomId)).thenReturn(Optional.of(room));
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(true);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        Dm dm = mock(Dm.class);
+        when(dm.getId()).thenReturn(10L);
+        when(dm.getType()).thenReturn(MessageType.SYSTEM);
+        when(dm.getContent()).thenReturn("testUser님이 나갔습니다.");
+        when(dm.getSender()).thenReturn(user);
+        when(user.getId()).thenReturn(userId);
+        when(dmRepository.save(any(Dm.class))).thenReturn(dm);
+
+        com.devstagram.domain.dm.dto.DmMessageResponse response = dmService.leaveGroupRoom(userId, roomId);
+
+        verify(dmRoomUserRepository).delete(roomUser);
+        verify(dmRoomUserRepository).flush();
+        assertThat(response).isNotNull();
+        assertThat(response.content()).isEqualTo("testUser님이 나갔습니다.");
+    }
+
+    @Test
+    void leaveGroupRoom_lastUser_success() {
+        Long userId = 1L;
+        Long roomId = 100L;
+
+        DmRoomUser roomUser = mock(DmRoomUser.class);
+        DmRoom room = mock(DmRoom.class);
+
+        when(dmRoomUserRepository.findByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(Optional.of(roomUser));
+        when(roomUser.getDmRoom()).thenReturn(room);
+        when(room.getIsGroup()).thenReturn(true);
+        when(dmRoomUserRepository.countByDmRoom_Id(roomId)).thenReturn(1L);
+
+        com.devstagram.domain.dm.dto.DmMessageResponse response = dmService.leaveGroupRoom(userId, roomId);
+
+        verify(dmRoomUserRepository).delete(roomUser);
+        verify(dmRoomUserRepository).flush();
+        verify(dmRepository).deleteByDmRoom_Id(roomId);
+        verify(dmRoomRepository).delete(room);
+        assertThat(response).isNull();
     }
 }

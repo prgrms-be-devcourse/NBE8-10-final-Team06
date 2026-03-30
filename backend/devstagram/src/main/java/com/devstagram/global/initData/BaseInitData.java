@@ -1,15 +1,14 @@
 package com.devstagram.global.initData;
 
 import java.time.LocalDate;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.comment.Service.CommentService;
@@ -21,6 +20,7 @@ import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.repository.DmRepository;
 import com.devstagram.domain.dm.repository.DmRoomRepository;
 import com.devstagram.domain.dm.repository.DmRoomUserRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostMedia;
 import com.devstagram.domain.post.repository.PostMediaRepository;
@@ -36,6 +36,7 @@ import com.devstagram.domain.technology.entity.TechCategory;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
@@ -66,6 +67,9 @@ public class BaseInitData implements ApplicationRunner {
     private final DmRepository dmRepository;
     private final TechnologyRepository technologyRepository;
     private final TechCategoryRepository techCategoryRepository;
+    private final FeedService feedService;
+    private final TechScoreService techScoreService;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     @Transactional
@@ -75,10 +79,11 @@ public class BaseInitData implements ApplicationRunner {
         initData();
     }
 
-    private void initData() {
+    private void initData() throws Exception {
         createTechMasterData();
         createUsers();
         createFollows();
+
         createPosts();
         createStories();
         createInteractions();
@@ -149,10 +154,14 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createFollows() {
-        User admin = userRepository.findByEmail("admin@test.com").get();
-        User user1 = userRepository.findByEmail("user1@test.com").get();
-        User user2 = userRepository.findByEmail("user2@test.com").get();
-        User user3 = userRepository.findByEmail("user3@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
+        User user3 =
+                userRepository.findByEmailAndIsDeletedFalse("user3@test.com").get();
 
         followService.follow(admin.getId(), user1.getId());
         followService.follow(admin.getId(), user2.getId());
@@ -235,8 +244,10 @@ public class BaseInitData implements ApplicationRunner {
 
     private void createStories() {
         List<User> users = userRepository.findAll();
-        User admin = userRepository.findByEmail("admin@test.com").get();
-        User user1 = userRepository.findByEmail("user1@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
 
         String[] storyUrls = {
             "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400",
@@ -292,9 +303,12 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createDms() {
-        User admin = userRepository.findByEmail("admin@test.com").get();
-        User user1 = userRepository.findByEmail("user1@test.com").get();
-        User user2 = userRepository.findByEmail("user2@test.com").get();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
 
         Post samplePost = postRepository.findAll().get(0);
         Story sampleStory = storyRepository.findAll().get(0);
@@ -335,5 +349,95 @@ public class BaseInitData implements ApplicationRunner {
 
         dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "5555555555555", null, true));
         dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "6666666666666", null, true));
+    }
+
+    private void createFeedScoringScenario() {
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
+        User user5 =
+                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
+        Technology java = technologyRepository.findAll().get(0); // Java
+
+        techScoreService.increaseScore(admin, java, "POST");
+
+        Post techPost =
+                Post.builder().user(user5).title("Java 신기술").content("내용").build();
+        addTagToPost(techPost, java);
+        postRepository.save(techPost);
+
+        feedService.registerPostToGlobalFeed(techPost);
+        feedService.deliverPostToFeeds(techPost);
+    }
+
+    private void createNormalPost() {
+        User stranger =
+                userRepository.findByEmailAndIsDeletedFalse("user4@test.com").orElseThrow();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
+
+        followService.follow(admin.getId(), stranger.getId());
+
+        Post normalPost = Post.builder()
+                .user(stranger)
+                .title("가중치 없는 일반 게시글")
+                .content("이제 admin의 팔로우 피드에 자연스럽게 노출됩니다.")
+                .build();
+
+        postRepository.save(normalPost);
+
+        feedService.registerPostToGlobalFeed(normalPost);
+        feedService.deliverPostToFeeds(normalPost);
+    }
+
+    private void createTechInterestScenario() {
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").orElseThrow();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").orElseThrow();
+        User author =
+                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
+
+        Technology java = technologyRepository.findById(1L).orElseThrow();
+        Technology spring = technologyRepository.findById(2L).orElseThrow();
+        Technology aws = technologyRepository.findById(4L).orElseThrow();
+        Technology docker = technologyRepository.findById(5L).orElseThrow();
+
+        for (int i = 0; i < 30; i++) {
+            // user1: Java, Spring Boot (Backend)
+            techScoreService.increaseScore(user1, java, "POST");
+            techScoreService.increaseScore(user1, spring, "POST");
+
+            // user2: AWS, Docker (Infra)
+            techScoreService.increaseScore(user2, aws, "POST");
+            techScoreService.increaseScore(user2, docker, "POST");
+        }
+
+        Post javaPost = Post.builder()
+                .user(author)
+                .title("2026년 Java 백엔드 로드맵")
+                .content("Java/Spring 중심")
+                .build();
+        addTagToPost(javaPost, java);
+        postRepository.save(javaPost);
+        feedService.registerPostToGlobalFeed(javaPost);
+        feedService.deliverPostToFeeds(javaPost);
+
+        Post infraPost = Post.builder()
+                .user(author)
+                .title("AWS와 Docker를 활용한 CI/CD")
+                .content("인프라 중심")
+                .build();
+        addTagToPost(infraPost, aws);
+        postRepository.save(infraPost);
+        feedService.registerPostToGlobalFeed(infraPost);
+        feedService.deliverPostToFeeds(infraPost);
+    }
+
+    private void boostPostToGlobalTop(Long postId) {
+        String postIdStr = String.valueOf(postId);
+        double superScore = 100_000_000_000.0;
+
+        redisTemplate.opsForZSet().add("posts:global:scores", postIdStr, superScore);
+        System.out.println(">>> [SUCCESS] ID " + postId + "번 게시글을 글로벌 전역 1등으로 설정했습니다.");
     }
 }

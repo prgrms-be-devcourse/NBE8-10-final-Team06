@@ -1,6 +1,7 @@
 package com.devstagram.domain.user.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,8 +60,15 @@ public class User extends BaseEntity {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserInfo userInfo;
 
+    @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PostScrap> scraps = new ArrayList<>();
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean isDeleted = false;
+
+    private LocalDateTime deletedAt;
 
     public void setUserInfo(UserInfo userInfo) {
         this.userInfo = userInfo;
@@ -74,5 +82,12 @@ public class User extends BaseEntity {
         this.profileImageUrl = profileImageUrl;
         this.birthDate = birthDate;
         this.gender = gender;
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.nickname = "탈퇴한 사용자_" + this.id;
+        this.email = "deleted_" + this.id + "_" + this.email;
     }
 }

@@ -11,6 +11,12 @@ terraform {
 # [2] AWS 접속 설정
 provider "aws" {
   region = var.region
+
+  default_tags {
+    tags = {
+      Team = var.prefix
+    }
+  }
 }
 
 # [3] VPC 네트워크 설정
@@ -122,6 +128,22 @@ resource "aws_security_group" "sg_ec2" {
   ingress {
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # 프로메테우스
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # 그라파나
+  ingress {
+    from_port   = 3001
+    to_port     = 3001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -239,14 +261,14 @@ EOF
 
 # [10] RDS DB 생성
 resource "aws_db_subnet_group" "rds_sub" {
-  name       = "${var.prefix}-rds-sub-group"
+  name       = "${var.prefix}-rds-sub"
   subnet_ids = [
     aws_subnet.subnet_1.id,
     aws_subnet.subnet_2.id,
     aws_subnet.subnet_3.id,
     aws_subnet.subnet_4.id
   ]
-  tags = { Name = "${var.prefix}-rds-sub-group" }
+  tags = { Name = "${var.prefix}-rds-sub" }
 }
 
 resource "aws_db_instance" "rds_1" {
@@ -288,4 +310,49 @@ resource "aws_route53_record" "www" {
 
   # 위에서 생성한 탄력적 IP 주소를 자동으로 참조합니다.
   records = [aws_eip.ec2_eip.public_ip]
+}
+
+# [13] S3 버킷 설정 (이미지 저장용)
+resource "aws_s3_bucket" "devstagram_storage" {
+  bucket = "${var.prefix}-storage-unique"
+
+  tags = { Name = "${var.prefix}-s3" }
+}
+
+# 버킷 소유권 설정
+resource "aws_s3_bucket_ownership_controls" "storage_oc" {
+  bucket = aws_s3_bucket.devstagram_storage.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+# 퍼블릭 액세스 차단 해제 (SNS 서비스이므로 이미지를 외부에서 볼 수 있어야 함)
+resource "aws_s3_bucket_public_access_block" "storage_pab" {
+  bucket = aws_s3_bucket.devstagram_storage.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# 버킷 정책 (누구나 읽기 가능하도록 설정 - GetObject 허용)
+resource "aws_s3_bucket_policy" "allow_public_read" {
+  bucket = aws_s3_bucket.devstagram_storage.id
+
+  depends_on = [aws_s3_bucket_public_access_block.storage_pab]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.devstagram_storage.arn}/*"
+      },
+    ]
+  })
 }

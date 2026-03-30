@@ -1,18 +1,28 @@
 package com.devstagram.domain.user.service;
 
+import java.util.Collections;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.devstagram.domain.post.dto.PostFeedProfileRes;
+import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.technology.dto.TechScoreDto;
 import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
+import com.devstagram.domain.user.dto.UserSearchResponse;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
+import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
@@ -30,17 +40,19 @@ public class UserService {
     private final StorageService storageService;
     private final FileValidator fileValidator;
     private final UserTechScoreRepository userTechScoreRepository;
+    private final PostRepository postRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 특정 사용자의 프로필 정보 조회
      */
-    public UserProfileResponse getUserProfile(String nickname, Long currentUserId) {
+    public UserProfileResponse getUserProfile(String nickname, Long currentUserId, Pageable pageable) {
         // 1. Fetch Join이 적용된 메서드로 변경 (성능 최적화)
         User targetUser = userRepository
                 .findByNicknameWithInfo(nickname)
                 .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
-        // 2. 팔로우 여부 확인 (기존 followService 로직 재사용)
+        // 2. 팔로우 여부 확인
         boolean isFollowing = false;
         if (currentUserId != null) {
             isFollowing = followService.isFollowing(currentUserId, targetUser.getId());
@@ -50,6 +62,11 @@ public class UserService {
         List<TechScoreDto> topTechScores =
                 allTechScores.stream().limit(5).map(TechScoreDto::from).toList();
 
+        // 4. 게시글 목록 직접 조회 (최신순 정렬 적용)
+        Slice<Post> postEntities = postRepository.findAllByUserIdOrderByCreatedAtDesc(targetUser.getId(), pageable);
+
+        Slice<PostFeedProfileRes> posts = postEntities.map(PostFeedProfileRes::from);
+
         // 3. Entity 내부의 카운트 필드를 사용하여 응답 생성
         return UserProfileResponse.of(
                 targetUser,
@@ -57,7 +74,8 @@ public class UserService {
                 targetUser.getFollowerCount(),
                 targetUser.getFollowingCount(),
                 isFollowing,
-                topTechScores);
+                topTechScores,
+                posts);
     }
 
     /**
@@ -104,5 +122,33 @@ public class UserService {
                     .resume(request.resume())
                     .build());
         }
+    }
+
+    public Slice<UserSearchResponse> searchUsers(String keyword, Long currentUserId, Pageable pageable) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return new SliceImpl<>(Collections.emptyList(), pageable, false);
+        }
+
+        Slice<User> users = userRepository.findByNicknameContaining(keyword, pageable);
+
+        // 2. 검색된 각 유저에 대해 '내가 팔로우 중인지' 여부를 확인하며 DTO로 변환
+        return users.map(user -> {
+            boolean isFollowing = false;
+            if (currentUserId != null) {
+                isFollowing = followService.isFollowing(currentUserId, user.getId());
+            }
+            return UserSearchResponse.of(user, isFollowing);
+        });
+    }
+
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "유저 없음"));
+
+        // 1. (User) 상태 변경
+        user.softDelete();
+
+        // 이 코드가 실행되는 순간, 이 이벤트를 기다리던 리스너들이 동시에 동작합니다.
+        eventPublisher.publishEvent(new UserWithdrawnEvent(userId));
     }
 }

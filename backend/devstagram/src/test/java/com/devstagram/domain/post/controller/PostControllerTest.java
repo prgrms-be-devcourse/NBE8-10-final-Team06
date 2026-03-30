@@ -177,7 +177,7 @@ class PostControllerTest {
         int pageNumber = 0;
         LocalDateTime now = LocalDateTime.now();
 
-        CommentInfoRes comment1 = new CommentInfoRes(1L, 10L, "첫 번째 댓글입니다.", "테스트유저", now, now, 2L);
+        CommentInfoRes comment1 = new CommentInfoRes(1L, 10L, "첫 번째 댓글입니다.", "테스트유저", true, false, "url", now, now, 2L);
         List<CommentInfoRes> commentList = List.of(comment1);
 
         Slice<CommentInfoRes> commentSlice = new SliceImpl<>(commentList, PageRequest.of(pageNumber, 10), true);
@@ -190,12 +190,14 @@ class PostControllerTest {
                 .content("테스트 내용")
                 .likeCount(10L)
                 .commentCount(5L)
+                .isLiked(false) // 추가
+                .isScrapped(false)
+                .isMine(false) // 추가
                 .createdAt(now)
                 .comments(commentSlice)
                 .build();
 
-        given(postService.getPostDetail(postId, pageNumber)).willReturn(response);
-
+        given(postService.getPostDetail(any(), eq(postId), eq(pageNumber))).willReturn(response);
         // when & then
         mockMvc.perform(get("/api/posts/{postId}", postId).param("page", String.valueOf(pageNumber)))
                 .andDo(print())
@@ -207,6 +209,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.likeCount").value(10))
                 .andExpect(jsonPath("$.data.commentCount").value(5))
                 .andExpect(jsonPath("$.data.comments.content[0].id").value(1L))
+                .andExpect(jsonPath("$.data.isLiked").value(false))
+                .andExpect(jsonPath("$.data.isMine").value(false))
                 .andExpect(jsonPath("$.data.comments.content[0].content").value("첫 번째 댓글입니다."))
                 .andExpect(jsonPath("$.data.comments.content[0].nickname").value("테스트유저"))
                 .andExpect(jsonPath("$.data.comments.content[0].replyCount").value(2))
@@ -233,6 +237,9 @@ class PostControllerTest {
                         .content("내용1")
                         .likeCount(10L)
                         .commentCount(2L)
+                        .isLiked(true)
+                        .isScrapped(false)
+                        .isMine(false)
                         .createdAt(now)
                         .build(),
                 PostFeedRes.builder()
@@ -243,14 +250,16 @@ class PostControllerTest {
                         .content("내용2")
                         .likeCount(5L)
                         .commentCount(0L)
+                        .isLiked(true)
+                        .isScrapped(false)
+                        .isMine(false)
                         .createdAt(now)
                         .build());
 
         Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
         Slice<PostFeedRes> sliceResponse = new SliceImpl<>(content, pageable, false);
 
-        given(postService.getPostFeed(any(Pageable.class))).willReturn(sliceResponse);
-
+        given(postService.getPostFeed(any(), any(Pageable.class))).willReturn(sliceResponse);
         // when & then
         mockMvc.perform(get("/api/posts").param("page", "0").param("size", "10").param("sort", "createdAt,desc"))
                 .andDo(print())

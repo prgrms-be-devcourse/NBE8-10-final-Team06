@@ -20,7 +20,9 @@ import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.devstagram.domain.comment.entity.Comment;
+import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
+import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.dto.PostCreateReq;
 import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
@@ -66,6 +68,12 @@ class PostServiceTest {
 
     @Mock
     private TechScoreService techScoreService;
+
+    @Mock
+    private CommentLikeRepository commentLikeRepository;
+
+    @Mock
+    private FeedService feedService;
 
     @Test
     @DisplayName("[게시글 작성 성공]")
@@ -123,7 +131,7 @@ class PostServiceTest {
         given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
 
         // 2. when
-        Slice<PostFeedRes> result = postService.getPostFeed(pageable);
+        Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
 
         // 3. then
         assertThat(result.getContent()).hasSize(2);
@@ -151,7 +159,7 @@ class PostServiceTest {
         given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
 
         // 2. when
-        Slice<PostFeedRes> result = postService.getPostFeed(pageable);
+        Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
 
         // 3. then
         assertThat(result.getContent()).hasSize(10);
@@ -260,7 +268,7 @@ class PostServiceTest {
                 .willReturn(commentEntitySlice);
 
         // 2. When
-        PostDetailRes result = postService.getPostDetail(postId, pageNumber);
+        PostDetailRes result = postService.getPostDetail(1L, postId, pageNumber);
 
         // 3. Then
         assertThat(result.nickname()).isEqualTo("작성자닉네임");

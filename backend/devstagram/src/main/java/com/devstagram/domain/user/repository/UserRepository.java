@@ -1,7 +1,10 @@
 package com.devstagram.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,9 +16,9 @@ import com.devstagram.domain.user.entity.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByEmail(String email);
+    Optional<User> findByEmailAndIsDeletedFalse(String email);
 
-    Optional<User> findByNickname(String nickname);
+    Optional<User> findByNicknameAndIsDeletedFalse(String nickname);
 
     Optional<User> findByApiKey(String apiKey);
 
@@ -49,6 +52,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.postCount = CASE WHEN u.postCount > 0 THEN u.postCount - 1 ELSE 0 END WHERE u.id = :id")
     void decreasePostCount(@Param("id") Long id);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo WHERE u.nickname = :nickname")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.userInfo " + "WHERE u.nickname = :nickname AND u.isDeleted = false")
     Optional<User> findByNicknameWithInfo(@Param("nickname") String nickname);
+
+    @Query("SELECT DISTINCT ts.user FROM UserTechScore ts " + "WHERE ts.technology.id IN :techIds "
+            + "AND ts.score >= :minScore "
+            + "AND ts.user.id != :authorId")
+    List<User> findUsersByInterestedTechIds(
+            @Param("techIds") List<Long> techIds, @Param("minScore") double minScore, @Param("authorId") Long authorId);
+
+    @Query("SELECT u FROM User u " + "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
+    Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
 }

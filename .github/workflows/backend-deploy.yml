@@ -6,8 +6,29 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  # 1. 다음 버전 번호를 미리 계산 (Dry Run 방식)
+  calculate-tag:
     runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_action.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculate next tag
+        id: tag_action
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: true # 실제로 태그를 찍지 않고 번호만 계산합니다.
+
+  # 2. 빌드 및 배포 작업
+  build-and-deploy:
+    needs: calculate-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.calculate-tag.outputs.new_tag }}
 
     steps:
       - name: Checkout Repository
@@ -19,29 +40,33 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 1. 빌드 (Gradle) - 테스트 제외하고 빌드 속도 향상
+      # Gradle 빌드 (테스트는 제외하여 빌드 속도 향상)
       - name: Build with Gradle
         run: |
           cd backend/devstagram
           chmod +x gradlew
           ./gradlew build -x test
 
-      # 2. 도커 로그인 (GitHub Container Registry)
+      # GitHub Container Registry(GHCR) 로그인
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. 도커 이미지 빌드 & 푸시
+      # 도커 이미지 빌드 및 GHCR 푸시 (계산된 버전 태그 사용)
       - name: Build and Push Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest ./backend/devstagram
-          docker push ghcr.io/${{ github.repository_owner }}/devstagram-backend:latest
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          BASE_NAME="ghcr.io/$REPO_OWNER/$REPO_NAME-backend"
+          
+          docker build -t $BASE_NAME:latest -t $BASE_NAME:${{ env.VERSION }} ./backend/devstagram
+          docker push $BASE_NAME:latest
+          docker push $BASE_NAME:${{ env.VERSION }}
 
-      # 4. 설정 파일(infra 폴더)을 EC2로 전송
-      # ✅ prometheus.yml 추가됨
+      # 설정 파일(infra 폴더 내 docker-compose, nginx, prometheus 등)을 EC2로 전송
       - name: Copy infra files to EC2
         uses: appleboy/scp-action@master
         with:
@@ -52,17 +77,18 @@ jobs:
           target: "/home/ec2-user/"
           strip_components: 1
 
-      # 5. EC2 서버에서 Blue-Green 전환 배포 실행
+      # EC2 서버에서 Blue-Green 무중단 배포 실행
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: VERSION
           script: |
             cd /home/ec2-user
-
-            # [Step 0] .env 파일 생성 (비밀값 주입)
+            
+            # [Step 0] 애플리케이션 실행을 위한 .env 환경 변수 생성
             echo "SPRING_PROFILES_ACTIVE=prod" > .env
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://${{ secrets.RDS_ENDPOINT }}:5432/devstagram" >> .env
             echo "SPRING_DATASOURCE_USERNAME=postgres" >> .env
@@ -71,64 +97,65 @@ jobs:
             echo "JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}" >> .env
             echo "JWT_ACCESS_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}" >> .env
             echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
+            echo "IMAGE_VERSION=$VERSION" >> .env
+            
+            # S3 관련 설정 추가
+            echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
+            echo "AWS_ACCESS_KEY=managed-by-iam-role" >> .env
+            echo "AWS_SECRET_KEY=managed-by-iam-role" >> .env
 
-            # [Step 1] 현재 실행 중인 컨테이너 확인 (8081 포트가 살아있으면 Blue가 떠있는 것)
+            # [Step 1] 현재 실행 중인 색상 확인 및 타겟 색상 결정
             EXIST_BLUE=$(sudo docker ps | grep backend-blue)
-
             if [ -z "$EXIST_BLUE" ]; then
-                echo "### 현재 GREEN 구동 중 -> BLUE로 배포를 시작합니다 ###"
-                TARGET_COLOR="blue"
-                TARGET_PORT=8081
-                BEFORE_COLOR="green"
+                TARGET_COLOR="blue"; TARGET_PORT=8081; BEFORE_COLOR="green"
             else
-                echo "### 현재 BLUE 구동 중 -> GREEN으로 배포를 시작합니다 ###"
-                TARGET_COLOR="green"
-                TARGET_PORT=8082
-                BEFORE_COLOR="blue"
+                TARGET_COLOR="green"; TARGET_PORT=8082; BEFORE_COLOR="blue"
             fi
-
-            # Nginx가 처음 뜰 때 파일이 없어서 죽는 것을 방지하는 "안전 장치"
-            sudo mkdir -p /home/ec2-user/nginx/conf.d
-            if [ ! -f /home/ec2-user/nginx/conf.d/service-env.inc ]; then
-                echo "set \$service_url http://backend-blue:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
-            fi
-
-            # ✅ prometheus.yml 디렉토리 생성 (없을 경우 대비)
+            
+            # 필요한 디렉토리 생성 (안전 장치)
             sudo mkdir -p /home/ec2-user/prometheus
+            sudo mkdir -p /home/ec2-user/nginx/conf.d
 
-            # [Step 2] 새로운 컨테이너 이미지 풀링 및 구동
-            sudo docker compose pull backend-$TARGET_COLOR
+            # [Step 2] 새 버전 이미지 풀링 및 컨테이너 실행 (Nginx 및 모니터링 도구 포함)
+            sudo docker compose pull redis nginx prometheus grafana node-exporter backend-$TARGET_COLOR
+            sudo docker compose up -d redis nginx backend-$TARGET_COLOR prometheus grafana node-exporter
 
-            # ✅ prometheus, grafana, node-exporter 함께 실행
-            sudo docker compose up -d nginx backend-$TARGET_COLOR prometheus grafana node-exporter
-
-            # [Step 3] 새로운 컨테이너 헬스체크 (Actuator 정석 방식)
-            echo "새 컨테이너($TARGET_COLOR) Actuator 헬스체크 시작..."
+            # [Step 3] 새 컨테이너가 정상적으로 떴는지 Actuator Health 체크
+            echo "새 컨테이너($TARGET_COLOR) 헬스체크 시작..."
             for retry in {1..12}
             do
                 HEALTH=$(curl -s http://localhost:$TARGET_PORT/actuator/health | grep "UP" || echo "fail")
-
                 if [ "$HEALTH" != "fail" ]; then
                     echo "--- 애플리케이션 건강 상태 확인 완료 (UP)! ---"
                     break
                 fi
-                echo "서버가 완전히 준비될 때까지 대기 중... ($retry/12)"
+                echo "대기 중... ($retry/12)"
                 sleep 5
-
-                if [ $retry -eq 12 ]; then
-                  echo "배포 실패: 애플리케이션이 정상 상태(UP)가 아니거나 DB 연결에 실패했습니다."
-                  exit 1
-                fi
+                if [ $retry -eq 12 ]; then exit 1; fi
             done
 
-            # [Step 4] Nginx 트래픽 전환 (동적 설정 파일 변경)
-            echo "Nginx 트래픽 전환: $BEFORE_COLOR -> $TARGET_COLOR"
+            # [Step 4] Nginx 트래픽을 새 컨테이너로 전환
             echo "set \$service_url http://backend-$TARGET_COLOR:8080;" | sudo tee /home/ec2-user/nginx/conf.d/service-env.inc
             sudo docker exec nginx nginx -s reload
 
-            # [Step 5] 이전 컨테이너 종료 및 정리
-            echo "5초 뒤 이전 버전($BEFORE_COLOR)을 종료합니다."
+            # [Step 5] 이전 버전 컨테이너 정리
             sleep 5
             sudo docker compose stop backend-$BEFORE_COLOR
             sudo docker compose rm -f backend-$BEFORE_COLOR
+            sudo docker image prune -f
             echo "### 무중단 배포 완료 ###"
+
+  # 3. 배포 성공 시 GitHub 공식 릴리스 생성 (Main/Develop 브랜치만 해당)
+  make-release:
+    needs: [build-and-deploy, calculate-tag]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.calculate-tag.outputs.new_tag }}
+          name: Release ${{ needs.calculate-tag.outputs.new_tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
