@@ -1,9 +1,9 @@
 /**
- * DM 토픽 `/topic/dm.{roomId}` STOMP 본문 정규화.
- * - `message`: `DmWebSocketController` 가 `WebSocketEventPayload` → `{ type: "message", data: DmMessageResponse }`.
- * - `typing`: 컨트롤러 주석은 `data` 중첩 예시이나, 실제 전송은 `TypingWsPayload` 평면 `{ type, roomId, userId, status }`.
- * - `read` / `join` / `leave`: 평면 레코드 (`read` 는 `messageId`).
- * 래핑·평면·스네이크 케이스를 모두 수용한다.
+ * DM 토픽 `/topic/dm.{roomId}` STOMP 본문.
+ * - 실시간 **메시지** 수신: `parseBackendDmMessageFromTopicBody` — 백엔드 `WebSocketEventPayload` 만 (`type: "message"`, `data: DmMessageResponse`).
+ * - **read**: `parseBackendReadFromTopicBody` — `ReadWsPayload` (`type`, `messageId`).
+ * - **typing**: `dmTypingInbound` 등 — `TypingWsPayload` 평면 `{ type, roomId, userId, status }` 및 변형.
+ * `parseDmMessagePayload` / `getTypingFieldsFromDmEvent` 등은 직렬화·중첩 폴백용.
  */
 
 import type { IMessage } from '@stomp/stompjs';
@@ -238,10 +238,39 @@ export function parseWrappedDmMessageEvent(event: unknown): DmMessageResponse | 
 }
 
 /**
- * STOMP `/topic/dm.*` 본문에서 수신 메시지 한 건 추출 (래퍼·평면·이중 JSON).
- * 실시간 말풍선이 안 붙는 경우 대부분 파싱 실패이므로 후보를 넓힌다.
+ * 토픽 JSON 루트 후보: 배열·단일 객체 + (선택) RsData 형 `{ resultCode, data: 실제이벤트 }` 한 겹.
+ * 게이트웨이/프록시가 REST 와 동일 래퍼를 씌우는 경우 대비.
  */
-export function parseAnyInboundDmStompBody(rawBody: string): DmMessageResponse | null {
+function flattenDmTopicJsonRoots(parsed: unknown): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const push = (r: Record<string, unknown>) => {
+    out.push(r);
+    const rc = r.resultCode ?? r.result_code;
+    const inner = r.data;
+    if (
+      isRecord(inner) &&
+      typeof rc === 'string' &&
+      rc.length > 0 &&
+      /^\d{3}-/.test(rc.trim())
+    ) {
+      out.push(inner);
+    }
+  };
+  if (Array.isArray(parsed)) {
+    for (const el of parsed) {
+      if (isRecord(el)) push(el);
+    }
+  } else if (isRecord(parsed)) {
+    push(parsed);
+  }
+  return out;
+}
+
+/**
+ * 백엔드 `DmWebSocketController.message` 브로드캐스트:
+ * `WebSocketEventPayload` → `type: "message"` + 본문은 `data`·`payload` 등 (`pickMessagePayloadField`).
+ */
+export function parseBackendDmMessageFromTopicBody(rawBody: string): DmMessageResponse | null {
   let parsed: unknown;
   try {
     parsed = parseDmWebSocketJson(rawBody);
@@ -250,49 +279,38 @@ export function parseAnyInboundDmStompBody(rawBody: string): DmMessageResponse |
   }
   if (parsed == null) return null;
 
-  const unwrapped = normalizeStompDmJsonRoot(parsed);
-  if (unwrapped != null) {
-    parsed = unwrapped;
-  }
+  const roots = flattenDmTopicJsonRoots(parsed);
 
-  // 프록시·브로커가 배열로 감싸거나, 한 프레임에 여러 JSON 값이 붙는 경우
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    for (const el of parsed) {
-      const inner = parseAnyInboundDmStompBody(
-        typeof el === 'string' ? el : JSON.stringify(el)
-      );
-      if (inner) return inner;
-    }
+  for (const el of roots) {
+    const typ = String(el.type ?? '').toLowerCase();
+    if (typ !== 'message') continue;
+    const msg = parseWrappedDmMessageEvent(el);
+    if (msg && Number.isFinite(msg.id) && msg.id > 0) return msg;
   }
+  return null;
+}
 
-  const wrapped = parseWrappedDmMessageEvent(parsed);
-  if (wrapped) return wrapped;
-
-  if (isRecord(parsed)) {
-    const typ = String(parsed.type ?? '').toLowerCase();
-    if (typ === 'typing' || typ === 'read' || typ === 'join' || typ === 'leave') return null;
-    // `type: "message"` 평면/변형 — parseWrapped 실패 시에도 normalize(중첩 data·senderId 병합)로 복원
-    if (typ === 'message') {
-      const rows = normalizeDmMessagesFromApi([parsed]);
-      const m = rows[0];
-      if (m && Number.isFinite(m.id) && m.id > 0) return m;
-      return null;
-    }
-    const row = normalizeDmMessagesFromApi([parsed]);
-    const m = row[0];
-    // senderId 는 0·누락일 수 있음 — 목록에는 올리고 말풍선은 computeDmMessageIsMe 가 처리
-    if (m && Number.isFinite(m.id) && m.id > 0) {
-      return m;
-    }
+/**
+ * 백엔드 `ReadWsPayload` — `{ "type": "read", "messageId": n }` (Jackson: messageId 필드명).
+ */
+export function parseBackendReadFromTopicBody(rawBody: string): number | null {
+  let parsed: unknown;
+  try {
+    parsed = parseDmWebSocketJson(rawBody);
+  } catch {
+    return null;
   }
-  // RsData 등 바깥 래퍼만 있고 실제 DM 이벤트가 `data` 안에 있는 경우
-  if (isRecord(parsed)) {
-    const nested = parsed.data;
-    if (isRecord(nested)) {
-      const w = parseWrappedDmMessageEvent(nested);
-      if (w) return w;
-      const direct = parseDmMessagePayload(nested.data ?? nested);
-      if (direct && Number.isFinite(direct.id) && direct.id > 0) return direct;
+  if (parsed == null) return null;
+
+  const roots = flattenDmTopicJsonRoots(parsed);
+
+  for (const el of roots) {
+    const typ = String(el.type ?? '').toLowerCase();
+    if (typ !== 'read') continue;
+    const mid = el.messageId ?? el.message_id;
+    if (mid != null) {
+      const n = Number(mid);
+      if (Number.isFinite(n) && n > 0) return n;
     }
   }
   return null;
@@ -309,7 +327,7 @@ export function stompMessageBodyToString(message: IMessage): string {
   return typeof b === 'string' ? b.replace(/^\uFEFF/, '') : '';
 }
 
-/** STOMP `message` 프레임 본문(JSON)에서 `DmMessageResponse` 추출 (data 중첩·문자열 JSON 대응) */
+/** @deprecated 백엔드 명세에 맞춘 `parseBackendDmMessageFromTopicBody` 사용 */
 export function extractDmMessageFromStompBody(rawBody: string): DmMessageResponse | null {
-  return parseAnyInboundDmStompBody(rawBody);
+  return parseBackendDmMessageFromTopicBody(rawBody);
 }

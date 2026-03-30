@@ -73,6 +73,14 @@ export function dmMessageDedupeKey(m: Pick<DmMessageResponse, 'senderId' | 'type
   return `${Number(m.senderId)}|${m.type}|${m.content}`;
 }
 
+/** mergeServerWithShareBackup 이 만드는 합성 id 상한(이보다 작거나 같으면 로컬 백업 행) — handleSend 낙관적 -1,-2 와 구분 */
+export const DM_SHARE_BACKUP_SYNTHETIC_ID_CEILING = -10_000_000_000;
+
+/** strict dedupe 가 발신자만 어긋날 때(서버 2|TEXT|x vs 백업 1|TEXT|x) 동일 본문 여부 판별용 */
+export function dmMessageRelaxedContentKey(m: Pick<DmMessageResponse, 'type' | 'content'>): string {
+  return `${m.type}|${String(m.content ?? '').trim()}`;
+}
+
 /** 말풍선 좌우: 본인 id 와 발신자 id 비교 (문자·실수·0·NaN 안전) */
 export function isDmMessageFromUser(
   msg: Pick<DmMessageResponse, 'senderId'>,
@@ -102,6 +110,47 @@ function pickSenderFieldsFromEnvelope(r: Record<string, unknown>): Record<string
   return o;
 }
 
+/** 래퍼 병합 시 바깥 스칼라가 안쪽 발신자를 덮어쓰면 안 되는 키(브로커/컨트롤러가 수신자 userId 를 루트에 두는 경우 등) */
+const ENVELOPE_KEYS_THAT_OVERWRITE_SENDER = [
+  'senderId',
+  'sender_id',
+  'userId',
+  'user_id',
+  'sender',
+  'fromUserId',
+  'from_user_id',
+] as const;
+
+function dmNestedBodyHasSenderIdentity(body: Record<string, unknown>): boolean {
+  if (toDmPositiveUserId(body.senderId) != null) return true;
+  if (toDmPositiveUserId(body.sender_id) != null) return true;
+  const s = body.sender;
+  if (isRecord(s)) {
+    if (toDmPositiveUserId(s.id) != null) return true;
+    if (toDmPositiveUserId(s.userId) != null) return true;
+    if (toDmPositiveUserId(s.user_id) != null) return true;
+  }
+  return false;
+}
+
+/**
+ * STOMP/WebSocketEventPayload 등 `{ type, userId, data: DmMessageResponse }` 평탄화 시,
+ * `data` 안에 이미 발신자 필드가 있으면 루트의 `userId`/`senderId` 가 이를 덮어쓰지 않게 한다.
+ * (런타임 로그: REST 는 senderId 1·2 교대로 정상인데 WS 꼬리만 전부 senderId 1 → 전부 내 말풍선)
+ */
+function mergeDmMessageNestedWithEnvelope(
+  nested: Record<string, unknown>,
+  envelope: Record<string, unknown>
+): Record<string, unknown> {
+  const picked = { ...pickSenderFieldsFromEnvelope(envelope) };
+  if (dmNestedBodyHasSenderIdentity(nested)) {
+    for (const k of ENVELOPE_KEYS_THAT_OVERWRITE_SENDER) {
+      delete picked[k];
+    }
+  }
+  return { ...nested, ...picked };
+}
+
 /**
  * REST/STOMP 한 겹 래핑 `{ data: { id, content, ... } }` + 바깥에 senderId 만 있는 형태 평탄화.
  */
@@ -116,7 +165,7 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
     isRecord(nested) &&
     (nested.id != null || nested.messageId != null || nested.message_id != null)
   ) {
-    return { ...nested, ...pickSenderFieldsFromEnvelope(r) };
+    return mergeDmMessageNestedWithEnvelope(nested, r);
   }
   // 일부 직렬화에서 `data` 가 객체가 아니라 JSON 문자열로 옴 → id 없는 래퍼만 남아 메시지가 통째로 드롭되던 문제
   if (!hasTopMessageId && typeof nested === 'string') {
@@ -128,7 +177,7 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
           isRecord(inner) &&
           (inner.id != null || inner.messageId != null || inner.message_id != null)
         ) {
-          return { ...inner, ...pickSenderFieldsFromEnvelope(r) };
+          return mergeDmMessageNestedWithEnvelope(inner, r);
         }
       } catch {
         /* ignore */
@@ -148,7 +197,7 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
       isRecord(inner) &&
       (inner.id != null || inner.messageId != null || inner.message_id != null)
     ) {
-      return { ...inner, ...pickSenderFieldsFromEnvelope(r), ...pickSenderFieldsFromEnvelope(nested) };
+      return mergeDmMessageNestedWithEnvelope(mergeDmMessageNestedWithEnvelope(inner, r), nested);
     }
   }
   return r;
@@ -156,8 +205,10 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
 
 /**
  * 말풍선 isMe (본인 = 오른쪽·파랑).
- * - 본인 id 확정(`toDmPositiveUserId`): 발신자 id 도 유효할 때만 `senderId === 본인`, 아니면 false (NaN 폴백 방지).
- * - 본인 id 미확정: 그룹이면 false. 1:1 이면 상대 id·발신자 id 둘 다 유효할 때만 `senderId !== 상대` 로 추정, 그 외 false.
+ * - 그룹: `senderId === 본인` 일 때만 true.
+ * - 1:1: **상대 userId 가 알려지면** `senderId === 상대` 이면 무조건 false — 본인 id 추정이 잠깐 틀려도 상대 메시지가 파란 말풍선으로 가지 않게.
+ * - 그다음 본인 id 확정 시 `senderId === 본인`.
+ * - 본인 id 미확정·1:1: 상대·발신자 id 둘 다 유효할 때만 `senderId !== 상대` 로 추정.
  */
 export function computeDmMessageIsMe(
   msg: Pick<DmMessageResponse, 'senderId'>,
@@ -166,17 +217,22 @@ export function computeDmMessageIsMe(
 ): boolean {
   const self = toDmPositiveUserId(myUserIdNum);
   const sid = toDmPositiveUserId(msg.senderId);
+  const opp = toDmPositiveUserId(ctx?.opponentUserId);
 
-  if (self != null) {
-    return sid != null && sid === self;
+  let out: boolean;
+  if (ctx?.isGroup === true) {
+    out = self != null && sid != null && sid === self;
+  } else if (opp != null && sid != null && sid === opp) {
+    out = false;
+  } else if (self != null) {
+    out = sid != null && sid === self;
+  } else if (opp == null || sid == null) {
+    out = false;
+  } else {
+    out = sid !== opp;
   }
 
-  if (ctx?.isGroup === true) return false;
-
-  const opp = toDmPositiveUserId(ctx?.opponentUserId);
-  if (opp == null || sid == null) return false;
-
-  return sid !== opp;
+  return out;
 }
 
 /**
@@ -221,6 +277,16 @@ function normalizeCreatedAtFromApi(v: unknown): string {
   return String(v);
 }
 
+/** Jackson 이 enum 을 `{ "name": "TEXT" }` 로보내는 환경 대비 */
+function coerceDmMessageTypeFromApi(raw: unknown): DmMessageResponse['type'] {
+  if (raw == null || raw === '') return 'TEXT';
+  if (typeof raw === 'string') return raw as DmMessageResponse['type'];
+  if (isRecord(raw) && typeof raw.name === 'string') {
+    return raw.name as DmMessageResponse['type'];
+  }
+  return String(raw) as DmMessageResponse['type'];
+}
+
 /** GET 메시지 응답 필드가 조금 달라도 카드/키 일치용으로 맞춤 */
 export function normalizeDmMessagesFromApi(rows: unknown[] | undefined): DmMessageResponse[] {
   if (!rows?.length) return [];
@@ -229,9 +295,11 @@ export function normalizeDmMessagesFromApi(rows: unknown[] | undefined): DmMessa
     const r = coerceDmMessageRowForNormalize(row);
     const rawId = r?.id ?? r?.messageId ?? r?.message_id;
     if (rawId == null || rawId === '') continue;
+    const idNum = Number(rawId);
+    if (!Number.isFinite(idNum) || idNum <= 0) continue;
     out.push({
-      id: Number(rawId),
-      type: r.type as DmMessageResponse['type'],
+      id: idNum,
+      type: coerceDmMessageTypeFromApi(r.type),
       content: String(r.content ?? ''),
       thumbnail: (r.thumbnail as string | null | undefined) ?? null,
       valid: r.valid !== false,

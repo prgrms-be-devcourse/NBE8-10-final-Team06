@@ -19,8 +19,12 @@ import {
   normalizeDmMessagesFromApi,
   toDmPositiveUserId,
 } from '../../util/dmMessageDedupe';
-import { mergeServerWithShareBackup, persistShareBackup, pruneShareBackupByServer } from '../../services/dmSharePersistence';
-import { fetchDmFirstPageIfStillInRoom, fetchDmPollMergeIfStillInRoom } from '../../util/dmRoomServerReconcile';
+import {
+  mergeServerWithShareBackup,
+  persistShareBackup,
+  pruneShareBackupByServer,
+} from '../../services/dmSharePersistence';
+import { fetchDmPollMergeIfStillInRoom } from '../../util/dmRoomServerReconcile';
 import {
   buildDmStompMessageBody,
   dmStompAppJoin,
@@ -33,20 +37,21 @@ import { isRsSuccess } from '../../util/rsData';
 import { mergePollSliceIntoMessages } from '../../util/dmMessagesMerge';
 import { readJwtSubAsUserId } from '../../util/jwtUserId';
 import { syncAuthTokensFromCookies } from '../../util/authStorageSync';
+import { resolveSockJsStompUrl } from '../../util/stompSockJsUrl';
 import DmRoomInfoModal from '../../components/dm/DmRoomInfoModal';
-import { useDmRoomStomp } from '../../hooks/useDmRoomStomp';
+import { useDmRoomTopic } from '../../hooks/useDmRoomTopic';
 import {
   DM_CLIENT_TYPING_START_REFRESH_MS,
   DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS,
 } from '../../util/dmTypingClient';
-import { debugAgentLogA7f850 } from '../../util/debugAgentLogA7f850';
+import { dmStompDebugLog } from '../../util/dmStompRuntimeDebug';
 
 /**
- * 채팅창 REST 폴링(백업). 이전 400ms 고정은 네트워크 탭에 연속 요청처럼 보이고 부하가 커서,
- * STOMP 연결 시에는 긴 간격만 두고, WS 미연결 시에만 더 자주 맞춘다.
+ * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
+ * DB 와 맞추기 위해 방 안·탭이 보일 때 짧은 간격으로 첫 페이지를 병합한다.
  */
-const DM_POLL_INTERVAL_CONNECTED_MS = 12_000;
-const DM_POLL_INTERVAL_DISCONNECTED_MS = 4_000;
+const DM_POLL_INTERVAL_IN_ROOM_MS = 2_500;
+const DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS = 2_000;
 
 /** /auth/me data.id 와 일부 환경의 userId 별칭 */
 function readMeUserId(data: SignupResponse): number | null {
@@ -84,6 +89,14 @@ const DmChatPage: React.FC = () => {
       toDmPositiveUserId(readJwtSubAsUserId())
     );
   }, [authMeNumericId, selfIdFromJwt]);
+  /**
+   * REST 메시지 `senderId` 는 DB user id 기준이 많아 `/auth/me` 와 맞추는 편이 안전함.
+   * JWT·스토어만 앞세운 `effectiveSelfId` 와 어긋나면 상대 말풍선이 전부 내 쪽으로 갈 수 있음.
+   */
+  const bubbleSelfUserId = useMemo(
+    (): number | null => selfIdForTypingEcho ?? effectiveSelfId,
+    [selfIdForTypingEcho, effectiveSelfId]
+  );
   const myUserIdNum = effectiveSelfId;
   const myNickNorm = myNickname?.trim().toLowerCase() ?? '';
   const { rooms, markAsRead, setRooms } = useDmStore();
@@ -99,7 +112,8 @@ const DmChatPage: React.FC = () => {
     if (!currentRoom) return null;
     if (currentRoom.isGroup) return currentRoom.participants[0] ?? null;
     const parts = currentRoom.participants;
-    const selfIdOk = myUserIdNum != null;
+    const selfForPeer = bubbleSelfUserId ?? myUserIdNum;
+    const selfIdOk = selfForPeer != null;
 
     const notSelfByNick = (p: (typeof parts)[0]) => {
       const pn = p.nickname?.trim().toLowerCase() ?? '';
@@ -109,18 +123,18 @@ const DmChatPage: React.FC = () => {
     if (parts.length === 1) {
       const only = parts[0];
       if (!only) return null;
-      if (selfIdOk && Number(only.userId) === myUserIdNum) return null;
+      if (selfIdOk && Number(only.userId) === selfForPeer) return null;
       if (myNickNorm && only.nickname?.trim().toLowerCase() === myNickNorm) return null;
       return only;
     }
 
     if (selfIdOk) {
-      const byId = parts.find((p) => Number(p.userId) !== myUserIdNum);
+      const byId = parts.find((p) => Number(p.userId) !== selfForPeer);
       if (byId) return byId;
     }
     const byNick = parts.find(notSelfByNick);
     return byNick ?? parts[0] ?? null;
-  }, [currentRoom, myUserIdNum, myNickNorm]);
+  }, [currentRoom, myUserIdNum, myNickNorm, bubbleSelfUserId]);
 
   const headerTitle = useMemo(() => {
     if (!currentRoom) return '채팅방';
@@ -130,13 +144,30 @@ const DmChatPage: React.FC = () => {
     return nick && nick.length > 0 ? nick : '채팅';
   }, [currentRoom, headerPeer]);
 
-  /** 메시지·타이핑 말풍선 공통 — `computeDmMessageIsMe` 의 마지막 senderId 비교에 사용 */
+  /**
+   * 1:1 말풍선용 상대 id — `headerPeer` 가 닉 폴백 등으로 틀릴 수 있어 participants 중 본인이 아닌 사람이 정확히 한 명이면 그 id 를 쓴다.
+   */
+  const dmBubbleOpponentUserId = useMemo((): number | null => {
+    if (!currentRoom || currentRoom.isGroup) {
+      return toDmPositiveUserId(headerPeer?.userId);
+    }
+    const selfGuess = bubbleSelfUserId ?? myUserIdNum;
+    if (selfGuess == null) return toDmPositiveUserId(headerPeer?.userId);
+    const others = currentRoom.participants.filter((p) => {
+      const pid = toDmPositiveUserId(p.userId);
+      return pid != null && pid !== selfGuess;
+    });
+    if (others.length === 1) return toDmPositiveUserId(others[0].userId);
+    return toDmPositiveUserId(headerPeer?.userId);
+  }, [currentRoom, headerPeer?.userId, bubbleSelfUserId, myUserIdNum]);
+
+  /** 메시지·타이핑 말풍선 공통 — 1:1 에서 `opponentUserId` 는 상대 확정용(회색 말풍선 우선) */
   const dmBubbleCtx = useMemo(
     () => ({
       isGroup: currentRoom?.isGroup ?? false,
-      opponentUserId: headerPeer?.userId,
+      opponentUserId: dmBubbleOpponentUserId,
     }),
-    [currentRoom?.isGroup, headerPeer?.userId]
+    [currentRoom?.isGroup, dmBubbleOpponentUserId]
   );
 
   const typingOpponentNickname = useMemo((): string | null => {
@@ -166,47 +197,11 @@ const DmChatPage: React.FC = () => {
     const remoteU = toDmPositiveUserId(remoteTyping.userId);
     if (remoteU == null) return true;
     const echoMe = toDmPositiveUserId(selfIdForTypingEcho);
-    const jwtSelf = toDmPositiveUserId(myUserIdNum);
+    const jwtSelf = toDmPositiveUserId(bubbleSelfUserId);
     if (echoMe != null && remoteU === echoMe) return false;
     if (jwtSelf != null && remoteU === jwtSelf) return false;
     return true;
-  }, [remoteTyping, isMeTyping, myUserIdNum, selfIdForTypingEcho]);
-
-  // #region agent log
-  useEffect(() => {
-    if (!remoteTyping) return;
-    if (!showPeerTypingFromRemote) {
-      debugAgentLogA7f850({
-        runId: 'verify',
-        hypothesisId: 'H-hidden',
-        location: 'DmChatPage:remoteTypingFiltered',
-        message: 'remoteTyping set but peer row hidden',
-        data: {
-          remoteUserId: remoteTyping.userId,
-          selfIdForTypingEcho,
-          myUserIdNum,
-          isMeTyping,
-        },
-      });
-    }
-  }, [remoteTyping, showPeerTypingFromRemote, selfIdForTypingEcho, myUserIdNum, isMeTyping]);
-
-  useEffect(() => {
-    if (!showPeerTypingFromRemote || !remoteTyping) return;
-    debugAgentLogA7f850({
-      runId: 'h-ui',
-      hypothesisId: 'H-ui',
-      location: 'DmChatPage:showPeerTypingFromRemote',
-      message: 'peer typing row visible',
-      data: {
-        remoteUserId: remoteTyping.userId,
-        selfIdForTypingEcho,
-        myUserIdNum,
-        isMeTyping,
-      },
-    });
-  }, [showPeerTypingFromRemote, remoteTyping, selfIdForTypingEcho, myUserIdNum, isMeTyping]);
-  // #endregion
+  }, [remoteTyping, isMeTyping, bubbleSelfUserId, selfIdForTypingEcho]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -259,9 +254,12 @@ const DmChatPage: React.FC = () => {
   /** 상대 typing 직후 REST 동기화(디바운스) — 메시지 지연 완화 */
   const typingPollDebounceRef = useRef<number | null>(null);
 
-  /** STOMP 핸들러·read 등에서 최신 본인 id (클로저 stale 방지) */
-  const effectiveSelfIdRef = useRef(effectiveSelfId);
-  effectiveSelfIdRef.current = effectiveSelfId;
+  /**
+   * STOMP·낙관적 전송·read 의 `userId`/`senderId` — REST `senderId`·말풍선과 같은 축이 되도록 `/auth/me` 우선 id(`bubbleSelfUserId`)를 쓴다.
+   * JWT/스토어만 쓰면 서버 숫자 id 와 어긋나 상대 메시지가 전부 내 말풍선으로 보일 수 있음.
+   */
+  const effectiveSelfIdRef = useRef<number | null>(bubbleSelfUserId);
+  effectiveSelfIdRef.current = bubbleSelfUserId;
 
   /** STOMP 타이핑 에코 억제 — 페이지에서 계산한 본인 id (me 우선) */
   const typingEchoSelfUserIdRef = useRef<number | null>(null);
@@ -270,26 +268,36 @@ const DmChatPage: React.FC = () => {
   const opponentTypingNicknameRef = useRef<string | null>(null);
   opponentTypingNicknameRef.current = typingOpponentNickname;
 
-  /** 쿠키→localStorage 동기화 직후 토큰을 잡기 위해 몇 차례 리렌더 — useStomp reconnectKey 갱신 */
-  const [stompTokenRescan, setStompTokenRescan] = useState(0);
+  /**
+   * STOMP reconnectKey 를 짧은 간격으로 여러 번 바꾸면 SockJS 가 연결 도중 `deactivate` 로 끊기며
+   * "WebSocket is closed before the connection is established" 가 반복되고, cleanup 시 대기 publish 가 버려져
+   * 메시지가 DB 에 저장되지 않을 수 있다. 쿠키→localStorage 반영은 1회만 검사한다.
+   */
+  const [stompAuthRevision, setStompAuthRevision] = useState(0);
   useEffect(() => {
-    const timeouts = [0, 120, 400].map((ms) =>
-      window.setTimeout(() => {
-        setStompTokenRescan((n) => n + 1);
-      }, ms)
-    );
-    return () => timeouts.forEach((id) => window.clearTimeout(id));
-  }, []);
+    const id = window.setTimeout(() => {
+      const before = (localStorage.getItem('accessToken') ?? '').trim();
+      syncAuthTokensFromCookies();
+      const after = (localStorage.getItem('accessToken') ?? '').trim();
+      if (after !== before) {
+        setStompAuthRevision((n) => n + 1);
+      }
+    }, 280);
+    return () => window.clearTimeout(id);
+  }, [isLoggedIn, userId]);
 
   const stompReconnectKey = useMemo(() => {
     syncAuthTokensFromCookies();
     const t = (localStorage.getItem('accessToken') ?? '').trim();
     const tail = t.length > 12 ? t.slice(-16) : t;
-    return `${isLoggedIn ? 1 : 0}:${userId ?? ''}:${tail}`;
-  }, [isLoggedIn, userId, stompTokenRescan]);
+    return `${isLoggedIn ? 1 : 0}:${userId ?? ''}:${tail}:r${stompAuthRevision}`;
+  }, [isLoggedIn, userId, stompAuthRevision]);
+
+  /** 개발 시 Vite 프록시 대신 백엔드 직접 연결 — SockJS WebSocket 조기 종료 완화 */
+  const stompSockJsUrl = useMemo(() => resolveSockJsStompUrl('/ws'), []);
 
   const { isConnected, subscribe, publish } = useStomp({
-    endpoint: '/ws',
+    endpoint: stompSockJsUrl,
     reconnectKey: stompReconnectKey,
   });
 
@@ -410,11 +418,13 @@ const DmChatPage: React.FC = () => {
     });
   }, [roomId, mergeFreshSliceIntoMessages]);
 
-  // STOMP 실시간이 누락돼도 REST로 동기화(저빈도 백업). 백그라운드 탭에서는 요청 생략, 포그라운드 복귀 시 1회 동기화.
+  // STOMP `message` 가 오지 않아도 getMessages 첫 페이지로 상대/본인 메시지를 맞춘다.
   useEffect(() => {
     if (!roomId) return;
     const rid = Number(roomId);
-    const intervalMs = isConnected ? DM_POLL_INTERVAL_CONNECTED_MS : DM_POLL_INTERVAL_DISCONNECTED_MS;
+    const intervalMs = isConnected
+      ? DM_POLL_INTERVAL_IN_ROOM_MS
+      : DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS;
 
     const tick = () => {
       if (roomIdRef.current == null || Number(roomIdRef.current) !== rid) return;
@@ -484,11 +494,8 @@ const DmChatPage: React.FC = () => {
     return () => observer.disconnect();
   }, [loadMoreMessages]);
 
-  /**
-   * STOMP `/topic/dm.{roomId}` 구독·토픽 이벤트 처리·대기 전송 플러시.
-   * 서버는 CONNECT JWT 를 세션에 묶고 SEND 마다 SecurityContext 를 복원하므로 message/read 가 실시간으로 맞는다.
-   */
-  useDmRoomStomp({
+  /** 토픽 한 구독: 메시지·read·타이핑·대기 배치 플러시 (백엔드 DmWebSocketController 명세). */
+  useDmRoomTopic({
     roomId,
     isConnected,
     subscribe,
@@ -524,7 +531,7 @@ const DmChatPage: React.FC = () => {
         publish(dmStompAppLeave(rid), { roomId: rid, userId: leaveId });
       }
     };
-  }, [isConnected, roomId, effectiveSelfId, publish]);
+  }, [isConnected, roomId, effectiveSelfId, bubbleSelfUserId, publish]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -559,6 +566,27 @@ const DmChatPage: React.FC = () => {
     const destination = dmStompAppMessage(rid);
     const stompBody = buildDmStompMessageBody(sendPl);
     publish(destination, stompBody);
+    // #region agent log
+    dmStompDebugLog('H5', 'DmChatPage.tsx:handleSendMessage', 'dm_send_attempt', {
+      rid,
+      destination,
+      actorId: actor,
+      isConnected,
+      contentLen: content.length,
+    });
+    // #endregion
+
+    const restSyncAfterSend = () => {
+      fetchDmPollMergeIfStillInRoom(rid, roomIdRef, setMessages, {
+        beforeMerge: (r, normalized) => pruneShareBackupByServer(r, normalized),
+        afterMerge: (incoming) => {
+          if (incoming.length > 0) setIsLoading(false);
+        },
+      });
+    };
+    window.setTimeout(restSyncAfterSend, 350);
+    window.setTimeout(restSyncAfterSend, 1_600);
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
@@ -570,10 +598,6 @@ const DmChatPage: React.FC = () => {
       lastTypingStartSentAtRef.current = 0;
     }
     setIsMeTyping(false);
-    /** STOMP `message` 수신이 1차 동기화 — 한 번 REST 로 낙관적 id·서버 스냅샷 정합만 맞춘다 */
-    window.setTimeout(() => {
-      fetchDmFirstPageIfStillInRoom(rid, roomIdRef, (slice) => mergeFreshSliceIntoMessages(rid, slice));
-    }, 700);
     // 하단 이동
     setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 0);
   };
@@ -710,7 +734,7 @@ const DmChatPage: React.FC = () => {
             <DmChatMessageRow
               key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
               msg={msg}
-              isMe={computeDmMessageIsMe(msg, myUserIdNum, dmBubbleCtx)}
+              isMe={computeDmMessageIsMe(msg, bubbleSelfUserId, dmBubbleCtx)}
               showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
             />
           ))
@@ -720,10 +744,10 @@ const DmChatPage: React.FC = () => {
         {showPeerTypingFromRemote && remoteTyping ? (
           <DmTypingBubbleRow text={remoteTyping.text} isMe={false} />
         ) : null}
-        {isMeTyping && isResolvedDmUserId(myUserIdNum) ? (
+        {isMeTyping && isResolvedDmUserId(bubbleSelfUserId) ? (
           <DmTypingBubbleRow
             text="입력 중..."
-            isMe={isDmTypingBubbleMine(myUserIdNum, myUserIdNum, dmBubbleCtx)}
+            isMe={isDmTypingBubbleMine(bubbleSelfUserId, bubbleSelfUserId, dmBubbleCtx)}
           />
         ) : null}
       </main>
