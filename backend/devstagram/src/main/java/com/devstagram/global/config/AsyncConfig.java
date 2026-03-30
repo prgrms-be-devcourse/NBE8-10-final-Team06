@@ -13,9 +13,19 @@ public class AsyncConfig {
     @Bean(name = "feedTaskExecutor")
     public Executor feedTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(8); // 기본 스레드 수
-        executor.setMaxPoolSize(16); // 최대 스레드 수
-        executor.setQueueCapacity(500); // 대기 큐
+
+        // Core 수
+        executor.setCorePoolSize(4);
+
+        // Max 수
+        executor.setMaxPoolSize(8);
+
+        // Queue
+        executor.setQueueCapacity(100);
+
+        // 거절 정책: 큐가 꽉 찼을 때 요청을 버리지 않고 호출한 스레드(Tomcat)에서 처리하게 함
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
         executor.setThreadNamePrefix("FeedAsync-");
         executor.initialize();
         return executor;
