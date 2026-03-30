@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.devstagram.domain.comment.constant.CommentConstants;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
+import com.devstagram.domain.comment.dto.CommentLikeRes;
 import com.devstagram.domain.comment.dto.ReplyInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.domain.comment.entity.CommentLike;
@@ -155,7 +156,7 @@ public class CommentService {
     }
 
     @Transactional
-    public boolean toggleCommentLike(Long commentId, Long userId) {
+    public CommentLikeRes toggleCommentLike(Long commentId, Long userId) {
 
         User user = userRepository.getReferenceById(userId);
 
@@ -165,16 +166,19 @@ public class CommentService {
 
         Optional<CommentLike> existingLike = commentLikeRepository.findByCommentIdAndUserId(commentId, userId);
 
+        boolean isLiked;
         if (existingLike.isPresent()) {
             commentLikeRepository.delete(existingLike.get());
-            commentRepository.decrementLikeCount(commentId);
-            return false;
+            comment.removeLike();
+            isLiked = false;
         } else {
             CommentLike newLike =
                     CommentLike.builder().user(user).comment(comment).build();
             commentLikeRepository.save(newLike);
-            commentRepository.incrementLikeCount(commentId);
-            return true;
+            comment.addLike();
+            isLiked = true;
         }
+
+        return new CommentLikeRes(isLiked, comment.getLikeCount());
     }
 }

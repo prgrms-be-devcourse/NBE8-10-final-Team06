@@ -8,10 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.devstagram.domain.comment.Service.CommentService;
-import com.devstagram.domain.comment.dto.CommentCreateReq;
-import com.devstagram.domain.comment.dto.CommentInfoRes;
-import com.devstagram.domain.comment.dto.CommentUpdateReq;
-import com.devstagram.domain.comment.dto.ReplyInfoRes;
+import com.devstagram.domain.comment.dto.*;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
 
@@ -79,11 +76,12 @@ public class CommentController {
     }
 
     @PostMapping("/comments/{commentId}")
-    public RsData<Void> toggleLike(@PathVariable Long commentId, @AuthenticationPrincipal SecurityUser securityUser) {
-        boolean isLiked = commentService.toggleCommentLike(commentId, securityUser.getId());
+    public RsData<CommentLikeRes> toggleLike(
+            @PathVariable Long commentId, @AuthenticationPrincipal SecurityUser securityUser) {
+        CommentLikeRes result = commentService.toggleCommentLike(commentId, securityUser.getId());
 
-        String message = isLiked ? "댓글 좋아요 성공" : "댓글 좋아요 취소 성공";
+        String message = result.isLiked() ? "댓글 좋아요 성공" : "댓글 좋아요 취소 성공";
 
-        return RsData.success(message, null);
+        return RsData.success(message, result);
     }
 }

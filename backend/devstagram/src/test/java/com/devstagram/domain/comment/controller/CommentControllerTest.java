@@ -26,10 +26,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.devstagram.domain.comment.Service.CommentService;
-import com.devstagram.domain.comment.dto.CommentCreateReq;
-import com.devstagram.domain.comment.dto.CommentInfoRes;
-import com.devstagram.domain.comment.dto.CommentUpdateReq;
-import com.devstagram.domain.comment.dto.ReplyInfoRes;
+import com.devstagram.domain.comment.dto.*;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
@@ -192,14 +189,17 @@ class CommentControllerTest {
     void toggleCommentLike_Created() throws Exception {
         // given
         Long commentId = 1L;
-        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(true);
+        CommentLikeRes res = new CommentLikeRes(true, 10L);
+        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(res);
 
         // when & then
-        mockMvc.perform(post("/api/comments/{commentId}", commentId).with(csrf())) // POST 요청이므로 CSRF 토큰 필요
+        mockMvc.perform(post("/api/comments/{commentId}", commentId).with(csrf()))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("댓글 좋아요 성공"));
+                .andExpect(jsonPath("$.msg").value("댓글 좋아요 성공"))
+                .andExpect(jsonPath("$.data.isLiked").value(true))
+                .andExpect(jsonPath("$.data.likeCount").value(10));
     }
 
     @Test
@@ -208,13 +208,16 @@ class CommentControllerTest {
     void toggleCommentLike_Removed() throws Exception {
         // given
         Long commentId = 1L;
-        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(false);
+        CommentLikeRes res = new CommentLikeRes(false, 9L);
+        given(commentService.toggleCommentLike(eq(commentId), anyLong())).willReturn(res);
 
         // when & then
         mockMvc.perform(post("/api/comments/{commentId}", commentId).with(csrf()))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("댓글 좋아요 취소 성공"));
+                .andExpect(jsonPath("$.msg").value("댓글 좋아요 취소 성공"))
+                .andExpect(jsonPath("$.data.isLiked").value(false))
+                .andExpect(jsonPath("$.data.likeCount").value(9));
     }
 }
