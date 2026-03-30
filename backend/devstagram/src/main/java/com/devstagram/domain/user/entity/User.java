@@ -14,6 +14,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users")
@@ -70,6 +72,11 @@ public class User extends BaseEntity {
 
     private LocalDateTime deletedAt;
 
+    @Builder.Default
+    @Column(columnDefinition = "vector(142)")
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    private float[] techVector = new float[142];
+
     public void setUserInfo(UserInfo userInfo) {
         this.userInfo = userInfo;
         if (userInfo != null) {
@@ -89,5 +96,13 @@ public class User extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
         this.nickname = "탈퇴한 사용자_" + this.id;
         this.email = "deleted_" + this.id + "_" + this.email;
+    }
+
+    public void updateTechScore(Long techId, float score) {
+        int index = techId.intValue() - 1; // 1번 기술 -> 0번 인덱스
+        if (index >= 0 && index < 142) {
+            if (this.techVector == null) this.techVector = new float[142];
+            this.techVector[index] += score; // 기존 점수에 누적
+        }
     }
 }

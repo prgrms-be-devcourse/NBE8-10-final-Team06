@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
-import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.user.entity.User;
 
@@ -23,63 +22,40 @@ public class TechScoreService {
 
     private final UserTechScoreRepository userTechScoreRepository;
 
-    // 활동별 점수 가중치 (게시=20, 좋아요=5, 스크랩= 10)
-    private static final int SCORE_POST = 20;
-    private static final int SCORE_LIKE = 5;
-    private static final int SCORE_SCRAP = 10;
+    // 활동별 점수 가중치
+    private static final float SCORE_POST = 20.0f;
+    private static final float SCORE_LIKE = 5.0f;
+    private static final float SCORE_SCRAP = 10.0f;
 
     /**
-     * 특정 활동에 대한 사용자의 기술 점수를 증가시킵니다.
-     * 해당 기술에 대한 점수 기록이 없는 경우 새롭게 생성합니다.
-     * * @param user         점수를 획득하는 사용자
-     * @param tech         점수가 부여될 기술 태그
-     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     * [벡터 방식] 특정 활동에 대한 사용자의 기술 점수를 가산합니다.
+     * 이제 별도의 테이블(UserTechScore)이 아닌, User 엔티티의 142차원 techVector 배열에 직접 점수를 누적합니다.
      */
     public void increaseScore(User user, Technology tech, String activityType) {
-        UserTechScore techScore = userTechScoreRepository
-                .findByUserAndTechnology(user, tech)
-                .orElseGet(() -> userTechScoreRepository.save(new UserTechScore(user, tech, tech.getCategory())));
+        float score = switch (activityType) {
+            case "POST" -> SCORE_POST;
+            case "LIKE" -> SCORE_LIKE;
+            case "SCRAP" -> SCORE_SCRAP;
+            default -> 0.0f;
+        };
 
-        switch (activityType) {
-            case "POST" -> {
-                techScore.increaseScore(SCORE_POST);
-                techScore.increasePostCount();
-            }
-            case "LIKE" -> {
-                techScore.increaseScore(SCORE_LIKE);
-                techScore.increaseLikeCount();
-            }
-            case "SCRAP" -> {
-                techScore.increaseScore(SCORE_SCRAP);
-                techScore.increaseScrapCount();
-            }
-        }
+        // User 엔티티 내부의 벡터 배열 업데이트
+        user.updateTechScore(tech.getId(), score);
     }
 
     /**
-     * 특정 활동이 취소되었을 때(예: 게시글 삭제, 좋아요 취소) 점수를 차감합니다.
-     * 기록이 존재하는 경우에만 차감 로직을 수행합니다.
-     * * @param user         점수가 차감될 사용자
-     * @param tech         대상 기술 태그
-     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     * [벡터 방식] 특정 활동이 취소되었을 때 점수를 차감합니다.
+     * User 엔티티의 techVector 배열에서 해당 기술 인덱스의 값을 감소시킵니다.
      */
     public void decreaseScore(User user, Technology tech, String activityType) {
-        userTechScoreRepository.findByUserAndTechnology(user, tech).ifPresent(techScore -> {
-            switch (activityType) {
-                case "POST" -> {
-                    techScore.decreaseScore(SCORE_POST);
-                    techScore.decreasePostCount();
-                }
-                case "LIKE" -> {
-                    techScore.decreaseScore(SCORE_LIKE);
-                    techScore.decreaseLikeCount();
-                }
-                case "SCRAP" -> {
-                    techScore.decreaseScore(SCORE_SCRAP);
-                    techScore.decreaseScrapCount();
-                }
-            }
-        });
+        float score = switch (activityType) {
+            case "POST" -> -SCORE_POST;
+            case "LIKE" -> -SCORE_LIKE;
+            case "SCRAP" -> -SCORE_SCRAP;
+            default -> 0.0f;
+        };
+
+        user.updateTechScore(tech.getId(), score);
     }
 
     /**

@@ -69,10 +69,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
-	implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
-	annotationProcessor("com.querydsl:querydsl-apt:5.1.0:jakarta")
-	annotationProcessor("jakarta.persistence:jakarta.persistence-api")
-	annotationProcessor("jakarta.annotation:jakarta.annotation-api")
+	implementation("pgvector:pgvector:0.1.6")
 
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
 	implementation ("org.springframework.boot:spring-boot-starter-actuator")
