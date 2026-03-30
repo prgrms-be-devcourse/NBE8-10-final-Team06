@@ -32,7 +32,7 @@ public class PostController {
     public ResponseEntity<RsData<Long>> createPost(
             @AuthenticationPrincipal SecurityUser user,
             @Valid @RequestPart("request") PostCreateReq req,
-            @RequestPart("files") List<MultipartFile> files) {
+            @RequestPart(value = "files", required = false) List<MultipartFile> files) {
 
         Long postId = postService.createPost(user.getId(), req, files);
 
