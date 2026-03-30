@@ -100,7 +100,7 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public Slice<ReplyInfoRes> getRepliesByCommentId(Long commentId, int pageNumber) {
+    public Slice<ReplyInfoRes> getRepliesByCommentId(Long memberId, Long commentId, int pageNumber) {
 
         Comment parent = commentRepository
                 .findById(commentId)
@@ -113,7 +113,11 @@ public class CommentService {
 
         Slice<Comment> replies = commentRepository.findRepliesWithUserAndImageByParentId(commentId, pageable);
 
-        return replies.map(ReplyInfoRes::new);
+        Set<Long> likedCommentIds = getLikedCommentIds(memberId, replies.getContent());
+
+        return replies.map(reply ->
+                new ReplyInfoRes(reply, likedCommentIds.contains(reply.getId()), memberId)
+        );
     }
 
     @Transactional

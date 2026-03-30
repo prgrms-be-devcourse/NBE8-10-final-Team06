@@ -41,7 +41,7 @@ public class CommentController {
             @PathVariable Long commentId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @AuthenticationPrincipal SecurityUser securityUser) {
-        Slice<ReplyInfoRes> replyList = commentService.getRepliesByCommentId(commentId, pageNumber);
+        Slice<ReplyInfoRes> replyList = commentService.getRepliesByCommentId(securityUser.getId(), commentId, pageNumber);
 
         return RsData.success("대댓글 조회 성공", replyList);
     }
