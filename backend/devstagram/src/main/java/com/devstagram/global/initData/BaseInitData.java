@@ -352,8 +352,10 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createFeedScoringScenario() {
-        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
-        User user5 = userRepository.findByEmail("user5@test.com").orElseThrow();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
+        User user5 =
+                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
         Technology java = technologyRepository.findAll().get(0); // Java
 
         techScoreService.increaseScore(admin, java, "POST");
@@ -368,8 +370,10 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createNormalPost() {
-        User stranger = userRepository.findByEmail("user4@test.com").orElseThrow();
-        User admin = userRepository.findByEmail("admin@test.com").orElseThrow();
+        User stranger =
+                userRepository.findByEmailAndIsDeletedFalse("user4@test.com").orElseThrow();
+        User admin =
+                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
 
         followService.follow(admin.getId(), stranger.getId());
 
@@ -386,9 +390,12 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createTechInterestScenario() {
-        User user1 = userRepository.findByEmail("user1@test.com").orElseThrow();
-        User user2 = userRepository.findByEmail("user2@test.com").orElseThrow();
-        User author = userRepository.findByEmail("user5@test.com").orElseThrow();
+        User user1 =
+                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").orElseThrow();
+        User user2 =
+                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").orElseThrow();
+        User author =
+                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
 
         Technology java = technologyRepository.findById(1L).orElseThrow();
         Technology spring = technologyRepository.findById(2L).orElseThrow();

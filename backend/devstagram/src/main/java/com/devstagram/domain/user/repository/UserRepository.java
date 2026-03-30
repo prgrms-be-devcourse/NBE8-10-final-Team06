@@ -59,10 +59,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             + "AND ts.score >= :minScore "
             + "AND ts.user.id != :authorId")
     List<User> findUsersByInterestedTechIds(
-            @Param("techIds") List<Long> techIds,
-            @Param("minScore") double minScore,
-            @Param("authorId") Long authorId
-    );
+            @Param("techIds") List<Long> techIds, @Param("minScore") double minScore, @Param("authorId") Long authorId);
 
     @Query("SELECT u FROM User u " + "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
     Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
