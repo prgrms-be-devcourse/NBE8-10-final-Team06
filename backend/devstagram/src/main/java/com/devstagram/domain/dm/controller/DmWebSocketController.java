@@ -197,8 +197,8 @@ public class DmWebSocketController {
     }
 
     /**
-     * message/read 등 <strong>반드시 로그인 사용자</strong>여야 하는 핸들러용.
-     * 1순위: STOMP {@code Message} 의 {@link StompHeaderAccessor#getUser()}({@code SecurityUser} principal)<br>
+     * message/read 등 반드시 로그인 사용자여야 하는 핸들러용.
+     * 1순위: STOMP {@code Message} 의 {@link StompHeaderAccessor#getUser()}({@code SecurityUser} principal)
      * 2순위: {@link SecurityUtil#getCurrentUserId()} (동일 스레드에 SecurityContext 가 있을 때만 성공)
      */
     private Long requireUserIdFromStompOrSecurity(Message<?> message) {
