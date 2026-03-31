@@ -12,14 +12,14 @@
 # ─────────────────────────────────────────────────────────
 
 BASE_URL=${1:-"https://devstagram.site"}
-COMMON_PW="Test1234!!"
+COMMON_PW="Test1234Pw"
 
 echo "🌱 k6 테스트 유저 생성 시작 (대상: ${BASE_URL})"
 echo ""
 
 for i in $(seq -w 1 10); do
-    EMAIL="test${i}@devstagram.com"
-    NICKNAME="test_dev_${i}"
+    EMAIL="k6test${i}@devstagram.com"
+    NICKNAME="k6dev${i}"
 
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
         -X POST "${BASE_URL}/api/auth/signup" \
@@ -44,5 +44,5 @@ done
 
 echo ""
 echo "✅ 시드 유저 생성 완료"
-echo "   이메일: test01@devstagram.com ~ test10@devstagram.com"
-echo "   비밀번호: ${COMMON_PW}"
+echo "   이메일: k6test01@devstagram.com ~ k6test10@devstagram.com"
+   echo "   비밀번호: ${COMMON_PW}"
