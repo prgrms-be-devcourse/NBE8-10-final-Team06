@@ -73,7 +73,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "infra/docker-compose.yml,infra/nginx/nginx.conf,infra/nginx/conf.d/service-env.inc,infra/prometheus/prometheus.yml"
+          source: "infra/docker-compose.yml,infra/nginx/nginx.conf,infra/nginx/conf.d/service-env.inc,infra/prometheus/prometheus.yml,infra/k6"
           target: "/home/ec2-user/"
           strip_components: 1
 
