@@ -128,7 +128,8 @@ class PostServiceTest {
 
         Slice<Post> slice = new SliceImpl<>(posts, pageable, false);
 
-        given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
+        given(postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable))
+                .willReturn(slice);
 
         // 2. when
         Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
@@ -137,7 +138,7 @@ class PostServiceTest {
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getContent().get(0).nickname()).isEqualTo("작성자");
 
-        verify(postRepository).findAllByOrderByCreatedAtDesc(pageable);
+        verify(postRepository).findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
 
     @Test
@@ -156,7 +157,8 @@ class PostServiceTest {
 
         List<Post> firstPageContent = posts.subList(0, 10);
         Slice<Post> slice = new SliceImpl<>(firstPageContent, pageable, true);
-        given(postRepository.findAllByOrderByCreatedAtDesc(pageable)).willReturn(slice);
+        given(postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable))
+                .willReturn(slice);
 
         // 2. when
         Slice<PostFeedRes> result = postService.getPostFeed(1L, pageable);
@@ -166,7 +168,7 @@ class PostServiceTest {
         assertThat(result.hasNext()).isTrue();
         assertThat(result.getContent().get(0).nickname()).isEqualTo("테스트작성자");
         assertThat(result.getContent().get(0).title()).isEqualTo("제목1");
-        verify(postRepository, times(1)).findAllByOrderByCreatedAtDesc(pageable);
+        verify(postRepository, times(1)).findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
 
     @Test

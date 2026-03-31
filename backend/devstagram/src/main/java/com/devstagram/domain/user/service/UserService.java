@@ -63,7 +63,8 @@ public class UserService {
                 allTechScores.stream().limit(5).map(TechScoreDto::from).toList();
 
         // 4. 게시글 목록 직접 조회 (최신순 정렬 적용)
-        Slice<Post> postEntities = postRepository.findAllByUserIdOrderByCreatedAtDesc(targetUser.getId(), pageable);
+        Slice<Post> postEntities =
+                postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(targetUser.getId(), pageable);
 
         Slice<PostFeedProfileRes> posts = postEntities.map(PostFeedProfileRes::from);
 
