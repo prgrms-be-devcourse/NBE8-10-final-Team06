@@ -29,7 +29,7 @@ public class TechnologyController {
 
         List<TechCategoryInfoRes> categories = technologyService.getAllTechCategories();
 
-        return RsData.success("전체 카테고리 조회 성공", categories);
+        return RsData.success("전체 기술 카테고리 조회 성공", categories);
     }
 
     @PostMapping()
@@ -45,7 +45,7 @@ public class TechnologyController {
     public RsData<Void> createCategory(@Valid @RequestBody TechCategoryCreateReq req) {
         technologyService.createCategory(req);
 
-        return RsData.success("카테고리 생성 성공", null);
+        return RsData.success("기술 카테고리 생성 성공", null);
     }
 
     @PutMapping("/{technologyId}")
@@ -61,7 +61,7 @@ public class TechnologyController {
     public RsData<Void> updateCategory(@Valid @RequestBody TechCategoryUpdateReq req, @PathVariable Long categoryId) {
         technologyService.updateCategory(categoryId, req);
 
-        return RsData.success("카테고리 수정 성공", null);
+        return RsData.success("기술 카테고리 수정 성공", null);
     }
 
     @DeleteMapping("/{technologyId}")
@@ -70,7 +70,7 @@ public class TechnologyController {
 
         technologyService.deleteTech(technologyId);
 
-        return RsData.success("기술 스택 삭제 성공", null);
+        return RsData.success("기술태그 삭제 성공", null);
     }
 
     @DeleteMapping("/categories/{categoryId}")
