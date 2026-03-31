@@ -25,9 +25,22 @@ public class TechCategory extends BaseEntity {
     @Column(name = "color", nullable = false)
     private String color;
 
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
     @Builder
-    public TechCategory(String name, String color) {
+    public TechCategory(Long id, String name, String color) {
+        this.id = id;
         this.name = name;
         this.color = color;
+    }
+
+    public void update(String name, String color){
+        this.name = name;
+        this.color = color;
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
     }
 }

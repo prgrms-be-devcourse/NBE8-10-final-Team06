@@ -30,4 +30,6 @@ public interface TechnologyRepository extends JpaRepository<Technology, Long> {
      */
     @Query("select t from Technology t where t.category.id = :categoryId")
     List<Technology> findAllByCategoryId(@Param("categoryId") Long categoryId);
+
+    List<Technology> findAllByOrderByNameAsc();
 }

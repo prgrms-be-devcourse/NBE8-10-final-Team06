@@ -29,4 +29,13 @@ public class Technology extends BaseEntity {
 
     @Column(name = "color")
     private String color;
+
+
+    public void update(TechCategory category, String name, String iconUrl, String color){
+        this.category = category;
+        this.name = name;
+        this.iconUrl = iconUrl;
+        this.color = color;
+    }
+
 }
