@@ -23,7 +23,7 @@ public class TechScoreService {
 
     private final UserTechScoreRepository userTechScoreRepository;
 
-    // 활동별 점수 가중치
+    // 활동별 점수 가중치 (게시=20, 좋아요=5, 스크랩= 10)
     private static final int SCORE_POST = 20;
     private static final int SCORE_LIKE = 5;
     private static final int SCORE_SCRAP = 10;
@@ -88,7 +88,7 @@ public class TechScoreService {
 
     /**
      * 사용자가 일정 점수 이상을 보유한 기술 ID 목록을 조회합니다.
-     * 피드 배달 시 관심 기술 매칭 여부 판단용
+     * 피드 배달 시 '관심 기술 매칭' 여부를 판단하기 위해 사용됩니다.
      */
     @Transactional(readOnly = true)
     public Set<Long> getInterestedTechIds(Long userId, int minScore) {
@@ -98,7 +98,7 @@ public class TechScoreService {
     }
 
     /**
-     * 게시글의 기술 태그들을 공통적으로 좋아하는 유저 리스트 조회
+     * 게시글의 기술 태그들을 공통적으로 좋아하는 '유저 리스트' 조회
      * 용도: 게시글 작성 시 Fan-out 배달 대상 추출
      */
     @Transactional(readOnly = true)
@@ -107,9 +107,12 @@ public class TechScoreService {
             return Collections.emptyList();
         }
 
+        // 1. PostTechnology 엔티티 리스트에서 Technology ID들만 추출
         List<Long> techIds =
                 postTechTags.stream().map(pt -> pt.getTechnology().getId()).toList();
 
+        // 2. 해당 기술 ID들 중 하나라도 '50점 이상'의 점수를 가진 유저들을 중복 없이 조회
+        // (UserTechScoreRepository에 추가한 쿼리 메서드 호출)
         return userTechScoreRepository.findUsersByTechIdsAndScoreGreaterThanEqual(techIds, 50);
     }
 }
