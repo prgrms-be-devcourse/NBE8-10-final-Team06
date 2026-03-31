@@ -29,6 +29,7 @@ public record SignupRequest(
                 .birthDate(this.birthDate)
                 .gender(this.gender)
                 .apiKey(encodedApiKey)
+                .techVector(new float[142])
                 .build();
 
         UserInfo userInfo =

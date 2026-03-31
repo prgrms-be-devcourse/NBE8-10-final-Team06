@@ -79,12 +79,12 @@ public class BaseInitData implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) throws Exception {
-        userTechScoreRepository.deleteAllInBatch();
-        followRepository.deleteAllInBatch();
-        postRepository.deleteAllInBatch();
-        userRepository.deleteAllInBatch();
+        // userTechScoreRepository.deleteAllInBatch();
+        // followRepository.deleteAllInBatch();
+        // postRepository.deleteAllInBatch();
+        // userRepository.deleteAllInBatch();
 
-        initData();
+        // initData();
     }
 
     private void initData() throws Exception {

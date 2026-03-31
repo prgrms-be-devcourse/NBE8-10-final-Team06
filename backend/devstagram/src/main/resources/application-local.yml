@@ -2,8 +2,8 @@ spring:
   datasource:
     # 도커 데스크탑으로 띄운 Postgres 주소
     url: jdbc:postgresql://localhost:5432/devstagram
-    username: root
-    password: root
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_USERNAME:root}
     driver-class-name: org.postgresql.Driver
 
   data:
@@ -13,7 +13,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

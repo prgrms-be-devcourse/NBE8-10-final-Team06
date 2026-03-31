@@ -1,4 +1,4 @@
-package com.devstagram.domain.user.controller;
+package com.devstagram.domain.user.service;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
@@ -33,8 +33,6 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.entity.UserInfo;
 import com.devstagram.domain.user.event.UserWithdrawnEvent;
 import com.devstagram.domain.user.repository.UserRepository;
-import com.devstagram.domain.user.service.FollowService;
-import com.devstagram.domain.user.service.UserService;
 import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 import com.devstagram.global.util.FileValidator;

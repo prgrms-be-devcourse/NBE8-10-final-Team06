@@ -1,19 +1,25 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb_test
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:postgresql://localhost:5432/devstagram_test
+    username: root
+    password: root
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        hibernate.jdbc.types_sql_type_mapping: true
+        hibernate.type.preferred_array_jdbc_type: VECTOR
+        format_sql: true
     show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 custom:
   jwt:

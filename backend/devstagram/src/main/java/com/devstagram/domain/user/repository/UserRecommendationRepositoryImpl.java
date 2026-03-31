@@ -1,11 +1,11 @@
 package com.devstagram.domain.user.repository;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import java.util.List;
 
 import com.devstagram.domain.user.entity.User;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -23,13 +23,14 @@ public class UserRecommendationRepositoryImpl implements UserRecommendationRepos
             WHERE u.id != :currentUserId
               AND u.is_deleted = false
               AND u.id NOT IN (
-                  SELECT f.to_user_id FROM follow f WHERE f.from_user_id = :currentUserId
+                  SELECT f.to_user_id FROM follows f WHERE f.from_user_id = :currentUserId
               )
             ORDER BY u.tech_vector <=> CAST(:targetVector AS vector) ASC
             LIMIT :limit
             """;
 
-        Query query = entityManager.createNativeQuery(sql, User.class)
+        Query query = entityManager
+                .createNativeQuery(sql, User.class)
                 .setParameter("currentUserId", currentUserId)
                 .setParameter("targetVector", targetVector)
                 .setParameter("limit", limit);

@@ -32,15 +32,15 @@ public class TechScoreService {
      * 이제 별도의 테이블(UserTechScore)이 아닌, User 엔티티의 142차원 techVector 배열에 직접 점수를 누적합니다.
      */
     public void increaseScore(User user, Technology tech, String activityType) {
-        float score = switch (activityType) {
-            case "POST" -> SCORE_POST;
-            case "LIKE" -> SCORE_LIKE;
-            case "SCRAP" -> SCORE_SCRAP;
-            default -> 0.0f;
-        };
+        float score =
+                switch (activityType) {
+                    case "POST" -> SCORE_POST;
+                    case "LIKE" -> SCORE_LIKE;
+                    case "SCRAP" -> SCORE_SCRAP;
+                    default -> 0.0f;
+                };
 
-        // User 엔티티 내부의 벡터 배열 업데이트
-        user.updateTechScore(tech.getId(), score);
+        user.updateTechScore(tech.getId().intValue(), score);
     }
 
     /**
@@ -48,14 +48,15 @@ public class TechScoreService {
      * User 엔티티의 techVector 배열에서 해당 기술 인덱스의 값을 감소시킵니다.
      */
     public void decreaseScore(User user, Technology tech, String activityType) {
-        float score = switch (activityType) {
-            case "POST" -> -SCORE_POST;
-            case "LIKE" -> -SCORE_LIKE;
-            case "SCRAP" -> -SCORE_SCRAP;
-            default -> 0.0f;
-        };
+        float score =
+                switch (activityType) {
+                    case "POST" -> -SCORE_POST;
+                    case "LIKE" -> -SCORE_LIKE;
+                    case "SCRAP" -> -SCORE_SCRAP;
+                    default -> 0.0f;
+                };
 
-        user.updateTechScore(tech.getId(), score);
+        user.updateTechScore(tech.getId().intValue(), score);
     }
 
     /**

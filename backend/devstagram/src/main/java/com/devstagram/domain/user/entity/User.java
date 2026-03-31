@@ -5,6 +5,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hibernate.annotations.Array;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import com.devstagram.domain.post.entity.PostScrap;
 import com.devstagram.global.entity.BaseEntity;
 
@@ -14,8 +18,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "users")
@@ -73,8 +75,9 @@ public class User extends BaseEntity {
     private LocalDateTime deletedAt;
 
     @Builder.Default
-    @Column(columnDefinition = "vector(142)")
     @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 142)
+    @Column(name = "tech_vector", columnDefinition = "vector(142)")
     private float[] techVector = new float[142];
 
     public void setUserInfo(UserInfo userInfo) {
@@ -98,11 +101,17 @@ public class User extends BaseEntity {
         this.email = "deleted_" + this.id + "_" + this.email;
     }
 
-    public void updateTechScore(Long techId, float score) {
-        int index = techId.intValue() - 1; // 1번 기술 -> 0번 인덱스
-        if (index >= 0 && index < 142) {
-            if (this.techVector == null) this.techVector = new float[142];
-            this.techVector[index] += score; // 기존 점수에 누적
+    public void updateTechScore(int techId, float score) {
+        int index = techId - 1;
+        if (index >= 0 && index < this.techVector.length) {
+            // 1. 값 업데이트
+            this.techVector[index] += score;
+
+            // 2. JPA에게 배열이 통째로 바뀌었다고 새로 갈아끼워줘야 DB에 반영됩니다.
+            // float[]는 객체라서 내부 값만 바꾸면 JPA가 모릅니다.
+            float[] newVector = new float[this.techVector.length];
+            System.arraycopy(this.techVector, 0, newVector, 0, this.techVector.length);
+            this.techVector = newVector;
         }
     }
 }
