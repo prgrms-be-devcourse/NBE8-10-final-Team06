@@ -27,7 +27,7 @@ public class Post extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String title;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(columnDefinition = "MEDIUMTEXT", nullable = false)
     private String content;
 
     private String thumbnailUrl;
