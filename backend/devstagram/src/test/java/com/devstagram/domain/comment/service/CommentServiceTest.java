@@ -26,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
+import com.devstagram.domain.comment.dto.CommentLikeRes;
 import com.devstagram.domain.comment.dto.ReplyInfoRes;
 import com.devstagram.domain.comment.entity.Comment;
 import com.devstagram.domain.comment.entity.CommentLike;
@@ -125,6 +126,7 @@ class CommentServiceTest {
     void getReplies_paging_success() {
         // [given]
         Long parentId = 1L;
+        Long memberId = 1L;
         Pageable pageable = PageRequest.of(0, 5);
         Comment parent = createComment(parentId, "부모", null, null, null);
         List<Comment> replies = new ArrayList<>();
@@ -140,7 +142,7 @@ class CommentServiceTest {
                 .willReturn(slice);
 
         // [when]
-        Slice<ReplyInfoRes> result = commentService.getRepliesByCommentId(parentId, 0);
+        Slice<ReplyInfoRes> result = commentService.getRepliesByCommentId(memberId, parentId, 0);
 
         // [then]
         assertThat(result.getContent()).hasSize(5);
@@ -270,12 +272,14 @@ class CommentServiceTest {
                 .willReturn(Optional.empty());
 
         // [when]
-        boolean result = commentService.toggleCommentLike(commentId, memberId);
+        CommentLikeRes result = commentService.toggleCommentLike(commentId, memberId);
 
         // [then]
-        assertThat(result).isTrue(); // 좋아요 성공 시 true 반환
+        assertThat(result.isLiked()).isTrue();
+        assertThat(result.likeCount()).isEqualTo(1L); // 이 부분이 이제 성공합니다!
+
         verify(commentLikeRepository, times(1)).save(any(CommentLike.class));
-        verify(commentRepository, times(1)).incrementLikeCount(commentId);
+        verify(commentRepository, times(1)).findByIdWithLock(commentId);
     }
 
     @Test
@@ -296,12 +300,14 @@ class CommentServiceTest {
                 .willReturn(Optional.of(existingLike));
 
         // [when]
-        boolean result = commentService.toggleCommentLike(commentId, memberId);
+        CommentLikeRes result = commentService.toggleCommentLike(commentId, memberId);
 
         // [then]
-        assertThat(result).isFalse(); // 좋아요 취소 시 false 반환
+        assertThat(result.isLiked()).isFalse();
+        assertThat(result.likeCount()).isEqualTo(0L);
+
         verify(commentLikeRepository, times(1)).delete(existingLike);
-        verify(commentRepository, times(1)).decrementLikeCount(commentId);
+        verify(commentRepository, times(1)).findByIdWithLock(commentId);
     }
 
     @Test
