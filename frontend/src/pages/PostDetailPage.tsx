@@ -1,0 +1,252 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Send, Trash2, Edit, Forward } from 'lucide-react';
+import { postApi } from '../api/post';
+import { commentApi } from '../api/comment';
+import { PostDetailResponse } from '../types/post';
+import CommentItem from '../components/comment/CommentItem';
+import UserListModal from '../components/profile/UserListModal';
+import MainLayout from '../components/layout/MainLayout';
+import { getAlternateAssetUrl, isAssetMarkedMissing, markAssetMissing, resolveAssetUrl } from '../util/assetUrl';
+import ProfileAvatar from '../components/common/ProfileAvatar';
+import { getApiErrorMessage } from '../util/apiError';
+import DmShareModal from '../components/dm/DmShareModal';
+import { buildPostSharePayload } from '../util/dmDeepLinks';
+
+const PostDetailPage: React.FC = () => {
+  const { postId } = useParams<{ postId: string }>();
+  const navigate = useNavigate();
+
+  const [post, setPost] = useState<PostDetailResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [isMediaUnavailable, setIsMediaUnavailable] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [showLikers, setShowLikers] = useState(false);
+  const [showDmShare, setShowDmShare] = useState(false);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
+
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
+  const currentMedia = post?.medias?.[currentMediaIndex];
+  const isKnownMissingMedia = currentMedia ? isAssetMarkedMissing(currentMedia.sourceUrl) : false;
+
+  const isVideo = (mediaType: string) =>
+    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
+
+  const fetchDetail = useCallback(async () => {
+    if (!postId) return;
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const res = await postApi.getDetail(Number(postId));
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        setPost(res.data);
+      } else {
+        setErrorMsg(res.msg);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.msg || '게시물을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [postId]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  useEffect(() => {
+    setIsMediaUnavailable(false);
+  }, [currentMediaIndex, post?.id]);
+
+  const handleLike = async () => {
+    if (!post) return;
+    try {
+      const res = await postApi.toggleLike(post.id);
+      if (res.resultCode.includes('-S-')) {
+        const isNowLiked = !post.isLiked;
+        setPost(prev => prev ? ({
+          ...prev,
+          isLiked: isNowLiked,
+          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
+        }) : null);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleScrap = async () => {
+    if (!post) return;
+    try {
+      const res = await postApi.toggleScrap(post.id);
+      if (res.resultCode.includes('-S-')) {
+        setPost(prev => prev ? ({ ...prev, isScrapped: !prev.isScrapped }) : null);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || isSubmittingComment || !post) return;
+
+    try {
+      setIsSubmittingComment(true);
+      const res = await commentApi.create(post.id, { content: commentText });
+      if (res.resultCode.includes('-S-')) {
+        setCommentText('');
+        fetchDetail(); // 댓글 목록 갱신
+      }
+    } catch (err: unknown) {
+      alert(getApiErrorMessage(err, '댓글 작성 실패'));
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handlePostDelete = async () => {
+    if (!post || isDeletingPost || !window.confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      setIsDeletingPost(true);
+      const res = await postApi.delete(post.id);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        navigate('/', { replace: true });
+        return;
+      }
+      alert(res.msg || '삭제 실패');
+    } catch (err: unknown) {
+      alert(getApiErrorMessage(err, '삭제 실패'));
+    } finally {
+      setIsDeletingPost(false);
+    }
+  };
+
+  if (loading) return <MainLayout title="Post"><div style={{ textAlign: 'center', padding: '100px' }}>로딩 중...</div></MainLayout>;
+  if (errorMsg || !post) return <MainLayout title="Error"><div style={{ textAlign: 'center', padding: '100px', color: '#8e8e8e' }}>{errorMsg || '게시물을 찾을 수 없습니다.'}</div></MainLayout>;
+
+  return (
+    <MainLayout title="Post" maxWidth="935px">
+      <div style={{ display: 'flex', backgroundColor: '#fff', border: '1px solid #dbdbdb', minHeight: '600px', marginBottom: '20px' }}>
+        {/* 왼쪽: 미디어 */}
+        <div style={{ flex: 1.5, backgroundColor: '#000', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+          {post.medias && post.medias.length > 0 && (
+            (isMediaUnavailable || isKnownMissingMedia) ? (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                삭제된 미디어입니다.
+              </div>
+            ) : (
+            isVideo(post.medias[currentMediaIndex].mediaType) ? (
+              <video
+                src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                controls
+                playsInline
+                onError={(e) => {
+                  const video = e.currentTarget;
+                  if (video.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                  if (fallback) {
+                    video.dataset.fallbackApplied = '1';
+                    video.src = fallback;
+                    video.load();
+                    return;
+                  }
+                  markAssetMissing(post.medias[currentMediaIndex].sourceUrl);
+                  setIsMediaUnavailable(true);
+                }}
+              />
+            ) : (
+              <img
+                src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                alt="post"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
+                  if (fallback) {
+                    img.dataset.fallbackApplied = '1';
+                    img.src = fallback;
+                    return;
+                  }
+                  markAssetMissing(post.medias[currentMediaIndex].sourceUrl);
+                  setIsMediaUnavailable(true);
+                }}
+              />
+            )
+            )
+          )}
+          {post.medias && post.medias.length > 1 && (
+            <>
+              {currentMediaIndex > 0 && <button onClick={() => setCurrentMediaIndex(i => i - 1)} style={{ position: 'absolute', left: '10px', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: '5px' }}><ChevronLeft /></button>}
+              {currentMediaIndex < post.medias.length - 1 && <button onClick={() => setCurrentMediaIndex(i => i + 1)} style={{ position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: '5px' }}><ChevronRight /></button>}
+            </>
+          )}
+        </div>
+
+        {/* 오른쪽: 상세 정보 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '350px' }}>
+          <div style={{ padding: '15px', borderBottom: '1px solid #efefef', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <ProfileAvatar authorUserId={post.authorId} profileImageUrl={post.profileImageUrl} nickname={post.nickname} sizePx={32} />
+              <strong style={{ cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>{post.nickname}</strong>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {post.isMine && (
+                <>
+                  <Edit size={18} style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post.id}/edit`)} />
+                  <Trash2 size={18} style={{ cursor: isDeletingPost ? 'not-allowed' : 'pointer', color: '#ed4956', opacity: isDeletingPost ? 0.5 : 1 }} onClick={handlePostDelete} />
+                </>
+              )}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <strong>{post.nickname}</strong> <span style={{ fontWeight: 'bold' }}>{post.title}</span>
+              <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+            </div>
+            {post.comments?.content?.map(comment => (
+              <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={fetchDetail} onReplyAdded={fetchDetail} />
+            ))}
+          </div>
+
+          <div style={{ padding: '15px', borderTop: '1px solid #efefef' }}>
+            <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
+              <Heart size={24} onClick={handleLike} style={{ cursor: 'pointer', color: post.isLiked ? 'red' : 'black' }} fill={post.isLiked ? 'red' : 'none'} />
+              <MessageCircle size={24} />
+              <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
+                <Forward size={24} />
+              </button>
+              <Bookmark size={24} onClick={handleScrap} style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'black' }} fill={post.isScrapped ? '#ffd700' : 'none'} />
+            </div>
+            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '10px', cursor: 'pointer' }} onClick={() => setShowLikers(true)}>좋아요 {post.likeCount}개</div>
+            
+            <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '10px', borderTop: '1px solid #efefef', paddingTop: '10px' }}>
+              <input 
+                type="text" 
+                placeholder="댓글 달기..." 
+                style={{ flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem' }}
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+              />
+              <button 
+                type="submit" 
+                disabled={!commentText.trim() || isSubmittingComment}
+                style={{ background: 'none', border: 'none', color: '#0095f6', fontWeight: 'bold', cursor: 'pointer', opacity: commentText.trim() ? 1 : 0.5 }}
+              >
+                게시
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {showLikers && <UserListModal title="좋아요" id={post.id} type="likers" onClose={() => setShowLikers(false)} />}
+      <DmShareModal open={showDmShare} onClose={() => setShowDmShare(false)} payloads={[buildPostSharePayload(post.id)]} />
+    </MainLayout>
+  );
+};
+
+export default PostDetailPage;
