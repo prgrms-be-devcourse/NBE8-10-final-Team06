@@ -37,7 +37,6 @@ import {
   stompMessageBodyToString,
 } from '../util/dmWebSocketPayload';
 import { parseAllInboundDmTypingEvents } from '../util/dmTypingInbound';
-import { dmStompDebugLog } from '../util/dmStompRuntimeDebug';
 
 export type UseDmRoomTopicParams = {
   roomId: string | undefined;
@@ -216,28 +215,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
       parseAllInboundDmTypingEvents(payloadBody).forEach(applyTopicTyping);
 
       const newMsg = parseBackendDmMessageFromTopicBody(payloadBody);
-      // #region agent log
-      let rootType = '';
-      try {
-        const p = JSON.parse(payloadBody.replace(/^\uFEFF/, '').trim()) as unknown;
-        const r =
-          Array.isArray(p) && p.length && typeof p[0] === 'object' && p[0] !== null
-            ? (p[0] as Record<string, unknown>)
-            : p && typeof p === 'object' && !Array.isArray(p)
-              ? (p as Record<string, unknown>)
-              : null;
-        rootType = r ? String(r.type ?? '') : '';
-      } catch {
-        rootType = 'parse_err';
-      }
-      dmStompDebugLog('H3', 'useDmRoomTopic.ts:onTopicFrame', 'topic_frame', {
-        rid,
-        bodyLen: payloadBody.length,
-        rootType,
-        parsedMsgId: newMsg?.id ?? null,
-        parseOk: !!newMsg,
-      });
-      // #endregion
       if (newMsg) {
         pruneShareBackupByServer(rid, [newMsg]);
         setIsLoading(false);
@@ -270,12 +247,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
     };
 
     const topicDest = dmStompTopic(rid);
-    // #region agent log
-    dmStompDebugLog('H1', 'useDmRoomTopic.ts:subscribe', 'dm_topic_subscribe', {
-      rid,
-      topicDest,
-    });
-    // #endregion
     const subscription = subscribeRef.current(topicDest, (frame) => {
       const payloadBody = stompMessageBodyToString(frame);
       if (!payloadBody) return;

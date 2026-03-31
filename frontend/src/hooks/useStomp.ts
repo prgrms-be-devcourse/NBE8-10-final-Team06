@@ -4,7 +4,6 @@ import { Client, IMessage, type IFrame } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { syncAuthTokensFromCookies } from '../util/authStorageSync';
 import { getCookie } from '../util/cookies';
-import { dmStompDebugLog } from '../util/dmStompRuntimeDebug';
 
 /** DM 디버그 패널용 — CONNECT 토큰 유무·STOMP ERROR·WS 종료 시각 (토큰 원문은 넣지 않음) */
 export type StompClientDiagnostics = {
@@ -127,14 +126,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
       onConnect: () => {
-        // #region agent log
-        dmStompDebugLog('H2', 'useStomp.ts:onConnect', 'stomp_connected', {
-          connectHeadersHadToken: !!connectHeaders.Authorization,
-          tokenLen: token.length,
-          pendingSubCount: pendingSubsRef.current.length,
-          pendingPubCount: pendingPubsRef.current.length,
-        });
-        // #endregion
         const pending = [...pendingSubsRef.current];
         pendingSubsRef.current = [];
         pending.forEach(({ destination, callback }) => {
@@ -162,13 +153,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
         setIsConnected(false);
       },
       onStompError: (frame: IFrame) => {
-        // #region agent log
-        dmStompDebugLog('H4', 'useStomp.ts:onStompError', 'stomp_error', {
-          command: frame.command,
-          headerMessage: frame.headers?.message ?? '',
-          bodyLen: (frame.body ?? '').length,
-        });
-        // #endregion
         setStompDiagnostics((d) => ({
           ...d,
           lastStompError: {
@@ -183,13 +167,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
       },
       onWebSocketClose: (evt: Event) => {
         const e = evt as CloseEvent;
-        // #region agent log
-        dmStompDebugLog('H4', 'useStomp.ts:onWebSocketClose', 'ws_close', {
-          code: typeof e.code === 'number' ? e.code : 0,
-          wasClean: !!e.wasClean,
-          reasonLen: (e.reason ?? '').length,
-        });
-        // #endregion
         setStompDiagnostics((d) => ({
           ...d,
           lastWebSocketClose: {
@@ -239,14 +216,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
     // connected 와 어긋날 수 있어 `connected && active` 조합이 SEND 를 큐에만 쌓고 onConnect 가
     // 다시 안 오면 /message·read 등이 늦거나 유실될 수 있음 (@stomp/stompjs Client 문서는 connected 기준).
     if (c && c.connected) {
-      // #region agent log
-      dmStompDebugLog('H2', 'useStomp.ts:publish', 'publish_immediate', {
-        destination,
-        bodyIsObject: body != null && typeof body === 'object',
-        bodyKeysLen:
-          body && typeof body === 'object' ? Object.keys(body as object).length : 0,
-      });
-      // #endregion
       const headers = stompSendAuthHeaders();
       c.publish({
         destination,
@@ -257,13 +226,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
     }
     // 연결 직전·일시 끊김 시 메시지가 유실되지 않도록 큐에 쌓았다가 onConnect 에서 전송
     pendingPubsRef.current.push({ destination, body });
-    // #region agent log
-    dmStompDebugLog('H2', 'useStomp.ts:publish', 'publish_queued', {
-      destination,
-      connected: !!(c && c.connected),
-      queueLenAfter: pendingPubsRef.current.length,
-    });
-    // #endregion
   }, []);
 
   return { isConnected, subscribe, publish, stompDiagnostics };

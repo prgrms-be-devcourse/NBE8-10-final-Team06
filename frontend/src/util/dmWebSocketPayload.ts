@@ -269,6 +269,10 @@ function flattenDmTopicJsonRoots(parsed: unknown): Record<string, unknown>[] {
 /**
  * 백엔드 `DmWebSocketController.message` 브로드캐스트:
  * `WebSocketEventPayload` → `type: "message"` + 본문은 `data`·`payload` 등 (`pickMessagePayloadField`).
+ *
+ * STOMP/프록시/직렬화에 따라 래퍼 없이 `DmMessageResponse` 만 오거나, `type` 이 이벤트가 아니라
+ * 메시지 종류(TEXT 등)만 있는 경우가 있어 폴백을 둔다. 그렇지 않으면 수신 프레임이 버려져
+ * 상대 실시간 메시지가 목록에 안 붙는다.
  */
 export function parseBackendDmMessageFromTopicBody(rawBody: string): DmMessageResponse | null {
   let parsed: unknown;
@@ -287,6 +291,33 @@ export function parseBackendDmMessageFromTopicBody(rawBody: string): DmMessageRe
     const msg = parseWrappedDmMessageEvent(el);
     if (msg && Number.isFinite(msg.id) && msg.id > 0) return msg;
   }
+
+  /** `{ data: DmMessageResponse }` 만 있고 루트 `type: "message"` 가 없는 변형 */
+  for (const el of roots) {
+    const outerKind = String(el.type ?? '').toLowerCase();
+    if (
+      outerKind === 'typing' ||
+      outerKind === 'read' ||
+      outerKind === 'join' ||
+      outerKind === 'leave'
+    ) {
+      continue;
+    }
+    const inner = el.data;
+    if (isRecord(inner)) {
+      const msg = parseDmMessagePayload(inner);
+      if (msg && Number.isFinite(msg.id) && msg.id > 0) return msg;
+    }
+  }
+
+  /** 래퍼 없는 평면 `DmMessageResponse` — `type` 이 TEXT/POST… (소문자 text 등) */
+  for (const el of roots) {
+    const k = String(el.type ?? '').toLowerCase();
+    if (k === 'typing' || k === 'read' || k === 'join' || k === 'leave') continue;
+    const msg = parseDmMessagePayload(el);
+    if (msg && Number.isFinite(msg.id) && msg.id > 0) return msg;
+  }
+
   return null;
 }
 

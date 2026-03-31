@@ -55,6 +55,41 @@ describe('DM STOMP 계약 (백엔드 DmWebSocketController)', () => {
     expect(msg!.senderId).toBe(3);
   });
 
+  it('래퍼 없이 DmMessageResponse 평면만 오면 복원한다 (실시간 프록시·직렬화 변형)', () => {
+    const body = JSON.stringify({
+      id: 77,
+      type: 'TEXT',
+      content: 'bare-dm',
+      thumbnail: null,
+      valid: true,
+      createdAt: '2026-03-30T12:00:00',
+      senderId: 9,
+    });
+    const msg = parseBackendDmMessageFromTopicBody(body);
+    expect(msg).not.toBeNull();
+    expect(msg!.id).toBe(77);
+    expect(msg!.content).toBe('bare-dm');
+    expect(msg!.senderId).toBe(9);
+  });
+
+  it('루트 type 없이 data 안에만 DM 이 있으면 복원한다', () => {
+    const body = JSON.stringify({
+      data: {
+        id: 88,
+        type: 'TEXT',
+        content: 'data-only',
+        thumbnail: null,
+        valid: true,
+        createdAt: '2026-03-30T12:00:00',
+        senderId: 3,
+      },
+    });
+    const msg = parseBackendDmMessageFromTopicBody(body);
+    expect(msg).not.toBeNull();
+    expect(msg!.id).toBe(88);
+    expect(msg!.content).toBe('data-only');
+  });
+
   it('data 가 JSON 문자열로 한 겹 감싸져 있어도 message 를 복원한다', () => {
     const inner = JSON.stringify({
       id: 100,

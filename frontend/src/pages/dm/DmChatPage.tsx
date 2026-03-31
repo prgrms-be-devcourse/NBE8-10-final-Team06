@@ -8,7 +8,13 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { useStomp } from '../../hooks/useStomp';
 import type { SignupResponse } from '../../types/auth';
-import { DmMessageResponse, MessageType, type DmMessageSliceResponse, type DmSendMessageRequest } from '../../types/dm';
+import {
+  DmMessageResponse,
+  MessageType,
+  type DmMessageSliceResponse,
+  type DmRoomParticipantSummary,
+  type DmSendMessageRequest,
+} from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { DmChatMessageRow } from '../../components/dm/DmChatMessageRow';
 import { DmTypingBubbleRow } from '../../components/dm/DmTypingBubbleRow';
@@ -44,7 +50,6 @@ import {
   DM_CLIENT_TYPING_START_REFRESH_MS,
   DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS,
 } from '../../util/dmTypingClient';
-import { dmStompDebugLog } from '../../util/dmStompRuntimeDebug';
 
 /**
  * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
@@ -170,6 +175,33 @@ const DmChatPage: React.FC = () => {
     [currentRoom?.isGroup, dmBubbleOpponentUserId]
   );
 
+  const participantByUserId = useMemo(() => {
+    const m = new Map<number, DmRoomParticipantSummary>();
+    if (!currentRoom?.participants?.length) return m;
+    for (const p of currentRoom.participants) {
+      const id = toDmPositiveUserId(p.userId);
+      if (id != null) m.set(id, p);
+    }
+    return m;
+  }, [currentRoom]);
+
+  const resolvePeerProfileForMessage = useCallback(
+    (isMe: boolean, senderId: number): DmRoomParticipantSummary | null => {
+      if (isMe) return null;
+      const sid = toDmPositiveUserId(senderId);
+      if (sid != null) {
+        const fromMap = participantByUserId.get(sid);
+        if (fromMap) return fromMap;
+      }
+      if (!currentRoom?.isGroup && headerPeer) {
+        const hpId = toDmPositiveUserId(headerPeer.userId);
+        if (hpId != null && sid != null && hpId === sid) return headerPeer;
+      }
+      return headerPeer;
+    },
+    [currentRoom?.isGroup, headerPeer, participantByUserId]
+  );
+
   const typingOpponentNickname = useMemo((): string | null => {
     if (!currentRoom || currentRoom.isGroup) return headerPeer?.nickname?.trim() ?? null;
     if (headerPeer?.nickname?.trim()) return headerPeer.nickname.trim();
@@ -202,6 +234,16 @@ const DmChatPage: React.FC = () => {
     if (jwtSelf != null && remoteU === jwtSelf) return false;
     return true;
   }, [remoteTyping, isMeTyping, bubbleSelfUserId, selfIdForTypingEcho]);
+
+  const remoteTypingPeerProfile = useMemo((): DmRoomParticipantSummary | null => {
+    if (!remoteTyping) return null;
+    const uid = toDmPositiveUserId(remoteTyping.userId);
+    if (uid == null) return headerPeer;
+    if (currentRoom?.isGroup) {
+      return participantByUserId.get(uid) ?? null;
+    }
+    return headerPeer;
+  }, [remoteTyping, currentRoom?.isGroup, headerPeer, participantByUserId]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -566,15 +608,6 @@ const DmChatPage: React.FC = () => {
     const destination = dmStompAppMessage(rid);
     const stompBody = buildDmStompMessageBody(sendPl);
     publish(destination, stompBody);
-    // #region agent log
-    dmStompDebugLog('H5', 'DmChatPage.tsx:handleSendMessage', 'dm_send_attempt', {
-      rid,
-      destination,
-      actorId: actor,
-      isConnected,
-      contentLen: content.length,
-    });
-    // #endregion
 
     const restSyncAfterSend = () => {
       fetchDmPollMergeIfStillInRoom(rid, roomIdRef, setMessages, {
@@ -730,19 +763,49 @@ const DmChatPage: React.FC = () => {
         {isLoading && messages.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#8e8e8e', marginTop: '20px' }}>로드 중...</p>
         ) : (
-          messages.map((msg, idx) => (
-            <DmChatMessageRow
-              key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
-              msg={msg}
-              isMe={computeDmMessageIsMe(msg, bubbleSelfUserId, dmBubbleCtx)}
-              showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
-            />
-          ))
+          messages.map((msg, idx) => {
+            const isMe = computeDmMessageIsMe(msg, bubbleSelfUserId, dmBubbleCtx);
+            const peer = resolvePeerProfileForMessage(isMe, msg.senderId);
+            const groupSenderNick =
+              !isMe && currentRoom?.isGroup
+                ? participantByUserId.get(Number(msg.senderId))?.nickname?.trim() ?? null
+                : null;
+            return (
+              <DmChatMessageRow
+                key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
+                msg={msg}
+                isMe={isMe}
+                showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
+                senderLabel={groupSenderNick}
+                peerProfile={
+                  peer
+                    ? {
+                        userId: peer.userId,
+                        nickname: peer.nickname,
+                        profileImageUrl: peer.profileImageUrl,
+                      }
+                    : null
+                }
+              />
+            );
+          })
         )}
 
         {/* 원격 타이핑: `showPeerTypingFromRemote` 가 켜진 경우만 렌더하므로 항상 상대 말풍선(왼쪽·회색). isDmTypingBubbleMine 은 본인 id 미확정 시 1:1 추론에서 오판할 수 있음. */}
         {showPeerTypingFromRemote && remoteTyping ? (
-          <DmTypingBubbleRow text={remoteTyping.text} isMe={false} />
+          <DmTypingBubbleRow
+            text={remoteTyping.text}
+            isMe={false}
+            peerProfile={
+              remoteTypingPeerProfile
+                ? {
+                    userId: remoteTypingPeerProfile.userId,
+                    nickname: remoteTypingPeerProfile.nickname,
+                    profileImageUrl: remoteTypingPeerProfile.profileImageUrl,
+                  }
+                : null
+            }
+          />
         ) : null}
         {isMeTyping && isResolvedDmUserId(bubbleSelfUserId) ? (
           <DmTypingBubbleRow
@@ -758,6 +821,31 @@ const DmChatPage: React.FC = () => {
           <input type="text" value={inputValue} onChange={handleInputChange} placeholder="메시지 입력..." style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1rem' }} />
           <button type="submit" disabled={!inputValue.trim()} style={{ background: 'none', border: 'none', color: inputValue.trim() ? '#0095f6' : '#b2dffc', fontWeight: 'bold', fontSize: '1rem' }}>보내기</button>
         </form>
+        <div
+          style={{
+            marginTop: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '0.72rem',
+            color: '#8e8e8e',
+            paddingLeft: '4px',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            aria-hidden
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              flexShrink: 0,
+              backgroundColor: isConnected ? '#22c55e' : '#f59e0b',
+            }}
+          />
+          <span>{isConnected ? '실시간 연결됨 (SockJS + STOMP)' : '실시간 재연결 중…'}</span>
+        </div>
       </footer>
 
       <DmRoomInfoModal open={showRoomInfo} onClose={() => setShowRoomInfo(false)} room={currentRoom ?? null} />

@@ -20,7 +20,21 @@ import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 
 /**
- * STOMP CONNECT 시점에 Authorization 헤더(Bearer JWT)를 읽어 SecurityContext 를 세팅한다.
+ * 클라이언트 인바운드 STOMP 프레임마다 실행되는 채널 인터셉터.
+ *
+ * CONNECT: native 헤더의 JWT 로 사용자를 조회해 {@link StompHeaderAccessor#setUser} 및
+ * 당시 스레드의 {@link SecurityContextHolder} 에 넣는다. 이후 WebSocket 세션에 principal 이 유지된다.
+ *
+ *
+ * SEND / SUBSCRIBE 등 비-CONNECT: CONNECT 와 다른 스레드에서 처리될 수 있고
+ * {@code SecurityContextHolder} 는 스레드 로컬이므로, 비어 있으면
+ * 세션에 붙어 있는 {@link StompHeaderAccessor#getUser()} 를 다시 현재 스레드 컨텍스트에 복사한다
+ * ({@link #applySecurityFromSessionUser}).
+ *
+ *
+ * 프레임 처리가 끝나면 {@link #afterSendCompletion} 에서 {@link SecurityContextHolder#clearContext()} 로
+ * 스레드 풀 재사용 시 인증 누수를 막는다.
+ *
  *
  * 클라이언트는 STOMP CONNECT native header 로 다음 중 하나를 보내면 된다.
  * - Authorization: Bearer <accessToken>
@@ -33,17 +47,31 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private final JwtProvider jwtProvider;
     private final UserSecurityService userSecurityService;
 
+    /**
+     * CONNECT 이면 JWT 로 principal 을 만들고 세션·현재 스레드에 심는다.
+     * 그 외 명령(SEND 등)이면 {@link #applySecurityFromSessionUser} 만 수행한다.
+     */
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        if (accessor == null) return message;
+        if (accessor == null) {
+            return message;
+        }
 
-        if (StompCommand.CONNECT != accessor.getCommand()) return message;
+        // CONNECT 가 아니면 JWT 재검증 없이, 이미 세션에 연결된 principal 만 현재 워커 스레드의 SecurityContext 에 맞춘다.
+        if (StompCommand.CONNECT != accessor.getCommand()) {
+            applySecurityFromSessionUser(accessor);
+            return message;
+        }
 
         String token = extractToken(accessor);
-        if (token == null || token.isBlank()) return message;
+        if (token == null || token.isBlank()) {
+            return message;
+        }
 
-        if (!jwtProvider.isValid(token)) return message;
+        if (!jwtProvider.isValid(token)) {
+            return message;
+        }
 
         Claims payload = jwtProvider.payload(token);
         Long userId = Long.parseLong(payload.getSubject());
@@ -54,10 +82,40 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 securityUser, securityUser.getPassword(), securityUser.getAuthorities());
 
+        // 이후 같은 WebSocket 세션의 SEND 등에서 StompHeaderAccessor#getUser() 로 꺼낼 수 있게 세션에 principal 고정
         accessor.setUser(authentication);
+        // CONNECT 를 처리하는 이 스레드에서만 유효; 다음 프레임은 다른 스레드일 수 있음
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         return message;
+    }
+
+    /**
+     * 인바운드 메시지 한 건에 대한 채널 처리가 끝난 뒤 호출된다.
+     * {@link #preSend} / {@link #applySecurityFromSessionUser} 가 채운 스레드 로컬 인증을 제거해,
+     * 동일 Executor 스레드가 다른 사용자·다른 요청에 재배정될 때 컨텍스트가 섞이지 않게 한다.
+     */
+    @Override
+    public void afterSendCompletion(Message<?> message, MessageChannel channel, boolean sent, Exception ex) {
+        SecurityContextHolder.clearContext();
+    }
+
+    /**
+     * STOMP CONNECT 시 {@link StompHeaderAccessor#setUser} 로 저장해 둔 {@link Authentication} 을
+     * <strong>이번 프레임을 처리 중인 스레드</strong>의 {@link SecurityContextHolder} 에 복사한다.
+     */
+    private void applySecurityFromSessionUser(StompHeaderAccessor accessor) {
+        if (accessor == null || accessor.getCommand() == null) {
+            return;
+        }
+        if (accessor.getCommand() == StompCommand.CONNECT) {
+            return;
+        }
+        Object u = accessor.getUser();
+        // CONNECT 시 setUser 해 둔 Authentication; 없으면(미인증 세션 등) 복사 생략
+        if (u instanceof Authentication authentication) {
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
     }
 
     private String extractToken(StompHeaderAccessor accessor) {

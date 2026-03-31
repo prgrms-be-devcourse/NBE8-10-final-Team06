@@ -4,6 +4,7 @@ import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import type { DmMessageResponse } from '../../types/dm';
 import { resolveDmAttachment } from '../../util/dmAttachment';
+import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
 
 const checkIsExpired = (content: string, type: string) => {
@@ -100,15 +101,29 @@ const AttachmentCard = ({
 
 export interface DmChatMessageRowProps {
   msg: DmMessageResponse;
-  /** true = 본인 메시지(오른쪽·파랑), false = 상대(왼쪽·회색) — senderId vs 로그인 user id */
+  /** true = 본인(오른쪽·파랑), false = 상대(왼쪽·회색) — senderId vs 로그인 user id */
   isMe: boolean;
   showReadStatus: boolean;
+  /** 그룹: 상대 메시지 위 발신자 표시명(참고 앱의 senderName 라벨과 동일 역할) */
+  senderLabel?: string | null;
+  /** 상대 메시지 왼쪽 프로필 — 1:1·그룹 공통 */
+  peerProfile?: {
+    userId: number;
+    nickname: string;
+    profileImageUrl: string | null;
+  } | null;
 }
 
 /**
- * 한 줄 DM 메시지: 정렬·말풍선 색은 isMe 에만 의존 (REST/WebSocket 공통 DmMessageResponse).
+ * REST·STOMP 공통 한 줄 DM — `isMe` 로 정렬·색 분리, 상대는 아바타·그룹 닉 라벨로 구분 강화.
  */
-export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({ msg, isMe, showReadStatus }) => {
+export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
+  msg,
+  isMe,
+  showReadStatus,
+  senderLabel,
+  peerProfile,
+}) => {
   const navigate = useNavigate();
   const attachmentData = resolveDmAttachment(msg);
   const isValid =
@@ -146,78 +161,130 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({ msg, isMe, s
   };
 
   const bubble = isMe ? DM_BUBBLE_MINE : DM_BUBBLE_PEER;
+  const showPeerAvatar = !isMe && peerProfile != null;
+  const trimmedLabel = senderLabel?.trim() ?? '';
+  const showGroupSenderName = !isMe && trimmedLabel.length > 0;
+
+  const bubbleBlock = !attachmentData ? (
+    <div
+      style={{
+        padding: '12px 16px',
+        borderRadius: '22px',
+        fontSize: '0.95rem',
+        wordBreak: 'break-word',
+        ...bubble,
+      }}
+    >
+      {msg.content}
+    </div>
+  ) : (
+    <AttachmentCard
+      type={attachmentData.type as 'post' | 'story'}
+      isValid={isValid}
+      isMe={isMe}
+      onClick={() => {
+        void openAttachment();
+      }}
+    />
+  );
 
   return (
     <div
       style={{
         display: 'flex',
         width: '100%',
+        flexShrink: 0,
         justifyContent: isMe ? 'flex-end' : 'flex-start',
         marginBottom: '16px',
       }}
     >
       <div
         style={{
-          maxWidth: '75%',
+          maxWidth: '78%',
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: isMe ? 'flex-end' : 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: showPeerAvatar ? '10px' : 0,
         }}
       >
+        {showPeerAvatar ? (
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              flexShrink: 0,
+              backgroundColor: '#efefef',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ProfileAvatar
+              fillContainer
+              authorUserId={peerProfile.userId}
+              profileImageUrl={peerProfile.profileImageUrl}
+              nickname={peerProfile.nickname}
+            />
+          </div>
+        ) : null}
         <div
           style={{
+            flex: 1,
+            minWidth: 0,
             display: 'flex',
-            alignItems: 'flex-end',
-            gap: '8px',
-            flexDirection: isMe ? 'row' : 'row-reverse',
+            flexDirection: 'column',
+            alignItems: isMe ? 'flex-end' : 'flex-start',
           }}
         >
-          {isMe && (
+          {showGroupSenderName ? (
             <span
               style={{
-                fontSize: '0.7rem',
-                color: showReadStatus ? 'transparent' : 'rgba(255,255,255,0.9)',
-                fontWeight: 'bold',
-                minWidth: '0.6rem',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                color: '#8e8e8e',
+                marginBottom: '4px',
+                paddingLeft: '2px',
               }}
             >
-              1
+              {trimmedLabel}
             </span>
-          )}
-          {!attachmentData ? (
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius: '22px',
-                fontSize: '0.95rem',
-                wordBreak: 'break-word',
-                ...bubble,
-              }}
-            >
-              {msg.content}
-            </div>
-          ) : (
-            <AttachmentCard
-              type={attachmentData.type as 'post' | 'story'}
-              isValid={isValid}
-              isMe={isMe}
-              onClick={() => {
-                void openAttachment();
-              }}
-            />
-          )}
+          ) : null}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: '8px',
+              flexDirection: isMe ? 'row' : 'row-reverse',
+            }}
+          >
+            {isMe && (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  color: showReadStatus ? 'transparent' : 'rgba(255,255,255,0.9)',
+                  fontWeight: 'bold',
+                  minWidth: '0.6rem',
+                }}
+              >
+                1
+              </span>
+            )}
+            {bubbleBlock}
+          </div>
+          <span
+            style={{
+              fontSize: '0.65rem',
+              color: '#8e8e8e',
+              marginTop: '4px',
+              padding: '0 4px',
+              alignSelf: isMe ? 'flex-end' : 'flex-start',
+            }}
+          >
+            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
         </div>
-        <span
-          style={{
-            fontSize: '0.65rem',
-            color: '#8e8e8e',
-            marginTop: '4px',
-            padding: '0 4px',
-            alignSelf: isMe ? 'flex-end' : 'flex-start',
-          }}
-        >
-          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
       </div>
     </div>
   );

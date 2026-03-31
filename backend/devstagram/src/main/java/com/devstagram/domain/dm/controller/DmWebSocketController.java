@@ -6,10 +6,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.messaging.Message;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import com.devstagram.domain.dm.dto.DmMessageResponse;
@@ -17,6 +21,7 @@ import com.devstagram.domain.dm.dto.DmSendMessageRequest;
 import com.devstagram.domain.dm.dto.TypingEventDto;
 import com.devstagram.domain.dm.dto.WebSocketEventPayload;
 import com.devstagram.domain.dm.service.DmService;
+import com.devstagram.global.security.SecurityUser;
 import com.devstagram.global.security.SecurityUtil;
 
 /**
@@ -55,10 +60,26 @@ public class DmWebSocketController {
         this.dmService = dmService;
     }
 
+    /**
+     * 클라이언트 → {@code /app/dm/{roomId}/message} 로 들어온 STOMP SEND 를 처리한다.
+     *
+     * {@code Message<?>} 를 인자로 받는 이유:
+     * Spring 의 client inbound channel 은 보통 {@link java.util.concurrent.Executor} 로 메시지를 처리하며,
+     * {@link org.springframework.messaging.support.ChannelInterceptor#preSend} 가 돌아가는 스레드와
+     * 이 {@code @MessageMapping} 메서드가 실행되는 스레드가 다를 수 있다.
+     * {@link com.devstagram.global.security.SecurityUtil#getCurrentUserId()} 는
+     * {@link org.springframework.security.core.context.SecurityContextHolder}(스레드 로컬)만 보므로,
+     * 인터셉터에서 채운 인증이 핸들러 스레드에 전달되지 않으면 401 이 발생할 수 있다.
+     *
+     *
+     * CONNECT 시 {@code StompHeaderAccessor#setUser} 로 WebSocket 세션에 붙인 {@code Authentication} 은
+     * 디스패치되는 {@code Message} 의 헤더/Accessor 를 통해 핸들러까지 따라오므로,
+     * {@link org.springframework.messaging.simp.stomp.StompHeaderAccessor#getUser()} 로 본인 userId 를 확정한다.
+     *
+     */
     @MessageMapping("/dm/{roomId}/message")
-    public void message(@DestinationVariable Long roomId, @Payload DmSendMessageRequest request) {
-        // STOMP 인증 연동 시 SecurityContext 에서 유저를 읽는다.
-        Long userId = SecurityUtil.getCurrentUserId();
+    public void message(Message<?> message, @DestinationVariable Long roomId, @Payload DmSendMessageRequest request) {
+        Long userId = requireUserIdFromStompOrSecurity(message);
 
         DmMessageResponse saved = dmService.sendMessage(userId, roomId, request);
         WebSocketEventPayload<DmMessageResponse> payload = new WebSocketEventPayload<>("message", saved);
@@ -66,16 +87,20 @@ public class DmWebSocketController {
         messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
     }
 
+    /**
+     * 타이핑 이벤트 송신. 본인 userId 는 STOMP {@code Message} 기준(세션 principal)을 우선하고,
+     * 없을 때만 페이로드의 {@code userId} 및 {@link SecurityUtil} 폴백을 사용한다.
+     */
     @MessageMapping("/dm/{roomId}/typing")
-    public void typing(@DestinationVariable Long roomId, @Payload TypingEventDto typingEventDto) {
-        Long userId = resolveUserId(typingEventDto.userId());
+    public void typing(Message<?> message, @DestinationVariable Long roomId, @Payload TypingEventDto typingEventDto) {
+        Long userId = resolveUserId(typingEventDto.userId(), message);
         String status = typingEventDto.status();
 
         TypingWsPayload payload = new TypingWsPayload("typing", roomId, userId, status);
         messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
 
-        // 인증이 없는 상태(테스트/특수 케이스)에서는 타이핑 stop 스케줄을 생략한다.
-        if (!isAuthenticated() || userId == null) return;
+        // STOMP 세션 또는 SecurityContext 어느 쪽에도 인증이 없으면(로컬 테스트 등) 지연 stop 스케줄만 생략
+        if (!isAuthenticated(message) || userId == null) return;
 
         String key = typingKey(roomId, userId);
 
@@ -98,9 +123,10 @@ public class DmWebSocketController {
 
     public record ReadEventDto(Long roomId, Long userId, Long messageId) {}
 
+    /** 읽음 처리. {@code message} 에서 세션 principal 로 읽은 사용자만 {@link DmService#markRead} 에 전달한다. */
     @MessageMapping("/dm/{roomId}/read")
-    public void read(@DestinationVariable Long roomId, @Payload ReadEventDto readEventDto) {
-        Long userId = SecurityUtil.getCurrentUserId();
+    public void read(Message<?> message, @DestinationVariable Long roomId, @Payload ReadEventDto readEventDto) {
+        Long userId = requireUserIdFromStompOrSecurity(message);
         Long messageId = dmService.markRead(userId, roomId, readEventDto.messageId());
 
         ReadWsPayload payload = new ReadWsPayload("read", messageId);
@@ -139,7 +165,14 @@ public class DmWebSocketController {
 
     public record JoinLeaveWsPayload(String type, Long roomId, Long userId) {}
 
-    private boolean isAuthenticated() {
+    /**
+     * 타이핑 스케줄 여부 판단용. STOMP 로 확정된 사용자가 있으면 true,
+     * 없으면 {@link SecurityUtil} 로만 시도(핸들러 스레드에 컨텍스트가 남아 있는 예외 경로).
+     */
+    private boolean isAuthenticated(Message<?> message) {
+        if (userIdFromStompMessage(message) != null) {
+            return true;
+        }
         try {
             return SecurityUtil.getCurrentUserId() != null;
         } catch (Exception e) {
@@ -147,13 +180,52 @@ public class DmWebSocketController {
         }
     }
 
-    private Long resolveUserId(Long fallbackUserId) {
+    /**
+     * 타이핑용: 세션 기반 ID → 없으면 HTTP 와 동일한 SecurityContext → 최종적으로 페이로드 {@code fallbackUserId}.
+     */
+    private Long resolveUserId(Long fallbackUserId, Message<?> message) {
+        Long stomp = userIdFromStompMessage(message);
+        if (stomp != null) {
+            return stomp;
+        }
         try {
             Long current = SecurityUtil.getCurrentUserId();
             return current != null ? current : fallbackUserId;
         } catch (Exception e) {
             return fallbackUserId;
         }
+    }
+
+    /**
+     * message/read 등 <strong>반드시 로그인 사용자</strong>여야 하는 핸들러용.
+     * 1순위: STOMP {@code Message} 의 {@link StompHeaderAccessor#getUser()}({@code SecurityUser} principal)<br>
+     * 2순위: {@link SecurityUtil#getCurrentUserId()} (동일 스레드에 SecurityContext 가 있을 때만 성공)
+     */
+    private Long requireUserIdFromStompOrSecurity(Message<?> message) {
+        Long stomp = userIdFromStompMessage(message);
+        if (stomp != null) {
+            return stomp;
+        }
+        return SecurityUtil.getCurrentUserId();
+    }
+
+    /**
+     * CONNECT 시 인터셉터가 {@code accessor.setUser(Authentication)} 해 둔 값을,
+     * 현재 디스패치 중인 STOMP {@code Message} 에서 꺼낸다. Executor 로 스레드가 바뀌어도 Message 는 같이 넘어온다.
+     */
+    private static Long userIdFromStompMessage(Message<?> message) {
+        if (message == null) {
+            return null;
+        }
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) {
+            return null;
+        }
+        Object u = accessor.getUser();
+        if (u instanceof Authentication authentication && authentication.getPrincipal() instanceof SecurityUser su) {
+            return su.getId();
+        }
+        return null;
     }
 
     private String typingKey(Long roomId, Long userId) {

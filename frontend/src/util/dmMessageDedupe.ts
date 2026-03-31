@@ -31,7 +31,11 @@ export function isResolvedDmUserId(v: number | null | undefined): v is number {
 export function pickDmSenderIdFromRow(r: Record<string, unknown>): number {
   const tryScalar = (v: unknown): number | null => toDmPositiveUserId(v);
 
-  const scalars: unknown[] = [
+  /**
+   * 루트 `userId` 는 수신자·세션 주체로 올 수 있어 마지막에만 본다.
+   * `{ userId: 나, sender: { id: 상대 } }` 를 잘못 읽으면 상대 메시지가 전부 내 말풍선·dedupe 에서 사라질 수 있다.
+   */
+  const explicitSenderScalars: unknown[] = [
     r.senderId,
     r.sender_id,
     r.senderUserId,
@@ -44,15 +48,8 @@ export function pickDmSenderIdFromRow(r: Record<string, unknown>): number {
     r.author_id,
     r.sendUserId,
     r.send_user_id,
-    // STOMP·일부 직렬화에서 발신자만 userId 로 오는 경우 (DM 본문 객체 한정)
-    r.userId,
-    r.user_id,
-    r.memberId,
-    r.member_id,
-    r.ownerId,
-    r.owner_id,
   ];
-  for (const s of scalars) {
+  for (const s of explicitSenderScalars) {
     const n = tryScalar(s);
     if (n != null) return n;
   }
@@ -63,6 +60,19 @@ export function pickDmSenderIdFromRow(r: Record<string, unknown>): number {
       const n = tryScalar(k);
       if (n != null) return n;
     }
+  }
+
+  const genericUserScalars: unknown[] = [
+    r.userId,
+    r.user_id,
+    r.memberId,
+    r.member_id,
+    r.ownerId,
+    r.owner_id,
+  ];
+  for (const s of genericUserScalars) {
+    const n = tryScalar(s);
+    if (n != null) return n;
   }
 
   const last = tryScalar(r.sender);

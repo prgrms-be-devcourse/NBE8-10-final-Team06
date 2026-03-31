@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -16,8 +17,11 @@ import com.devstagram.domain.dm.entity.Dm;
 @Repository
 public interface DmRepository extends JpaRepository<Dm, Long> {
 
+    /** sender 는 LAZY — 페이징 조회 시 함께 로드하지 않으면 행마다 다른 발신자 id 가 무력화되는 환경이 있어 EntityGraph 로 고정 */
+    @EntityGraph(attributePaths = {"sender"})
     Slice<Dm> findByDmRoom_IdOrderByIdDesc(Long dmRoomId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"sender"})
     Slice<Dm> findByDmRoom_IdAndIdLessThanOrderByIdDesc(Long dmRoomId, Long cursor, Pageable pageable);
 
     Dm findTopByDmRoom_IdOrderByIdDesc(Long roomId);
