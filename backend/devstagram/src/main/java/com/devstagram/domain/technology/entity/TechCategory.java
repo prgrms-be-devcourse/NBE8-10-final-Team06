@@ -1,5 +1,8 @@
 package com.devstagram.domain.technology.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.devstagram.global.entity.BaseEntity;
 
 import jakarta.persistence.*;
@@ -28,6 +31,12 @@ public class TechCategory extends BaseEntity {
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;
 
+    @OneToMany(mappedBy = "category", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Technology> technologies = new ArrayList<>();
+
+    @OneToMany(mappedBy = "category", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<PostTechnology> postTechnologies = new ArrayList<>();
+
     @Builder
     public TechCategory(Long id, String name, String color) {
         this.id = id;
@@ -35,12 +44,8 @@ public class TechCategory extends BaseEntity {
         this.color = color;
     }
 
-    public void update(String name, String color){
+    public void update(String name, String color) {
         this.name = name;
         this.color = color;
-    }
-
-    public void softDelete() {
-        this.isDeleted = true;
     }
 }

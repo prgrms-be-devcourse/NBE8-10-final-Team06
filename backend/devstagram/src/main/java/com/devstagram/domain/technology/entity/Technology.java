@@ -1,5 +1,8 @@
 package com.devstagram.domain.technology.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.devstagram.global.entity.BaseEntity;
 
 import jakarta.persistence.*;
@@ -30,12 +33,13 @@ public class Technology extends BaseEntity {
     @Column(name = "color")
     private String color;
 
+    @OneToMany(mappedBy = "technology", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<PostTechnology> postTechnologies = new ArrayList<>();
 
-    public void update(TechCategory category, String name, String iconUrl, String color){
+    public void update(TechCategory category, String name, String iconUrl, String color) {
         this.category = category;
         this.name = name;
         this.iconUrl = iconUrl;
         this.color = color;
     }
-
 }

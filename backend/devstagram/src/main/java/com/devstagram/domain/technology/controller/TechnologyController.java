@@ -1,14 +1,16 @@
 package com.devstagram.domain.technology.controller;
 
-import com.devstagram.domain.technology.dto.*;
-import com.devstagram.domain.technology.service.TechnologyService;
-import com.devstagram.global.rsdata.RsData;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import com.devstagram.domain.technology.dto.*;
+import com.devstagram.domain.technology.service.TechnologyService;
+import com.devstagram.global.rsdata.RsData;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/technologies")
@@ -36,7 +38,6 @@ public class TechnologyController {
         technologyService.createTech(req);
 
         return RsData.success("기술태그 생성 성공", null);
-
     }
 
     @PostMapping("/categories")
@@ -49,24 +50,18 @@ public class TechnologyController {
 
     @PutMapping("/{technologyId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public RsData<Void> updateTech(
-            @Valid @RequestBody TechUpdateReq req,
-            @PathVariable Long technologyId) {
+    public RsData<Void> updateTech(@Valid @RequestBody TechUpdateReq req, @PathVariable Long technologyId) {
         technologyService.updateTech(technologyId, req);
 
         return RsData.success("기술태그 수정 성공", null);
-
     }
 
     @PutMapping("/categories/{categoryId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public RsData<Void> updateCategory(
-            @Valid @RequestBody TechCategoryUpdateReq req,
-            @PathVariable Long categoryId) {
+    public RsData<Void> updateCategory(@Valid @RequestBody TechCategoryUpdateReq req, @PathVariable Long categoryId) {
         technologyService.updateCategory(categoryId, req);
 
         return RsData.success("카테고리 수정 성공", null);
-
     }
 
     @DeleteMapping("/{technologyId}")
@@ -86,7 +81,4 @@ public class TechnologyController {
 
         return RsData.success("기술 카테고리 삭제 성공", null);
     }
-
-
-
 }
