@@ -23,7 +23,9 @@ import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.devstagram.domain.post.repository.PostRepository;
-import com.devstagram.domain.technology.repository.UserTechScoreRepository;
+import com.devstagram.domain.technology.entity.TechCategory;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.dto.UserSearchResponse;
@@ -52,17 +54,17 @@ class UserServiceTest {
     @Mock
     private FileValidator fileValidator;
 
-    @InjectMocks
-    private UserService userService;
-
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
-    private UserTechScoreRepository userTechScoreRepository;
+    private PostRepository postRepository;
 
     @Mock
-    private PostRepository postRepository;
+    private TechnologyRepository technologyRepository;
+
+    @InjectMocks
+    private UserService userService;
 
     @Test
     @DisplayName("프로필 수정 성공 - 닉네임 변경 및 UserInfo가 자동 생성되어야 한다")
@@ -82,12 +84,10 @@ class UserServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(userRepository.existsByNickname("newNickname")).willReturn(false);
 
-        // when - 세 번째 인자로 null(파일 없음)을 넘겨줍니다.
+        // when
         userService.updateProfile(userId, request, null);
 
         // then
-        assertThat(user.getNickname()).isEqualTo("newNickname");
-        // profileImage가 null이므로 기존 imageUrl인 "oldUrl"이 유지되어야 함 (로직에 따라 확인)
         assertThat(user.getNickname()).isEqualTo("newNickname");
         assertThat(user.getUserInfo()).isNotNull();
     }
@@ -95,7 +95,7 @@ class UserServiceTest {
     @Test
     @DisplayName("프로필 수정 성공 - 이미지가 있을 때 스토리지 서비스가 호출되어야 한다")
     void updateProfile_WithImage() {
-        // 1. Given (데이터 준비)
+        // given
         Long userId = 1L;
         User user = User.builder()
                 .nickname("oldName")
@@ -105,22 +105,21 @@ class UserServiceTest {
         ProfileUpdateRequest request = new ProfileUpdateRequest(
                 "newName", "https://github.com/dohwa", Resume.JUNIOR, LocalDate.now(), Gender.MALE);
 
-        // 가짜 이미지 파일 생성
         org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
                 "profileImage", "test.png", "image/png", "test".getBytes());
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
         given(storageService.store(file)).willReturn("https://new-image-url.com");
+        given(userRepository.existsByNickname("newName")).willReturn(false);
 
-        // 2. When (실행)
+        // when
         userService.updateProfile(userId, request, file);
 
-        // 3. Then (검증)
+        // then
         verify(fileValidator).validateImage(file);
         verify(storageService).store(file);
         verify(storageService).delete("old-image.png");
 
-        // 최종적으로 유저의 이미지 URL이 바뀌었는지 확인
         assertThat(user.getProfileImageUrl()).isEqualTo("https://new-image-url.com");
         assertThat(user.getNickname()).isEqualTo("newName");
     }
@@ -140,7 +139,7 @@ class UserServiceTest {
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
         // when
-        userService.updateProfile(userId, request, null); // 인자 3개!
+        userService.updateProfile(userId, request, null);
 
         // then
         assertThat(user.getNickname()).isEqualTo(sameNickname);
@@ -161,7 +160,7 @@ class UserServiceTest {
         given(userRepository.existsByNickname("otherUserNickname")).willReturn(true);
 
         // when & then
-        assertThatThrownBy(() -> userService.updateProfile(userId, request, null)) // 인자 3개!
+        assertThatThrownBy(() -> userService.updateProfile(userId, request, null))
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("이미 사용 중인 닉네임입니다.");
     }
@@ -169,12 +168,11 @@ class UserServiceTest {
     @Test
     @DisplayName("유저 검색 성공 - 검색 키워드와 페이징을 이용해 Slice 형태의 결과를 반환한다")
     void searchUsers_Success() {
-        // 1. 준비 (given)
+        // given
         String keyword = "dohwa";
         Long currentUserId = 1L;
         Pageable pageable = PageRequest.of(0, 20);
 
-        // User 엔티티 생성 (builder에 id가 없으므로 ReflectionTestUtils 사용)
         User user1 = User.builder()
                 .nickname("dohwa_backend")
                 .profileImageUrl("https://image1.com")
@@ -184,23 +182,15 @@ class UserServiceTest {
         User user2 = User.builder().nickname("dohwa_ai").build();
         ReflectionTestUtils.setField(user2, "id", 2L);
 
-        // 리포지토리 결과를 SliceImpl로 감싸서 준비
         List<User> userList = Arrays.asList(user1, user2);
-        Slice<UserSearchResponse> sliceResponse = new SliceImpl<>(
-                Arrays.asList(UserSearchResponse.of(user1, false), UserSearchResponse.of(user2, false)),
-                pageable,
-                false);
 
-        // 서비스 로직에서 리포지토리가 아닌 서비스 메서드 자체를 검증하거나
-        // 서비스 내부에서 호출하는 userRepository.findByNicknameContaining 등을 모킹
-        // 도화님의 UserController를 보니 Slice<UserSearchResponse>를 반환하므로 서비스 메서드 호출 결과 모킹
         given(userRepository.findByNicknameContaining(anyString(), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(userList, pageable, false));
 
-        // 2. 실행 (when)
+        // when
         Slice<UserSearchResponse> results = userService.searchUsers(keyword, currentUserId, pageable);
 
-        // 3. 검증 (then)
+        // then
         assertThat(results.getContent()).hasSize(2);
         assertThat(results.getContent().get(0).nickname()).isEqualTo("dohwa_backend");
         assertThat(results.getContent().get(1).nickname()).isEqualTo("dohwa_ai");
@@ -212,18 +202,16 @@ class UserServiceTest {
     @DisplayName("유저 검색 - 검색어가 공백이면 리포지토리를 호출하지 않고 빈 Slice를 반환한다")
     void searchUsers_EmptyKeyword() {
         // given
-        String keyword = "  "; // 공백 입력
+        String keyword = "  ";
         Long currentUserId = 1L;
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 20);
+        Pageable pageable = PageRequest.of(0, 20);
 
         // when
-        org.springframework.data.domain.Slice<com.devstagram.domain.user.dto.UserSearchResponse> results =
-                userService.searchUsers(keyword, currentUserId, pageable);
+        Slice<UserSearchResponse> results = userService.searchUsers(keyword, currentUserId, pageable);
 
         // then
         assertThat(results.getContent()).isEmpty();
-        verify(userRepository, never())
-                .findByNicknameContaining(anyString(), any(org.springframework.data.domain.Pageable.class));
+        verify(userRepository, never()).findByNicknameContaining(anyString(), any(Pageable.class));
     }
 
     @Test
@@ -244,18 +232,15 @@ class UserServiceTest {
         userService.withdraw(userId);
 
         // then
-        // 1. 유저의 상태값이 변경되었는지 확인
         assertThat(user.isDeleted()).isTrue();
         assertThat(user.getNickname()).contains("탈퇴한 사용자");
-
-        // 2. 이벤트가 실제로 발행되었는지 확인
         verify(eventPublisher, times(1)).publishEvent(any(UserWithdrawnEvent.class));
     }
 
     @Test
-    @DisplayName("유저 프로필 조회 성공 - 기술 스택과 게시글 목록을 포함한 응답을 반환한다")
+    @DisplayName("유저 프로필 조회 성공 - 기술 벡터 기반 상위 기술과 게시글 목록을 포함한 응답을 반환한다")
     void getUserProfile_Success() {
-        // 1. Given (데이터 준비)
+        // given
         String nickname = "dohwa";
         Long currentUserId = 1L;
         Pageable pageable = PageRequest.of(0, 10);
@@ -268,30 +253,63 @@ class UserServiceTest {
                 .build();
         ReflectionTestUtils.setField(targetUser, "id", 2L);
 
-        // 기술 스택 모킹
-        given(userTechScoreRepository.findAllByUserOrderByScoreDesc(targetUser)).willReturn(Collections.emptyList());
+        // 벡터 기반 점수를 직접 반영한다.
+        // 현재 User 엔티티는 technologyId = index + 1 규칙으로 techVector를 관리한다.
+        targetUser.updateTechScore(1, 65);
+        targetUser.updateTechScore(2, 40);
+
+        TechCategory backendCategory = TechCategory.builder().name("Backend").build();
+
+        Technology javaTechnology = Technology.builder()
+                .name("Java")
+                .color("#007396")
+                .category(backendCategory)
+                .build();
+        ReflectionTestUtils.setField(javaTechnology, "id", 1L);
+
+        Technology springBootTechnology = Technology.builder()
+                .name("Spring Boot")
+                .color("#6DB33F")
+                .category(backendCategory)
+                .build();
+        ReflectionTestUtils.setField(springBootTechnology, "id", 2L);
+
+        // 유저 조회 모킹
+        given(userRepository.findByNicknameWithInfo(nickname)).willReturn(Optional.of(targetUser));
+
+        // 팔로우 여부 모킹
+        given(followService.isFollowing(currentUserId, targetUser.getId())).willReturn(true);
 
         // 게시글 목록 모킹
         given(postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(
                         eq(targetUser.getId()), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(Collections.emptyList(), pageable, false));
 
-        // 유저 조회 모킹 (Fetch Join 버전)
-        given(userRepository.findByNicknameWithInfo(nickname)).willReturn(Optional.of(targetUser));
+        // 상위 기술 ID로 Technology 엔티티를 조회하는 부분 모킹
+        given(technologyRepository.findAllByIdsWithCategory(anyList()))
+                .willReturn(List.of(javaTechnology, springBootTechnology));
 
-        // 팔로우 여부 모킹
-        given(followService.isFollowing(currentUserId, targetUser.getId())).willReturn(true);
-
-        // 2. When (실행)
+        // when
         UserProfileResponse response = userService.getUserProfile(nickname, currentUserId, pageable);
 
-        // 3. Then (검증)
+        // then
         assertThat(response.nickname()).isEqualTo(nickname);
         assertThat(response.followerCount()).isEqualTo(10L);
-        assertThat(response.isFollowing()).isTrue(); // 팔로우 중인지 확인
+        assertThat(response.followingCount()).isEqualTo(20L);
+        assertThat(response.postCount()).isEqualTo(5L);
+        assertThat(response.isFollowing()).isTrue();
+
+        // 벡터 기반으로 계산된 상위 기술 점수 검증
+        assertThat(response.topTechScores()).hasSize(2);
+        assertThat(response.topTechScores().get(0).techName()).isEqualTo("Java");
+        assertThat(response.topTechScores().get(0).score()).isEqualTo(65);
+        assertThat(response.topTechScores().get(1).techName()).isEqualTo("Spring Boot");
+        assertThat(response.topTechScores().get(1).score()).isEqualTo(40);
 
         verify(userRepository).findByNicknameWithInfo(nickname);
+        verify(followService).isFollowing(currentUserId, targetUser.getId());
         verify(postRepository)
                 .findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class));
+        verify(technologyRepository).findAllByIdsWithCategory(anyList());
     }
 }

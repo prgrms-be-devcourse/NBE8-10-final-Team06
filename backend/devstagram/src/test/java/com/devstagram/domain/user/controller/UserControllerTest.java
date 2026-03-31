@@ -22,6 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.technology.entity.TechCategory;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechCategoryRepository;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
@@ -46,6 +50,12 @@ class UserControllerTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TechnologyRepository technologyRepository;
+
+    @Autowired
+    private TechCategoryRepository techCategoryRepository;
 
     private Cookie authCookie;
     private User me;
@@ -74,6 +84,54 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.msg").value("프로필 조회 성공"))
                 .andExpect(jsonPath("$.data.nickname").value("otherNickname"))
                 .andExpect(jsonPath("$.data.profileImageUrl").exists())
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("프로필 조회 시 기술 벡터 기반 상위 기술 점수를 반환한다")
+    void getProfileTopTechScoresFromVector() throws Exception {
+        // given
+        TechCategory backendCategory = techCategoryRepository.save(
+                TechCategory.builder().name("Backend").color("#6C757D").build());
+
+        Technology javaTechnology = technologyRepository.save(Technology.builder()
+                .name("Java")
+                .color("#007396")
+                .category(backendCategory)
+                .build());
+
+        Technology springBootTechnology = technologyRepository.save(Technology.builder()
+                .name("Spring Boot")
+                .color("#6DB33F")
+                .category(backendCategory)
+                .build());
+
+        Technology dockerTechnology = technologyRepository.save(Technology.builder()
+                .name("Docker")
+                .color("#2496ED")
+                .category(backendCategory)
+                .build());
+
+        // 저장된 실제 기술 ID를 사용해 벡터 점수를 누적한다.
+        otherUser.updateTechScore(javaTechnology.getId().intValue(), 65);
+        otherUser.updateTechScore(springBootTechnology.getId().intValue(), 40);
+        otherUser.updateTechScore(dockerTechnology.getId().intValue(), 20);
+
+        userRepository.save(otherUser);
+
+        // when & then
+        mvc.perform(get("/api/users/" + otherUser.getNickname() + "/profile").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
+                .andExpect(jsonPath("$.msg").value("프로필 조회 성공"))
+                .andExpect(jsonPath("$.data.nickname").value("otherNickname"))
+                .andExpect(jsonPath("$.data.topTechScores").isArray())
+                .andExpect(jsonPath("$.data.topTechScores[0].techName").value("Java"))
+                .andExpect(jsonPath("$.data.topTechScores[0].score").value(65))
+                .andExpect(jsonPath("$.data.topTechScores[1].techName").value("Spring Boot"))
+                .andExpect(jsonPath("$.data.topTechScores[1].score").value(40))
+                .andExpect(jsonPath("$.data.topTechScores[2].techName").value("Docker"))
+                .andExpect(jsonPath("$.data.topTechScores[2].score").value(20))
                 .andDo(print());
     }
 

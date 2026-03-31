@@ -1,14 +1,12 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.technology.entity.Technology;
-import com.devstagram.domain.technology.repository.TechnologyRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -21,6 +19,8 @@ import com.devstagram.domain.post.dto.PostFeedProfileRes;
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.technology.dto.TechScoreDto;
+import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.user.dto.ProfileUpdateRequest;
 import com.devstagram.domain.user.dto.UserProfileResponse;
 import com.devstagram.domain.user.dto.UserSearchResponse;
@@ -194,9 +194,8 @@ public class UserService {
                 .toList();
 
         // 5. 상위 5개 기술의 ID만 추출
-        List<Long> technologyIds = top5Technologies.stream()
-                .map(TechScoreInfo::techId)
-                .toList();
+        List<Long> technologyIds =
+                top5Technologies.stream().map(TechScoreInfo::techId).toList();
 
         // 6. 기술 ID들로 Technology 엔티티를 한 번에 조회
         //    현재는 기술 이름만 사용하지만, repository 메서드가 category도 함께 fetch하도록 되어 있다
@@ -204,8 +203,8 @@ public class UserService {
 
         // 7. 조회한 Technology를 "기술ID -> Technology" 형태의 Map으로 변환
         //    나중에 빠르게 찾아 쓰기 위해서
-        Map<Long, Technology> technologyById = technologies.stream()
-                .collect(Collectors.toMap(Technology::getId, technology -> technology));
+        Map<Long, Technology> technologyById =
+                technologies.stream().collect(Collectors.toMap(Technology::getId, technology -> technology));
 
         // 8. 상위 5개 정보(top5Technologies)를 DTO로 변환
         return top5Technologies.stream()
