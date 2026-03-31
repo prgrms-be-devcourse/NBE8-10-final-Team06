@@ -54,7 +54,7 @@ public class TechScoreService {
                 techScore.increaseScrapCount();
                 user.updateTechScore(tech.getId().intValue(), SCORE_SCRAP);
             }
-            default -> {}
+            default -> throw new IllegalArgumentException("지원하지 않는 activityType: " + activityType);
         }
     }
 
@@ -81,7 +81,7 @@ public class TechScoreService {
                     techScore.decreaseScrapCount();
                     user.updateTechScore(tech.getId().intValue(), -SCORE_SCRAP);
                 }
-                default -> {}
+                default -> throw new IllegalArgumentException("지원하지 않는 activityType: " + activityType);
             }
         });
     }

@@ -105,7 +105,8 @@ public class User extends BaseEntity {
         int index = techId - 1;
         if (index >= 0 && index < this.techVector.length) {
             // 1. 값 업데이트
-            this.techVector[index] += score;
+            float updated = this.techVector[index] + score;
+            this.techVector[index] = Math.max(0, updated);
 
             // 2. JPA에게 배열이 통째로 바뀌었다고 새로 갈아끼워줘야 DB에 반영됩니다.
             // float[]는 객체라서 내부 값만 바꾸면 JPA가 모릅니다.
