@@ -54,9 +54,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        if (accessor == null) {
-            return message;
-        }
+        if (accessor == null) return message;
 
         // CONNECT 가 아니면 JWT 재검증 없이, 이미 세션에 연결된 principal 만 현재 워커 스레드의 SecurityContext 에 맞춘다.
         if (StompCommand.CONNECT != accessor.getCommand()) {
@@ -65,13 +63,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         String token = extractToken(accessor);
-        if (token == null || token.isBlank()) {
-            return message;
-        }
+        if (token == null || token.isBlank()) return message;
 
-        if (!jwtProvider.isValid(token)) {
-            return message;
-        }
+        if (!jwtProvider.isValid(token)) return message;
 
         Claims payload = jwtProvider.payload(token);
         Long userId = Long.parseLong(payload.getSubject());
