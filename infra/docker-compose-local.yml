@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   db:
-    image: postgres:15
+    image: ankane/pgvector:v0.5.1
     container_name: local-db
     restart: always
     environment:
