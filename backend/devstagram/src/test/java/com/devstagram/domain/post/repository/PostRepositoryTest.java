@@ -11,10 +11,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
+import org.springframework.test.context.ActiveProfiles;
 
 import com.devstagram.domain.post.entity.Post;
 import com.devstagram.domain.post.entity.PostScrap;
@@ -23,6 +25,8 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 
 @DataJpaTest
+@ActiveProfiles("test")
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class PostRepositoryTest {
 
     @Autowired

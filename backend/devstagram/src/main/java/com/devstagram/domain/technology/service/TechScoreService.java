@@ -30,10 +30,8 @@ public class TechScoreService {
 
     /**
      * 특정 활동에 대한 사용자의 기술 점수를 증가시킵니다.
-     * 해당 기술에 대한 점수 기록이 없는 경우 새롭게 생성합니다.
-     * * @param user         점수를 획득하는 사용자
-     * @param tech         점수가 부여될 기술 태그
-     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     * 1) user_tech_score 테이블 갱신
+     * 2) users.tech_vector 갱신
      */
     public void increaseScore(User user, Technology tech, String activityType) {
         UserTechScore techScore = userTechScoreRepository
@@ -44,24 +42,26 @@ public class TechScoreService {
             case "POST" -> {
                 techScore.increaseScore(SCORE_POST);
                 techScore.increasePostCount();
+                user.updateTechScore(tech.getId().intValue(), SCORE_POST);
             }
             case "LIKE" -> {
                 techScore.increaseScore(SCORE_LIKE);
                 techScore.increaseLikeCount();
+                user.updateTechScore(tech.getId().intValue(), SCORE_LIKE);
             }
             case "SCRAP" -> {
                 techScore.increaseScore(SCORE_SCRAP);
                 techScore.increaseScrapCount();
+                user.updateTechScore(tech.getId().intValue(), SCORE_SCRAP);
             }
+            default -> throw new IllegalArgumentException("지원하지 않는 activityType: " + activityType);
         }
     }
 
     /**
-     * 특정 활동이 취소되었을 때(예: 게시글 삭제, 좋아요 취소) 점수를 차감합니다.
-     * 기록이 존재하는 경우에만 차감 로직을 수행합니다.
-     * * @param user         점수가 차감될 사용자
-     * @param tech         대상 기술 태그
-     * @param activityType 활동 유형 ("POST", "LIKE", "SCRAP")
+     * 특정 활동이 취소되었을 때 점수를 차감합니다.
+     * 1) user_tech_score 테이블 갱신
+     * 2) users.tech_vector 갱신
      */
     public void decreaseScore(User user, Technology tech, String activityType) {
         userTechScoreRepository.findByUserAndTechnology(user, tech).ifPresent(techScore -> {
@@ -69,15 +69,19 @@ public class TechScoreService {
                 case "POST" -> {
                     techScore.decreaseScore(SCORE_POST);
                     techScore.decreasePostCount();
+                    user.updateTechScore(tech.getId().intValue(), -SCORE_POST);
                 }
                 case "LIKE" -> {
                     techScore.decreaseScore(SCORE_LIKE);
                     techScore.decreaseLikeCount();
+                    user.updateTechScore(tech.getId().intValue(), -SCORE_LIKE);
                 }
                 case "SCRAP" -> {
                     techScore.decreaseScore(SCORE_SCRAP);
                     techScore.decreaseScrapCount();
+                    user.updateTechScore(tech.getId().intValue(), -SCORE_SCRAP);
                 }
+                default -> throw new IllegalArgumentException("지원하지 않는 activityType: " + activityType);
             }
         });
     }

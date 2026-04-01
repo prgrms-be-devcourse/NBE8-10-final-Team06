@@ -6,7 +6,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.user.dto.SignupResponse;
+import com.devstagram.domain.user.dto.MyInfoResponse;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
@@ -35,8 +35,8 @@ public class UserSecurityService {
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
     }
 
-    public SignupResponse getMyInfo(Long id) {
+    public MyInfoResponse getMyInfo(Long id) {
         User user = findById(id);
-        return SignupResponse.from(user);
+        return MyInfoResponse.from(user);
     }
 }
