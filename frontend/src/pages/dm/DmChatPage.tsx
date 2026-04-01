@@ -219,21 +219,26 @@ const DmChatPage: React.FC = () => {
   /** STOMP typing 이벤트 — 말풍선 좌우는 렌더 시 `senderId`(userId) 로 `computeDmMessageIsMe` 와 동일 규칙 적용 */
   const [remoteTyping, setRemoteTyping] = useState<{ userId: number; text: string } | null>(null);
   const [isMeTyping, setIsMeTyping] = useState(false);
+  /** `handleInputChange`/`applyTypingForInputValue` 에서 stale closure 없이 타이핑 세션 판별 */
+  const isMeTypingRef = useRef(false);
+  isMeTypingRef.current = isMeTyping;
   /**
    * 로컬 타이핑 중 본인 STOMP 에코만 숨김.
    * 타이핑 payload 의 userId 가 `/auth/me` 와 맞거나 JWT(`effectiveSelfId`) 와 맞는 경우가 있어 둘 다 에코 후보로 본다.
    */
   const showPeerTypingFromRemote = useMemo(() => {
     if (!remoteTyping) return false;
-    if (!isMeTyping) return true;
+
     const remoteU = toDmPositiveUserId(remoteTyping.userId);
     if (remoteU == null) return true;
+
     const echoMe = toDmPositiveUserId(selfIdForTypingEcho);
     const jwtSelf = toDmPositiveUserId(bubbleSelfUserId);
     if (echoMe != null && remoteU === echoMe) return false;
     if (jwtSelf != null && remoteU === jwtSelf) return false;
+
     return true;
-  }, [remoteTyping, isMeTyping, bubbleSelfUserId, selfIdForTypingEcho]);
+  }, [remoteTyping, bubbleSelfUserId, selfIdForTypingEcho]);
 
   const remoteTypingPeerProfile = useMemo((): DmRoomParticipantSummary | null => {
     if (!remoteTyping) return null;
@@ -343,6 +348,129 @@ const DmChatPage: React.FC = () => {
     reconnectKey: stompReconnectKey,
   });
 
+  const applyTypingForInputValue = useCallback(
+    (nextVal: string) => {
+      const actor = effectiveSelfIdRef.current;
+      const rid = roomId != null ? Number(roomId) : NaN;
+      // #region agent log
+      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+        body: JSON.stringify({
+          sessionId: '4d4e2f',
+          location: 'DmChatPage.tsx:applyTypingForInputValue:enter',
+          message: 'applyTyping enter',
+          data: {
+            hypothesisId: 'H1-H4',
+            runId: 'pre-fix',
+            valLen: nextVal.length,
+            trimEmpty: nextVal.trim() === '',
+            sessionActive: typingSessionActiveRef.current,
+            isMeTypingRef: isMeTypingRef.current,
+            ridOk: Number.isFinite(rid) && isResolvedDmUserId(actor),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
+
+      if (nextVal.trim() === '') {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = null;
+        }
+        const hadTypingSession = typingSessionActiveRef.current || isMeTypingRef.current;
+        /** 에코가 `publish(stop)` 직전에 처리되면 `typingSessionActiveRef` 가 true 로 남아 자기 stop 이 무시될 수 있음 */
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
+        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+        setRemoteTyping((prev) => {
+          if (prev == null) return prev;
+          const prevUid = toDmPositiveUserId(prev.userId);
+          const selfUid = toDmPositiveUserId(actor);
+          return selfUid != null && prevUid === selfUid ? null : prev;
+        });
+        // #region agent log
+        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+          body: JSON.stringify({
+            sessionId: '4d4e2f',
+            location: 'DmChatPage.tsx:applyTypingForInputValue:empty',
+            message: 'publish stop empty input',
+            data: { hypothesisId: 'H5', runId: 'post-fix', hadTypingSession, sessionClearedBeforePublish: true },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        if (hadTypingSession) {
+          console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
+        }
+        setIsMeTyping(false);
+        return;
+      }
+
+      const typingDest = dmStompAppTyping(rid);
+      const typingBody = { roomId: rid, userId: actor, status: 'start' as const };
+      const now = Date.now();
+
+      if (!isMeTypingRef.current) {
+        setIsMeTyping(true);
+        publish(typingDest, typingBody);
+        // #region agent log
+        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+          body: JSON.stringify({
+            sessionId: '4d4e2f',
+            location: 'DmChatPage.tsx:applyTypingForInputValue:firstStart',
+            message: 'publish start first_keystroke',
+            data: { hypothesisId: 'H1-H3', runId: 'pre-fix' },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
+        typingSessionActiveRef.current = true;
+        lastTypingStartSentAtRef.current = now;
+      } else if (
+        typingSessionActiveRef.current &&
+        now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
+      ) {
+        publish(typingDest, typingBody);
+        // #region agent log
+        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+          body: JSON.stringify({
+            sessionId: '4d4e2f',
+            location: 'DmChatPage.tsx:applyTypingForInputValue:keepalive',
+            message: 'publish start keepalive',
+            data: { hypothesisId: 'H4', runId: 'pre-fix', deltaMs: now - lastTypingStartSentAtRef.current },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
+        lastTypingStartSentAtRef.current = now;
+      }
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsMeTyping(false);
+        if (typingSessionActiveRef.current) {
+          typingSessionActiveRef.current = false;
+          lastTypingStartSentAtRef.current = 0;
+          publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+          console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'idle_timeout' });
+        }
+        typingTimeoutRef.current = null;
+      }, DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS);
+    },
+    [roomId, publish]
+  );
+
   const mergeFreshSliceIntoMessages = useCallback((rid: number, slice: DmMessageSliceResponse) => {
     const normalized = normalizeDmMessagesFromApi(slice.messages ?? []);
     pruneShareBackupByServer(rid, normalized);
@@ -420,6 +548,8 @@ const DmChatPage: React.FC = () => {
         isResolvedDmUserId(actor) &&
         typingSessionActiveRef.current
       ) {
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
         publish(dmStompAppTyping(prevNum), { roomId: prevNum, userId: actor, status: 'stop' });
       }
     }
@@ -625,10 +755,10 @@ const DmChatPage: React.FC = () => {
       typingTimeoutRef.current = null;
     }
     if (typingSessionActiveRef.current && isResolvedDmUserId(actor)) {
-      publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-      console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
       typingSessionActiveRef.current = false;
       lastTypingStartSentAtRef.current = 0;
+      publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+      console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
     }
     setIsMeTyping(false);
     // 하단 이동
@@ -638,56 +768,73 @@ const DmChatPage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextVal = e.target.value;
     setInputValue(nextVal);
-    const actor = effectiveSelfIdRef.current;
-    const rid = roomId != null ? Number(roomId) : NaN;
-    if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
+    const native = e.nativeEvent as InputEvent;
+    // #region agent log
+    fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+      body: JSON.stringify({
+        sessionId: '4d4e2f',
+        location: 'DmChatPage.tsx:handleInputChange',
+        message: 'onChange',
+        data: {
+          hypothesisId: 'H2-H3',
+          runId: 'pre-fix',
+          isComposing: native.isComposing === true,
+          valLen: nextVal.length,
+          trimEmpty: nextVal.trim() === '',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    if (native.isComposing) return;
+    applyTypingForInputValue(nextVal);
+  };
 
-    if (nextVal.trim() === '') {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
-      if (typingSessionActiveRef.current) {
-        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
-        typingSessionActiveRef.current = false;
-        lastTypingStartSentAtRef.current = 0;
-      }
-      setIsMeTyping(false);
-      return;
-    }
-
-    const typingDest = dmStompAppTyping(rid);
-    const typingBody = { roomId: rid, userId: actor, status: 'start' as const };
-    const now = Date.now();
-
-    if (!isMeTyping) {
-      setIsMeTyping(true);
-      publish(typingDest, typingBody);
-      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
-      typingSessionActiveRef.current = true;
-      lastTypingStartSentAtRef.current = now;
-    } else if (
-      typingSessionActiveRef.current &&
-      now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
-    ) {
-      // 백엔드는 마지막 start 기준 3초 후 자동 stop — 연속 입력 중에도 주기적으로 start 로 타이머 리셋
-      publish(typingDest, typingBody);
-      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
-      lastTypingStartSentAtRef.current = now;
-    }
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsMeTyping(false);
-      if (typingSessionActiveRef.current) {
-        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'idle_timeout' });
-        typingSessionActiveRef.current = false;
-        lastTypingStartSentAtRef.current = 0;
-      }
-      typingTimeoutRef.current = null;
-    }, DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS);
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    const el = e.currentTarget;
+    const v = el.value;
+    // #region agent log
+    fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+      body: JSON.stringify({
+        sessionId: '4d4e2f',
+        location: 'DmChatPage.tsx:handleCompositionEnd:sync',
+        message: 'compositionEnd sync',
+        data: {
+          hypothesisId: 'H1',
+          runId: 'pre-fix',
+          valLen: v.length,
+          trimEmpty: v.trim() === '',
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    queueMicrotask(() => {
+      const vLater = el.value;
+      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+        body: JSON.stringify({
+          sessionId: '4d4e2f',
+          location: 'DmChatPage.tsx:handleCompositionEnd:microtask',
+          message: 'compositionEnd vs microtask input value',
+          data: {
+            hypothesisId: 'H1',
+            runId: 'pre-fix',
+            valLenSync: v.length,
+            valLenLater: vLater.length,
+            mismatch: v !== vLater,
+            laterTrimEmpty: vLater.trim() === '',
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    });
+    // #endregion
+    applyTypingForInputValue(v);
   };
 
   const handleLeaveRoom = async () => {
@@ -828,7 +975,14 @@ const DmChatPage: React.FC = () => {
       <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
           <ImageIcon size={24} color="#262626" style={{ cursor: 'pointer' }} />
-          <input type="text" value={inputValue} onChange={handleInputChange} placeholder="메시지 입력..." style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1rem' }} />
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onCompositionEnd={handleCompositionEnd}
+            placeholder="메시지 입력..."
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1rem' }}
+          />
           <button type="submit" disabled={!inputValue.trim()} style={{ background: 'none', border: 'none', color: inputValue.trim() ? '#0095f6' : '#b2dffc', fontWeight: 'bold', fontSize: '1rem' }}>보내기</button>
         </form>
         <div

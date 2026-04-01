@@ -96,7 +96,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
     }
     const rid = Number(roomId);
 
-    const TYPING_STOP_UI_DEBOUNCE_MS = 220;
     const typingStopUiDebounceRef = { current: null as number | null };
     const cancelTypingStopDebounce = () => {
       if (typingStopUiDebounceRef.current != null) {
@@ -155,6 +154,28 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
       const selfJwt = toDmPositiveUserId(readJwtSubAsUserId());
       const echoSuppressId = selfFromPage ?? selfJwt;
 
+      // #region agent log
+      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+        body: JSON.stringify({
+          sessionId: '4d4e2f',
+          location: 'useDmRoomTopic.ts:applyTopicTyping',
+          message: 'inbound typing',
+          data: {
+            hypothesisId: 'H5',
+            runId: 'pre-fix',
+            status: t.status,
+            typingUid,
+            echoSuppressId,
+            lastShownUid: lastShownTypingUserIdRef.current,
+            sessionActiveRef: typingSessionActiveRef.current,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       const parts = roomSnap?.participants ?? [];
 
       const runTypingPollDebounced = () => {
@@ -174,6 +195,19 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           typingUid === echoSuppressId &&
           typingSessionActiveRef.current
         ) {
+          // #region agent log
+          fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+            body: JSON.stringify({
+              sessionId: '4d4e2f',
+              location: 'useDmRoomTopic.ts:applyTopicTyping:stopIgnoredEcho',
+              message: 'stop ignored self echo',
+              data: { hypothesisId: 'H5', runId: 'pre-fix', typingUid },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
           return;
         }
         if (
@@ -182,15 +216,21 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
         ) {
           return;
         }
-        cancelTypingStopDebounce();
-        const uidForStop = typingUid;
-        typingStopUiDebounceRef.current = window.setTimeout(() => {
-          typingStopUiDebounceRef.current = null;
-          if (lastShownTypingUserIdRef.current === uidForStop) {
-            lastShownTypingUserIdRef.current = null;
-            setRemoteTyping(null);
-          }
-        }, TYPING_STOP_UI_DEBOUNCE_MS);
+        /** 지연 해제 시 그 사이 도착한 `start` 가 디바운스를 취소해 입력 종료 후에도 말풍선이 다시 켜질 수 있음 → 즉시 해제 */
+        clearRemoteTypingNow();
+        // #region agent log
+        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
+          body: JSON.stringify({
+            sessionId: '4d4e2f',
+            location: 'useDmRoomTopic.ts:applyTopicTyping:stopImmediate',
+            message: 'remote typing cleared immediately on stop',
+            data: { hypothesisId: 'H5', runId: 'post-fix', typingUid },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         return;
       }
 
