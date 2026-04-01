@@ -54,6 +54,8 @@ export interface PostFeedResponse {
   likeCount: number;
   commentCount: number;
   createdAt: string;
+  /** 추천 피드 스코어 (백엔드 PostFeedRes) */
+  feedScore?: number;
 }
 
 /**

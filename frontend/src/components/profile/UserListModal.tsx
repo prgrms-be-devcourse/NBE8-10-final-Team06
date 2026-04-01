@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { userApi, FOLLOW_CHANGED_EVENT } from '../../api/user';
@@ -15,6 +15,7 @@ import {
   filterViewerFromOwnersFollowersWhenUnfollowed,
 } from '../../services/profileFollowStats';
 import type { FollowUserResponse } from '../../types/user';
+import { appendRowsByUniqueId } from '../../util/pagination';
 
 function mapFollowUsersToRows(list: FollowUserResponse[]) {
   return list.map((followUser) => ({
@@ -35,6 +36,8 @@ interface UserListModalProps {
   /** 팔로워 모달: 내가 프로필 주인을 팔로우하지 않으면 팔로워 명단에서 본인 행 제거 */
   viewerFollowsProfileOwner?: boolean;
 }
+
+const LIKERS_PAGE_SIZE = 20;
 
 const UserListModal: React.FC<UserListModalProps> = ({
   title,
@@ -65,6 +68,10 @@ const UserListModal: React.FC<UserListModalProps> = ({
   });
   const [loading, setLoading] = useState(true);
   const [processingUserId, setProcessingUserId] = useState<number | null>(null);
+  const [likersPage, setLikersPage] = useState(0);
+  const [likersHasMore, setLikersHasMore] = useState(false);
+  const [likersLoadingMore, setLikersLoadingMore] = useState(false);
+  const listScrollRef = useRef<HTMLDivElement>(null);
 
   const fetchUsers = useCallback(async (opts?: { silent?: boolean }) => {
     if (id === undefined || id === null) {
@@ -94,9 +101,12 @@ const UserListModal: React.FC<UserListModalProps> = ({
         rawUsers = filterMyFollowingsByActiveEdge(Number(id), myUserId, rawUsers);
         setUsers(mapFollowUsersToRows(rawUsers));
       } else {
-        const res = await postApi.getLikers(id);
+        const res = await postApi.getLikers(id, 0, LIKERS_PAGE_SIZE);
         if (!isRsDataSuccess(res)) return;
-        const rawUsers = (res.data?.content ?? []) as PostLikerResponse[];
+        const slice = res.data;
+        const rawUsers = (slice?.content ?? []) as PostLikerResponse[];
+        setLikersPage(0);
+        setLikersHasMore(slice ? !slice.last : false);
         setUsers(
           rawUsers.map((u) => ({
             id: u.userId,
@@ -113,9 +123,43 @@ const UserListModal: React.FC<UserListModalProps> = ({
     }
   }, [id, type, title, myUserId, viewerFollowsProfileOwner]);
 
+  const loadMoreLikers = useCallback(async () => {
+    if (id == null || type !== 'likers' || !likersHasMore || likersLoadingMore) return;
+    setLikersLoadingMore(true);
+    try {
+      const nextPage = likersPage + 1;
+      const res = await postApi.getLikers(id, nextPage, LIKERS_PAGE_SIZE);
+      if (!isRsDataSuccess(res) || !res.data) return;
+      const rawUsers = (res.data.content ?? []) as PostLikerResponse[];
+      const extra = rawUsers.map((u) => ({
+        id: u.userId,
+        nickname: u.nickname,
+        profileImageUrl: null as string | null,
+        isFollowing: false,
+      }));
+      setUsers((prev) => appendRowsByUniqueId(prev, extra));
+      setLikersPage(nextPage);
+      setLikersHasMore(!res.data.last);
+    } catch (err) {
+      console.error('좋아요 목록 추가 로드 실패:', err);
+    } finally {
+      setLikersLoadingMore(false);
+    }
+  }, [id, type, likersHasMore, likersLoadingMore, likersPage]);
+
   useEffect(() => {
     void fetchUsers();
   }, [fetchUsers]);
+
+  const handleLikersScroll = useCallback(() => {
+    if (type !== 'likers') return;
+    const el = listScrollRef.current;
+    if (!el || likersLoadingMore || !likersHasMore) return;
+    const threshold = 64;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+      void loadMoreLikers();
+    }
+  }, [type, likersLoadingMore, likersHasMore, loadMoreLikers]);
 
   const followingHints = useFollowLocalStore((s) => s.followingHintByUserId);
   useEffect(() => {
@@ -218,7 +262,11 @@ const UserListModal: React.FC<UserListModalProps> = ({
           <X size={24} style={{ cursor: 'pointer' }} onClick={onClose} />
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}>
+        <div
+          ref={listScrollRef}
+          onScroll={handleLikersScroll}
+          style={{ flex: 1, overflowY: 'auto', padding: '10px 0', minHeight: 0 }}
+        >
           {!id ? (
             <p style={{ textAlign: 'center', padding: '20px', color: '#ed4956' }}>유효하지 않은 요청입니다.</p>
           ) : loading ? (
@@ -284,6 +332,12 @@ const UserListModal: React.FC<UserListModalProps> = ({
               </div>
               );
             })
+          )}
+          {type === 'likers' && likersLoadingMore && (
+            <p style={{ textAlign: 'center', padding: '12px', color: '#8e8e8e', fontSize: '0.85rem' }}>더 불러오는 중…</p>
+          )}
+          {type === 'likers' && !loading && !likersHasMore && users.length > 0 && (
+            <p style={{ textAlign: 'center', padding: '8px', color: '#dbdbdb', fontSize: '0.75rem' }}>모든 항목을 불러왔습니다</p>
           )}
         </div>
       </div>

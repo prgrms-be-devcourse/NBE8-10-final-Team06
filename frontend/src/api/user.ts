@@ -1,5 +1,6 @@
 import client from './client';
 import { RsData, Slice } from '../types/common';
+import { appendJsonRequestPart } from '../util/formDataParts';
 import { UserProfileResponse, ProfileUpdateRequest, UserSearchResponse } from '../types/user';
 import { followApi, FOLLOW_CHANGED_EVENT } from './follow';
 
@@ -35,7 +36,7 @@ export const userApi = {
   // 내 프로필 정보 수정
   updateProfile: (req: ProfileUpdateRequest, profileImage?: File) => {
     const formData = new FormData();
-    formData.append('request', new Blob([JSON.stringify(req)], { type: 'application/json' }));
+    appendJsonRequestPart(formData, req);
     if (profileImage) {
       formData.append('profileImage', profileImage);
     }
@@ -58,4 +59,7 @@ export const userApi = {
   getFollowings: followApi.getFollowings,
   getFollowerCount: followApi.getFollowerCount,
   getFollowingCount: followApi.getFollowingCount,
+
+  /** DELETE /api/users/me */
+  withdraw: () => client.delete<RsData<void>>('/users/me').then((res) => res.data),
 };

@@ -39,3 +39,9 @@ export interface CommentCreateRequest {
 export interface CommentUpdateRequest {
   content: string;
 }
+
+/** POST /comments/{commentId} (toggle like) 응답 data */
+export interface CommentLikeResponse {
+  isLiked: boolean;
+  likeCount: number;
+}

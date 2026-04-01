@@ -8,3 +8,8 @@ export function isRsSuccess(resultCode: string | undefined | null): boolean {
 export function isRsDataSuccess(res: { resultCode?: string | null } | null | undefined): boolean {
   return isRsSuccess(res?.resultCode ?? null);
 }
+
+export function getRsMsg(res: { msg?: string | null } | null | undefined, fallback = ''): string {
+  const m = res?.msg;
+  return typeof m === 'string' && m.trim() !== '' ? m : fallback;
+}

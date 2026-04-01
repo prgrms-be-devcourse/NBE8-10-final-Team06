@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Send, Trash2, Edit, Forward } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Trash2, Edit, Forward } from 'lucide-react';
 import { postApi } from '../api/post';
 import { commentApi } from '../api/comment';
 import { PostDetailResponse } from '../types/post';
+import { CommentInfoResponse } from '../types/comment';
 import CommentItem from '../components/comment/CommentItem';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
@@ -12,6 +13,7 @@ import ProfileAvatar from '../components/common/ProfileAvatar';
 import { getApiErrorMessage } from '../util/apiError';
 import DmShareModal from '../components/dm/DmShareModal';
 import { buildPostSharePayload } from '../util/dmDeepLinks';
+import { isRsDataSuccess } from '../util/rsData';
 
 const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -27,6 +29,10 @@ const PostDetailPage: React.FC = () => {
   const [showLikers, setShowLikers] = useState(false);
   const [showDmShare, setShowDmShare] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+  const [comments, setComments] = useState<CommentInfoResponse[]>([]);
+  const [commentsLast, setCommentsLast] = useState(true);
+  const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
+  const [nextCommentPage, setNextCommentPage] = useState(1);
 
   const getFullUrl = (url: string) => resolveAssetUrl(url);
   const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
@@ -43,7 +49,12 @@ const PostDetailPage: React.FC = () => {
       setErrorMsg(null);
       const res = await postApi.getDetail(Number(postId));
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        setPost(res.data);
+        const data = res.data;
+        setPost(data);
+        const slice = data.comments;
+        setComments(slice?.content ?? []);
+        setCommentsLast(slice?.last ?? true);
+        setNextCommentPage(1);
       } else {
         setErrorMsg(res.msg);
       }
@@ -121,6 +132,23 @@ const PostDetailPage: React.FC = () => {
       setIsDeletingPost(false);
     }
   };
+
+  const loadMoreComments = useCallback(async () => {
+    if (!postId || commentsLoadingMore || commentsLast) return;
+    setCommentsLoadingMore(true);
+    try {
+      const res = await commentApi.getComments(Number(postId), nextCommentPage);
+      if (isRsDataSuccess(res) && res.data) {
+        setComments((prev) => [...prev, ...(res.data.content ?? [])]);
+        setCommentsLast(res.data.last);
+        setNextCommentPage((p) => p + 1);
+      }
+    } catch (err) {
+      console.error('댓글 추가 로드 실패:', err);
+    } finally {
+      setCommentsLoadingMore(false);
+    }
+  }, [postId, commentsLoadingMore, commentsLast, nextCommentPage]);
 
   if (loading) return <MainLayout title="Post"><div style={{ textAlign: 'center', padding: '100px' }}>로딩 중...</div></MainLayout>;
   if (errorMsg || !post) return <MainLayout title="Error"><div style={{ textAlign: 'center', padding: '100px', color: '#8e8e8e' }}>{errorMsg || '게시물을 찾을 수 없습니다.'}</div></MainLayout>;
@@ -207,9 +235,30 @@ const PostDetailPage: React.FC = () => {
               <strong>{post.nickname}</strong> <span style={{ fontWeight: 'bold' }}>{post.title}</span>
               <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
             </div>
-            {post.comments?.content?.map(comment => (
+            {comments.map((comment) => (
               <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={fetchDetail} onReplyAdded={fetchDetail} />
             ))}
+            {!commentsLast && (
+              <button
+                type="button"
+                onClick={() => void loadMoreComments()}
+                disabled={commentsLoadingMore}
+                style={{
+                  width: '100%',
+                  marginTop: '12px',
+                  padding: '10px',
+                  border: '1px solid #dbdbdb',
+                  borderRadius: '4px',
+                  background: '#fafafa',
+                  color: '#0095f6',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: commentsLoadingMore ? 'wait' : 'pointer',
+                }}
+              >
+                {commentsLoadingMore ? '불러오는 중…' : '댓글 더 보기'}
+              </button>
+            )}
           </div>
 
           <div style={{ padding: '15px', borderTop: '1px solid #efefef' }}>

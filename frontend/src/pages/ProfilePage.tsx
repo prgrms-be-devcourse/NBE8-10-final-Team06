@@ -15,7 +15,7 @@ import { dmApi } from '../api/dm';
 import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
-import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
+import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
@@ -52,6 +52,11 @@ const ProfilePage: React.FC = () => {
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech' | 'archive'>('posts');
   const [scrappedPosts, setScrappedPosts] = useState<PostFeedProfileRes[]>([]);
+  const [scrapsLast, setScrapsLast] = useState(true);
+  const [scrapsPage, setScrapsPage] = useState(0);
+  const [scrapsLoadingMore, setScrapsLoadingMore] = useState(false);
+  const [scrapsTotalElements, setScrapsTotalElements] = useState<number | null>(null);
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
   const [archivedStories, setArchivedStories] = useState<StoryDetailResponse[]>([]);
   const [followers, setFollowers] = useState<FollowUserResponse[]>([]);
   const [followings, setFollowings] = useState<FollowUserResponse[]>([]);
@@ -256,19 +261,84 @@ const ProfilePage: React.FC = () => {
     }
   }, [fetchFollowLists]);
 
-  const fetchScraps = useCallback(async () => {
+  const mapScrapToGrid = useCallback(
+    (p: { id: number; medias: PostFeedProfileRes['medias']; techStacks: PostFeedProfileRes['techStacks']; likeCount: number; commentCount: number }) => ({
+      id: p.id,
+      medias: p.medias,
+      techStacks: p.techStacks,
+      likeCount: p.likeCount,
+      commentCount: p.commentCount,
+    }),
+    []
+  );
+
+  const fetchScrapsInitial = useCallback(async () => {
     if (!isMe) return;
     try {
       const res = await postApi.getScraps(0);
-      if (res.resultCode?.includes('-S-')) {
-        const mapped = res.data.content.map((p: any) => ({
-          id: p.id, medias: p.medias, techStacks: p.techStacks,
-          likeCount: p.likeCount, commentCount: p.commentCount
-        }));
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const data = res.data;
+        const mapped = (data.content ?? []).map((p) => mapScrapToGrid(p));
         setScrappedPosts(mapped);
+        setScrapsLast(data.last);
+        setScrapsPage(0);
+        setScrapsTotalElements(typeof data.totalElements === 'number' ? data.totalElements : null);
       }
-    } catch (err) { console.error('스크랩 로드 실패', err); }
-  }, [isMe]);
+    } catch (err) {
+      console.error('스크랩 로드 실패', err);
+    }
+  }, [isMe, mapScrapToGrid]);
+
+  const loadMoreProfilePosts = useCallback(async () => {
+    const name = targetNicknameRef.current;
+    if (!name || postsLoadingMore || !profileRef.current?.posts || profileRef.current.posts.last) return;
+    setPostsLoadingMore(true);
+    try {
+      const nextPage = profileRef.current.posts.number + 1;
+      const res = await userApi.getProfile(name, nextPage);
+      if (!(res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) || !res.data) return;
+      if (targetNicknameRef.current !== name) return;
+      const data = res.data;
+      setProfile((prev) => {
+        if (!prev || prev.userId !== data.userId) return data;
+        const inc = data.posts;
+        return {
+          ...data,
+          posts: {
+            ...inc,
+            content: [...prev.posts.content, ...inc.content],
+            first: prev.posts.first,
+            numberOfElements: prev.posts.content.length + inc.content.length,
+          },
+        };
+      });
+    } catch (err) {
+      console.error('게시물 추가 로드 실패', err);
+    } finally {
+      setPostsLoadingMore(false);
+    }
+  }, [postsLoadingMore]);
+
+  const loadMoreScraps = useCallback(async () => {
+    if (!isMe || scrapsLast || scrapsLoadingMore) return;
+    setScrapsLoadingMore(true);
+    try {
+      const nextPage = scrapsPage + 1;
+      const res = await postApi.getScraps(nextPage);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const data = res.data;
+        const mapped = (data.content ?? []).map((p) => mapScrapToGrid(p));
+        setScrappedPosts((prev) => [...prev, ...mapped]);
+        setScrapsLast(data.last);
+        setScrapsPage(nextPage);
+        if (typeof data.totalElements === 'number') setScrapsTotalElements(data.totalElements);
+      }
+    } catch (err) {
+      console.error('스크랩 추가 로드 실패', err);
+    } finally {
+      setScrapsLoadingMore(false);
+    }
+  }, [isMe, scrapsLast, scrapsLoadingMore, scrapsPage, mapScrapToGrid]);
 
   const fetchArchivedStories = useCallback(async () => {
     if (!isMe) return;
@@ -440,10 +510,9 @@ const ProfilePage: React.FC = () => {
   }, [targetNickname, fetchFollowLists]);
 
   useEffect(() => {
-    if (isMe && activeTab === 'scraps' && scrappedPosts.length === 0) {
-      fetchScraps();
-    }
-  }, [isMe, activeTab, fetchScraps, scrappedPosts.length]);
+    if (!isMe || activeTab !== 'scraps') return;
+    void fetchScrapsInitial();
+  }, [isMe, activeTab, fetchScrapsInitial]);
 
   useEffect(() => {
     if (isMe && activeTab === 'archive' && archivedStories.length === 0) {
@@ -687,100 +756,167 @@ const ProfilePage: React.FC = () => {
       <div style={{ borderTop: '1px solid #dbdbdb', display: 'flex', justifyContent: 'center', gap: '60px' }}>
         <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Grid size={12} /> 게시물</button>
         <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><BarChart2 size={12} /> 기술 레벨</button>
-        {isMe && <button onClick={() => setActiveTab('scraps')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'scraps' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Bookmark size={12} /> 저장됨</button>}
+        {isMe && (
+          <button
+            onClick={() => setActiveTab('scraps')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '15px 0',
+              borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none',
+              marginTop: '-1px',
+              cursor: 'pointer',
+              color: activeTab === 'scraps' ? '#262626' : '#8e8e8e',
+              fontWeight: 'bold',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+          >
+            <Bookmark size={12} /> 저장됨
+            {activeTab === 'scraps' && scrapsTotalElements != null ? (
+              <span style={{ fontWeight: 600, color: '#8e8e8e' }}>({scrapsTotalElements})</span>
+            ) : null}
+          </button>
+        )}
         {isMe && <button onClick={() => setActiveTab('archive')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'archive' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Clock3 size={12} /> 만료 스토리</button>}
       </div>
 
       <div style={{ marginTop: '20px' }}>
         {activeTab === 'posts' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
-            {profile.posts.content.map(post => (
-              <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ position: 'relative', aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && (
-                  isVideo(post.medias[0].mediaType) ? (
-                    <video
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      muted
-                      playsInline
-                      onError={(e) => {
-                        const video = e.currentTarget;
-                        if (video.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          video.dataset.fallbackApplied = '1';
-                          video.src = fallback;
-                          video.load();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      alt="thumb"
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        if (img.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          img.dataset.fallbackApplied = '1';
-                          img.src = fallback;
-                        }
-                      }}
-                    />
-                  )
-                )}
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', gap: '20px' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={20} fill="white" /> {post.likeCount}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><MessageCircle size={20} fill="white" /> {post.commentCount}</div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+              {profile.posts.content.map((post) => (
+                <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ position: 'relative', aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
+                  {post.medias[0] && (
+                    isVideo(post.medias[0].mediaType) ? (
+                      <video
+                        src={getFullUrl(post.medias[0].sourceUrl)}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        muted
+                        playsInline
+                        onError={(e) => {
+                          const video = e.currentTarget;
+                          if (video.dataset.fallbackApplied === '1') return;
+                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                          if (fallback) {
+                            video.dataset.fallbackApplied = '1';
+                            video.src = fallback;
+                            video.load();
+                          }
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={getFullUrl(post.medias[0].sourceUrl)}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        alt="thumb"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallbackApplied === '1') return;
+                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                          if (fallback) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = fallback;
+                          }
+                        }}
+                      />
+                    )
+                  )}
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', gap: '20px' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={20} fill="white" /> {post.likeCount}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><MessageCircle size={20} fill="white" /> {post.commentCount}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            {!profile.posts.last && profile.posts.content.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void loadMoreProfilePosts()}
+                disabled={postsLoadingMore}
+                style={{
+                  width: '100%',
+                  marginTop: '20px',
+                  padding: '14px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#0095f6',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: postsLoadingMore ? 'wait' : 'pointer',
+                }}
+              >
+                {postsLoadingMore ? '불러오는 중…' : '게시물 더 보기'}
+              </button>
+            )}
+          </>
         )}
         {activeTab === 'scraps' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
-            {scrappedPosts.map(post => (
-              <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && (
-                  isVideo(post.medias[0].mediaType) ? (
-                    <video
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      muted
-                      playsInline
-                      onError={(e) => {
-                        const video = e.currentTarget;
-                        if (video.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          video.dataset.fallbackApplied = '1';
-                          video.src = fallback;
-                          video.load();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      alt="thumb"
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        if (img.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          img.dataset.fallbackApplied = '1';
-                          img.src = fallback;
-                        }
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            ))}
-          </div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+              {scrappedPosts.map((post) => (
+                <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
+                  {post.medias[0] && (
+                    isVideo(post.medias[0].mediaType) ? (
+                      <video
+                        src={getFullUrl(post.medias[0].sourceUrl)}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        muted
+                        playsInline
+                        onError={(e) => {
+                          const video = e.currentTarget;
+                          if (video.dataset.fallbackApplied === '1') return;
+                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                          if (fallback) {
+                            video.dataset.fallbackApplied = '1';
+                            video.src = fallback;
+                            video.load();
+                          }
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={getFullUrl(post.medias[0].sourceUrl)}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        alt="thumb"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallbackApplied === '1') return;
+                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
+                          if (fallback) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = fallback;
+                          }
+                        }}
+                      />
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+            {!scrapsLast && scrappedPosts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void loadMoreScraps()}
+                disabled={scrapsLoadingMore}
+                style={{
+                  width: '100%',
+                  marginTop: '20px',
+                  padding: '14px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#0095f6',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  cursor: scrapsLoadingMore ? 'wait' : 'pointer',
+                }}
+              >
+                {scrapsLoadingMore ? '불러오는 중…' : '저장됨 더 보기'}
+              </button>
+            )}
+          </>
         )}
         {activeTab === 'tech' && (
           <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '12px' }}>
