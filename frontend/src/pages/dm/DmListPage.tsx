@@ -24,10 +24,12 @@ function roomListTitle(room: DmRoomSummaryResponse, myUserId: number | null): st
 function resolveParticipantDisplayLabel(
   userId: number,
   indexZeroBased: number,
+  selectedUserMap: Map<number, UserSearchResponse>,
   searchResults: UserSearchResponse[],
   rooms: DmRoomSummaryResponse[]
 ): string {
   const user =
+    selectedUserMap.get(userId) ||
     searchResults.find((u) => u.userId === userId) ||
     rooms.flatMap((r) => r.participants).find((p) => p.userId === userId);
   const nick = user?.nickname?.trim();
@@ -36,11 +38,12 @@ function resolveParticipantDisplayLabel(
 
 function buildDefaultGroupRoomName(
   selectedUserIds: number[],
+  selectedUserMap: Map<number, UserSearchResponse>,
   searchResults: UserSearchResponse[],
   rooms: DmRoomSummaryResponse[]
 ): string {
   const labels = selectedUserIds.map((id, i) =>
-    resolveParticipantDisplayLabel(id, i, searchResults, rooms)
+    resolveParticipantDisplayLabel(id, i, selectedUserMap, searchResults, rooms)
   );
   return `${labels.join(', ')} 의 채팅방`;
 }
@@ -53,6 +56,7 @@ const DmListPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [selectedUserMap, setSelectedUserMap] = useState<Map<number, UserSearchResponse>>(new Map());
   const [groupName, setGroupName] = useState('');
   
   const navigate = useNavigate();
@@ -89,18 +93,40 @@ const DmListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchKeyword]);
 
+  useEffect(() => {
+    if (searchResults.length === 0) return;
+    setSelectedUserMap((prev) => {
+      const next = new Map(prev);
+      for (const user of searchResults) {
+        if (selectedUserIds.includes(user.userId)) {
+          next.set(user.userId, user);
+        }
+      }
+      return next;
+    });
+  }, [searchResults, selectedUserIds]);
+
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setSearchKeyword('');
     setSearchResults([]);
     setSelectedUserIds([]);
+    setSelectedUserMap(new Map());
     setGroupName('');
   };
 
   const toggleUserSelection = (userId: number) => {
-    setSelectedUserIds(prev => 
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    );
+    const selectedUser = searchResults.find((u) => u.userId === userId);
+    setSelectedUserIds((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+    setSelectedUserMap((prev) => {
+      const next = new Map(prev);
+      if (selectedUser) {
+        next.set(userId, selectedUser);
+      } else if (next.has(userId) && selectedUserIds.includes(userId)) {
+        next.delete(userId);
+      }
+      return next;
+    });
   };
 
   const handleCreateRoom = async () => {
@@ -114,7 +140,7 @@ const DmListPage: React.FC = () => {
         const name =
           trimmed.length > 0
             ? trimmed
-            : buildDefaultGroupRoomName(selectedUserIds, searchResults, rooms);
+            : buildDefaultGroupRoomName(selectedUserIds, selectedUserMap, searchResults, rooms);
         res = await dmApi.createGroupRoom(selectedUserIds, name);
       }
       if (res.resultCode.startsWith('200')) {
@@ -173,7 +199,7 @@ const DmListPage: React.FC = () => {
                 {selectedUserIds.map((id, idx) => {
                   return (
                     <span key={id} style={{ backgroundColor: '#e0f1ff', color: '#0095f6', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {resolveParticipantDisplayLabel(id, idx, searchResults, rooms)}
+                      {resolveParticipantDisplayLabel(id, idx, selectedUserMap, searchResults, rooms)}
                       <X size={12} style={{ cursor: 'pointer' }} onClick={() => toggleUserSelection(id)} />
                     </span>
                   );
