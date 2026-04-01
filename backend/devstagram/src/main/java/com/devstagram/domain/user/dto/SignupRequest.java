@@ -13,12 +13,18 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record SignupRequest(
-        @NotBlank @Size(max = 50) String nickname,
-        @NotBlank @Email @Size(max = 50) String email,
-        @NotBlank @Size(min = 8, max = 100) String password,
-        @NotNull LocalDate birthDate,
-        @NotNull Gender gender,
-        @Size(max = 200) String githubUrl,
+        @NotBlank(message = "닉네임은 필수입니다.") @Size(max = 50, message = "닉네임은 50자 이하여야 합니다.") String nickname,
+
+        @NotBlank(message = "이메일은 필수입니다.") @Email(message = "올바른 이메일 형식이 아닙니다.") @Size(max = 50, message = "이메일은 50자 이하여야 합니다.") String email,
+
+        @NotBlank(message = "비밀번호는 필수입니다.") @Size(min = 8, max = 100, message = "비밀번호는 8자 이상 100자 이하여야 합니다.") String password,
+
+        @NotNull(message = "생년월일은 필수입니다.") LocalDate birthDate,
+
+        @NotNull(message = "성별은 필수입니다.") Gender gender,
+
+        @Size(max = 200, message = "GitHub URL은 200자 이하여야 합니다.") String githubUrl,
+
         @NotNull Resume resume) {
 
     public User toEntity(String encodedPassword, String encodedApiKey) {

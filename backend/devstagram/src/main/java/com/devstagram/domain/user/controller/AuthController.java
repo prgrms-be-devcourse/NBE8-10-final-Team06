@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.LoginResponse;
+import com.devstagram.domain.user.dto.MyInfoResponse;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.dto.SignupResponse;
 import com.devstagram.domain.user.service.AuthService;
@@ -45,8 +46,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public RsData<SignupResponse> me(@AuthenticationPrincipal SecurityUser user) {
-        SignupResponse response = userSecurityService.getMyInfo(user.getId());
+    public RsData<MyInfoResponse> me(@AuthenticationPrincipal SecurityUser user) {
+        MyInfoResponse response = userSecurityService.getMyInfo(user.getId());
 
         return RsData.success("내 정보 조회 성공", response);
     }
