@@ -87,9 +87,12 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   };
 
   return (
-    <article style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '8px', marginBottom: '20px', width: '100%', position: 'relative' }}>
+    <article
+      className="post-card-feed"
+      style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', position: 'relative' }}
+    >
       {/* 헤더 섹션 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px' }}>
+      <div className="post-card-feed-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>
           <ProfileAvatar authorUserId={post.authorId} profileImageUrl={post.profileImageUrl} nickname={post.nickname} sizePx={32} />
           
@@ -174,14 +177,35 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
       </div>
 
       {/* 액션 버튼 및 본문 */}
-      <div style={{ padding: '12px' }}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
-          <Heart size={24} onClick={handleLike} style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }} fill={post.isLiked ? '#ed4956' : 'none'} />
-          <MessageCircle size={24} style={{ cursor: 'pointer' }} onClick={() => navigate(`/post/${post.id}`)} />
-          <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
-            <Forward size={24} />
+      <div className="post-card-feed-section">
+        <div
+          className="post-card-feed-actions"
+          style={{ display: 'flex', gap: 'clamp(10px, 1.5vw, 14px)', marginBottom: '8px', alignItems: 'center' }}
+        >
+          <Heart
+            className="post-card-feed-action-icon"
+            size={24}
+            onClick={handleLike}
+            style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }}
+            fill={post.isLiked ? '#ed4956' : 'none'}
+          />
+          <MessageCircle
+            className="post-card-feed-action-icon"
+            size={24}
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(`/post/${post.id}`)}
+          />
+          <button
+            type="button"
+            title="DM으로 공유"
+            aria-label="DM으로 공유"
+            onClick={() => setShowDmShare(true)}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
+          >
+            <Forward className="post-card-feed-action-icon" size={24} />
           </button>
           <Bookmark
+            className="post-card-feed-action-icon"
             size={24}
             onClick={handleScrap}
             style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'inherit' }}

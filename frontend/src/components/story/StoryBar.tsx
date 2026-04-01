@@ -88,66 +88,47 @@ const StoryBar: React.FC = () => {
   };
 
   return (
-    <div style={{ 
-      display: 'flex', gap: '15px', overflowX: 'auto', padding: '12px 15px',
-      backgroundColor: '#fff', borderBottom: '1px solid #dbdbdb'
-    }} className="story-container">
-      <style>{`
-        .story-container::-webkit-scrollbar { display: none; }
-        .story-container { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-      
+    <div className="story-bar">
       {/* 내 스토리 섹션 */}
-      <div style={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0, width: '74px' }} onClick={handleMyStoryClick}>
-        <div style={{ 
-          width: '70px', height: '70px', borderRadius: '50%', padding: '2.5px',
-          background: '#dbdbdb',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', position: 'relative'
-        }}>
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '50%',
-              border: '2px solid #fff',
-              overflow: 'hidden',
-              backgroundColor: '#efefef',
-            }}
-          >
+      <div className="story-bar-item" onClick={handleMyStoryClick}>
+        <div
+          className="story-bar-ring-outer"
+          style={{
+            background: '#dbdbdb',
+          }}
+        >
+          <div className="story-bar-ring-inner">
             <ProfileAvatar fillContainer authorUserId={userId ?? undefined} profileImageUrl={myProfileImageUrl} nickname={nickname} />
           </div>
           {!hasActiveMyStory && (
-            <div style={{ position: 'absolute', bottom: '2px', right: '2px', backgroundColor: '#0095f6', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', zIndex: 2 }}>
+            <div className="story-bar-add-badge">
               <Plus size={14} color="#fff" strokeWidth={3} />
             </div>
           )}
         </div>
-        <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#8e8e8e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>내 스토리</div>
+        <div className="story-bar-label" style={{ color: '#8e8e8e' }}>
+          내 스토리
+        </div>
       </div>
 
       {/* 타인 스토리 섹션 */}
       {otherUsersFeed.map((item) => (
-        <div key={item.userId} style={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0, width: '74px' }} onClick={() => navigate(`/story/${item.userId}`)}>
-          <div style={{ 
-            width: '70px', height: '70px', borderRadius: '50%', padding: '2.5px',
-            background: item.isUnread ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)' : '#dbdbdb',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto'
-          }}>
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                border: '2px solid #fff',
-                overflow: 'hidden',
-                backgroundColor: '#efefef',
-              }}
-            >
-              {/* 타인: StoryFeedResponse.profileImageUrl만 사용(세션·전역 캐시 미사용) */}
+        <div key={item.userId} className="story-bar-item" onClick={() => navigate(`/story/${item.userId}`)}>
+          <div
+            className="story-bar-ring-outer"
+            style={{
+              background: item.isUnread
+                ? 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+                : '#dbdbdb',
+            }}
+          >
+            <div className="story-bar-ring-inner">
               <ProfileAvatar fillContainer profileImageUrl={item.profileImageUrl} nickname={item.nickname} />
             </div>
           </div>
-          <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nickname}</div>
+          <div className="story-bar-label" style={{ color: '#262626' }}>
+            {item.nickname}
+          </div>
         </div>
       ))}
     </div>

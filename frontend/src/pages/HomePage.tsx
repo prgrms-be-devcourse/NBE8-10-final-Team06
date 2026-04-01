@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { postApi } from '../api/post';
 import { PostFeedResponse } from '../types/post';
 import StoryBar from '../components/story/StoryBar';
@@ -39,11 +39,8 @@ const HomePage: React.FC = () => {
       }
     } catch (err) {
       console.error('피드 로딩 실패:', err);
-      // #region agent log
-      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f1c727'},body:JSON.stringify({sessionId:'f1c727',runId:'feed-500',hypothesisId:'H1',location:'HomePage.tsx:fetchFeed',message:'feed_request_failed',data:{page:pageNumber,status:axios.isAxiosError(err)?err.response?.status:null,hasMsg:!!(axios.isAxiosError(err)&&err.response?.data&&typeof err.response.data==='object'&&'msg'in err.response.data)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const hint =
-        axios.isAxiosError(err) && err.response?.status === 500
+        isAxiosError(err) && err.response?.status === 500
           ? '서버 내부 오류입니다. Redis·백엔드 로그를 확인하거나 잠시 후 다시 시도해 주세요.'
           : '';
       setFeedError(
@@ -63,7 +60,7 @@ const HomePage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div style={{ width: '100%', maxWidth: '600px', margin: '0 auto' }}>
+      <div className="home-feed-column">
         {isLoggedIn && <StoryBar />}
 
         <div style={{ marginTop: '20px' }}>

@@ -658,7 +658,16 @@ const ProfilePage: React.FC = () => {
 
   return (
     <MainLayout title={profile.nickname}>
-      <header style={{ display: 'flex', alignItems: 'flex-start', gap: '40px', marginBottom: '44px' }}>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 'clamp(20px, 4vw, 40px)',
+          marginBottom: '44px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
         {profileStoryRing.hasActiveStories ? (
           <div
             role="button"
@@ -716,8 +725,8 @@ const ProfilePage: React.FC = () => {
             style={{ border: '1px solid #dbdbdb', flexShrink: 0, alignSelf: 'flex-start' }}
           />
         )}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: '300' }}>{profile.nickname}</span>
             {isMe ? (
               <>
@@ -732,7 +741,7 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '40px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(16px, 4vw, 40px)', marginBottom: '20px' }}>
             <span>게시물 <strong>{getProfilePostCountLabel(profile)}</strong></span>
             <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>
               팔로워 <strong>{profile.followerCount}</strong>
@@ -754,24 +763,14 @@ const ProfilePage: React.FC = () => {
         </div>
       </header>
 
-      <div
-        style={{
-          borderTop: '1px solid #dbdbdb',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: '12px 32px',
-          rowGap: '12px',
-        }}
-      >
+      <div className={`profile-tab-grid ${isMe ? 'profile-tab-grid--cols-4' : 'profile-tab-grid--cols-2'}`}>
         <button
           type="button"
           onClick={() => setActiveTab('posts')}
           style={{
             background: 'none',
             border: 'none',
-            padding: '15px 0',
+            padding: '15px 8px',
             borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none',
             marginTop: '-1px',
             cursor: 'pointer',
@@ -780,8 +779,9 @@ const ProfilePage: React.FC = () => {
             fontSize: '0.75rem',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '5px',
-            flexShrink: 0,
+            minWidth: 0,
             whiteSpace: 'nowrap',
           }}
         >
@@ -793,7 +793,7 @@ const ProfilePage: React.FC = () => {
           style={{
             background: 'none',
             border: 'none',
-            padding: '15px 0',
+            padding: '15px 8px',
             borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none',
             marginTop: '-1px',
             cursor: 'pointer',
@@ -802,8 +802,9 @@ const ProfilePage: React.FC = () => {
             fontSize: '0.75rem',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '5px',
-            flexShrink: 0,
+            minWidth: 0,
             whiteSpace: 'nowrap',
           }}
         >
@@ -816,7 +817,7 @@ const ProfilePage: React.FC = () => {
             style={{
               background: 'none',
               border: 'none',
-              padding: '15px 0',
+              padding: '15px 8px',
               borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none',
               marginTop: '-1px',
               cursor: 'pointer',
@@ -825,8 +826,9 @@ const ProfilePage: React.FC = () => {
               fontSize: '0.75rem',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '5px',
-              flexShrink: 0,
+              minWidth: 0,
               whiteSpace: 'nowrap',
             }}
           >
@@ -843,7 +845,7 @@ const ProfilePage: React.FC = () => {
             style={{
               background: 'none',
               border: 'none',
-              padding: '15px 0',
+              padding: '15px 8px',
               borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none',
               marginTop: '-1px',
               cursor: 'pointer',
@@ -852,8 +854,9 @@ const ProfilePage: React.FC = () => {
               fontSize: '0.75rem',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '5px',
-              flexShrink: 0,
+              minWidth: 0,
               whiteSpace: 'nowrap',
             }}
           >
@@ -862,12 +865,12 @@ const ProfilePage: React.FC = () => {
         )}
       </div>
 
-      <div style={{ marginTop: '20px' }}>
+      <div className="profile-tab-body">
         {activeTab === 'posts' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+            <div className="profile-tab-grid-3">
               {profile.posts.content.map((post) => (
-                <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ position: 'relative', aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
+                <div key={post.id} className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
                   {post.medias[0] && (
                     isVideo(post.medias[0].mediaType) ? (
                       <video
@@ -913,19 +916,9 @@ const ProfilePage: React.FC = () => {
             {!profile.posts.last && profile.posts.content.length > 0 && (
               <button
                 type="button"
+                className="profile-tab-load-more"
                 onClick={() => void loadMoreProfilePosts()}
                 disabled={postsLoadingMore}
-                style={{
-                  width: '100%',
-                  marginTop: '20px',
-                  padding: '14px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0095f6',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: postsLoadingMore ? 'wait' : 'pointer',
-                }}
               >
                 {postsLoadingMore ? '불러오는 중…' : '게시물 더 보기'}
               </button>
@@ -934,9 +927,9 @@ const ProfilePage: React.FC = () => {
         )}
         {activeTab === 'scraps' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+            <div className="profile-tab-grid-3">
               {scrappedPosts.map((post) => (
-                <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
+                <div key={post.id} className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
                   {post.medias[0] && (
                     isVideo(post.medias[0].mediaType) ? (
                       <video
@@ -978,19 +971,9 @@ const ProfilePage: React.FC = () => {
             {!scrapsLast && scrappedPosts.length > 0 && (
               <button
                 type="button"
+                className="profile-tab-load-more"
                 onClick={() => void loadMoreScraps()}
                 disabled={scrapsLoadingMore}
-                style={{
-                  width: '100%',
-                  marginTop: '20px',
-                  padding: '14px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#0095f6',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: scrapsLoadingMore ? 'wait' : 'pointer',
-                }}
               >
                 {scrapsLoadingMore ? '불러오는 중…' : '저장됨 더 보기'}
               </button>
@@ -998,24 +981,26 @@ const ProfilePage: React.FC = () => {
           </>
         )}
         {activeTab === 'tech' && (
-          <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '12px' }}>
-            <h3 style={{ marginBottom: '8px', fontSize: '1rem', fontWeight: 'bold' }}>기술 스택 숙련도</h3>
-            <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#8e8e8e' }}>
-              각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
-            </p>
-            {profile.topTechScores && profile.topTechScores.length > 0 ? (
-              <TechRadarChart scores={profile.topTechScores} maxScore={100} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p>
-              </div>
-            )}
+          <div className="profile-tab-grid-3 profile-tab-grid-3--single">
+            <div className="profile-tab-tech-inner">
+              <h3 className="profile-tab-section-title">기술 스택 숙련도</h3>
+              <p className="profile-tab-section-desc">
+                각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
+              </p>
+              {profile.topTechScores && profile.topTechScores.length > 0 ? (
+                <TechRadarChart scores={profile.topTechScores} maxScore={100} />
+              ) : (
+                <div className="profile-tab-empty">
+                  <p style={{ margin: 0 }}>아직 활동 데이터가 부족합니다.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
         {activeTab === 'archive' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+          <div className="profile-tab-grid-3">
             {archivedStories.map((story) => (
-              <div key={story.storyId} style={{ position: 'relative', aspectRatio: '9/16', backgroundColor: '#efefef', overflow: 'hidden' }}>
+              <div key={story.storyId} className="profile-tab-thumb" style={{ aspectRatio: '9/16' }}>
                 {story.mediaType.toLowerCase().includes('mp4') || story.mediaType.toLowerCase().includes('webm') || story.mediaType.toLowerCase().includes('mov') ? (
                   <video
                     src={getFullUrl(story.mediaUrl)}
@@ -1072,8 +1057,8 @@ const ProfilePage: React.FC = () => {
               </div>
             ))}
             {archivedStories.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8e8e8e', padding: '40px 0' }}>
-                만료된 스토리가 없습니다.
+              <div className="profile-tab-empty">
+                <p style={{ margin: 0 }}>만료된 스토리가 없습니다.</p>
               </div>
             )}
           </div>
