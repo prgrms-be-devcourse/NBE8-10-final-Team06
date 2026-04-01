@@ -154,7 +154,7 @@ const PostDetailPage: React.FC = () => {
   if (errorMsg || !post) return <MainLayout title="Error"><div style={{ textAlign: 'center', padding: '100px', color: '#8e8e8e' }}>{errorMsg || '게시물을 찾을 수 없습니다.'}</div></MainLayout>;
 
   return (
-    <MainLayout title="Post" maxWidth="935px">
+    <MainLayout title="Post">
       <div style={{ display: 'flex', backgroundColor: '#fff', border: '1px solid #dbdbdb', minHeight: '600px', marginBottom: '20px' }}>
         {/* 왼쪽: 미디어 */}
         <div style={{ flex: 1.5, backgroundColor: '#000', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>

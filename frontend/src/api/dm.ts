@@ -29,8 +29,8 @@ export const dmApi = {
   create1v1Room: (otherUserId: number) => 
     client.post<RsData<DmCreate1v1WithRoomListResponse>>(`/dm/rooms/1v1/${otherUserId}`).then(res => res.data),
 
-  // 그룹 채팅방 생성
-  createGroupRoom: (userIds: number[], name?: string) => 
+  // 그룹 채팅방 생성 (서버는 name 필수 — 호출부에서 비어 있지 않은 문자열 전달)
+  createGroupRoom: (userIds: number[], name: string) =>
     client.post<RsData<DmCreateGroupWithRoomListResponse>>('/dm/rooms/group', { userIds, name }).then(res => res.data),
 
   // 1:1 채팅방 나가기 (방 삭제)

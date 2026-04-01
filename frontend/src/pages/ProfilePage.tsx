@@ -23,6 +23,7 @@ import { getApiErrorMessage } from '../util/apiError';
 import ProfileAvatar from '../components/common/ProfileAvatar';
 import TechRadarChart from '../components/profile/TechRadarChart';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
+import { getProfilePostCountLabel } from '../util/profilePostCount';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -732,7 +733,7 @@ const ProfilePage: React.FC = () => {
             )}
           </div>
           <div style={{ display: 'flex', gap: '40px', marginBottom: '20px' }}>
-            <span>게시물 <strong>{profile.postCount}</strong></span>
+            <span>게시물 <strong>{getProfilePostCountLabel(profile)}</strong></span>
             <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>
               팔로워 <strong>{profile.followerCount}</strong>
             </span>
@@ -753,11 +754,64 @@ const ProfilePage: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ borderTop: '1px solid #dbdbdb', display: 'flex', justifyContent: 'center', gap: '60px' }}>
-        <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Grid size={12} /> 게시물</button>
-        <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><BarChart2 size={12} /> 기술 레벨</button>
+      <div
+        style={{
+          borderTop: '1px solid #dbdbdb',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '12px 32px',
+          rowGap: '12px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setActiveTab('posts')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '15px 0',
+            borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none',
+            marginTop: '-1px',
+            cursor: 'pointer',
+            color: activeTab === 'posts' ? '#262626' : '#8e8e8e',
+            fontWeight: 'bold',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Grid size={12} /> 게시물
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('tech')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '15px 0',
+            borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none',
+            marginTop: '-1px',
+            cursor: 'pointer',
+            color: activeTab === 'tech' ? '#262626' : '#8e8e8e',
+            fontWeight: 'bold',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <BarChart2 size={12} /> 기술 레벨
+        </button>
         {isMe && (
           <button
+            type="button"
             onClick={() => setActiveTab('scraps')}
             style={{
               background: 'none',
@@ -772,6 +826,8 @@ const ProfilePage: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '5px',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
             <Bookmark size={12} /> 저장됨
@@ -780,7 +836,30 @@ const ProfilePage: React.FC = () => {
             ) : null}
           </button>
         )}
-        {isMe && <button onClick={() => setActiveTab('archive')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'archive' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Clock3 size={12} /> 만료 스토리</button>}
+        {isMe && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('archive')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '15px 0',
+              borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none',
+              marginTop: '-1px',
+              cursor: 'pointer',
+              color: activeTab === 'archive' ? '#262626' : '#8e8e8e',
+              fontWeight: 'bold',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Clock3 size={12} /> 만료 스토리
+          </button>
+        )}
       </div>
 
       <div style={{ marginTop: '20px' }}>
