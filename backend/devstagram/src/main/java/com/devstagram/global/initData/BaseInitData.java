@@ -34,13 +34,16 @@ import com.devstagram.domain.story.repository.StoryTagRepository;
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.TechCategory;
 import com.devstagram.domain.technology.entity.Technology;
+import com.devstagram.domain.technology.entity.UserTechScore;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
+import com.devstagram.domain.technology.repository.UserTechScoreRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
+import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.domain.user.service.AuthService;
 import com.devstagram.domain.user.service.FollowService;
@@ -49,7 +52,7 @@ import com.devstagram.global.enumtype.MediaType;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
-@Profile("dev")
+@Profile({"dev", "local"})
 @RequiredArgsConstructor
 public class BaseInitData implements ApplicationRunner {
 
@@ -67,6 +70,8 @@ public class BaseInitData implements ApplicationRunner {
     private final DmRepository dmRepository;
     private final TechnologyRepository technologyRepository;
     private final TechCategoryRepository techCategoryRepository;
+    private final UserTechScoreRepository userTechScoreRepository;
+    private final FollowRepository followRepository;
     private final FeedService feedService;
     private final TechScoreService techScoreService;
     private final StringRedisTemplate redisTemplate;
@@ -74,16 +79,19 @@ public class BaseInitData implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) throws Exception {
-        if (userRepository.count() > 0) return;
+        // userTechScoreRepository.deleteAllInBatch();
+        // followRepository.deleteAllInBatch();
+        // postRepository.deleteAllInBatch();
+        // userRepository.deleteAllInBatch();
 
-        initData();
+        // initData();
     }
 
     private void initData() throws Exception {
         createTechMasterData();
         createUsers();
+        createTechScores();
         createFollows();
-
         createPosts();
         createStories();
         createInteractions();
@@ -133,22 +141,41 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private void createUsers() {
-        String[] nicknames = {"admin", "user1", "user2", "user3", "user4", "user5"};
-        String[] emails = {
-            "admin@test.com", "user1@test.com", "user2@test.com", "user3@test.com", "user4@test.com", "user5@test.com"
-        };
-        Resume[] resumes = {
-            Resume.SENIOR, Resume.JUNIOR, Resume.UNDERGRADUATE, Resume.INTERMEDIATE, Resume.JUNIOR, Resume.UNDERGRADUATE
+        // 1. 닉네임 배열 (10명)
+        String[] nicknames = {
+            "admin", "user1", "user2", "user3", "user4",
+            "user5", "user6", "user7", "user8", "user9"
         };
 
+        // 2. 이메일 배열 (10명)
+        String[] emails = {
+            "admin@test.com", "user1@test.com", "user2@test.com", "user3@test.com", "user4@test.com",
+            "user5@test.com", "user6@test.com", "user7@test.com", "user8@test.com", "user9@test.com"
+        };
+
+        // 3. 이력/경력 상태 배열 (다양하게 섞음)
+        Resume[] resumes = {
+            Resume.SENIOR, // admin
+            Resume.JUNIOR, // user1
+            Resume.UNDERGRADUATE, // user2
+            Resume.INTERMEDIATE, // user3
+            Resume.SENIOR, // user4
+            Resume.JUNIOR, // user5
+            Resume.INTERMEDIATE, // user6
+            Resume.SENIOR, // user7
+            Resume.UNDERGRADUATE, // user8
+            Resume.JUNIOR // user9
+        };
+
+        // 4. 데이터 생성 루프
         for (int i = 0; i < nicknames.length; i++) {
             authService.signup(new SignupRequest(
                     nicknames[i],
                     emails[i],
-                    "password123",
-                    LocalDate.of(1990 + i, (i % 12) + 1, (i % 28) + 1),
-                    i % 2 == 0 ? Gender.MALE : Gender.FEMALE,
-                    "https://github.com/" + nicknames[i],
+                    "password123", // 비밀번호는 공통
+                    LocalDate.of(1990 + (i % 10), (i % 12) + 1, (i % 28) + 1), // 생년월일 분산
+                    i % 2 == 0 ? Gender.MALE : Gender.FEMALE, // 성별 교차
+                    "https://github.com/" + nicknames[i], // 깃허브 주소
                     resumes[i]));
         }
     }
@@ -349,6 +376,29 @@ public class BaseInitData implements ApplicationRunner {
 
         dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "5555555555555", null, true));
         dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "6666666666666", null, true));
+    }
+
+    private void createTechScores() {
+        List<User> users = userRepository.findAll();
+        List<Technology> techs = technologyRepository.findAll();
+
+        if (users.isEmpty() || techs.isEmpty()) return;
+
+        for (User user : users) {
+            // 한 유저에게 줄 기술들을 섞어서 중복 없이 선택
+            java.util.Collections.shuffle(techs);
+
+            // 상위 2개의 기술만 선택 (중복 발생 불가)
+            for (int i = 0; i < 2; i++) {
+                Technology targetTech = techs.get(i);
+
+                UserTechScore score = new UserTechScore(user, targetTech, targetTech.getCategory());
+                int randomScore = (int) (Math.random() * 90) + 10;
+                score.increaseScore(randomScore);
+
+                userTechScoreRepository.save(score);
+            }
+        }
     }
 
     private void createFeedScoringScenario() {

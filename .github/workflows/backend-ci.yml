@@ -2,10 +2,9 @@ name: Java 21 CI with Gradle
 
 on:
   push:
-    branches: [ main , develop ]
-
+    branches: [ main, develop ]
     paths:
-      - 'backend/**'  # backend 폴더 안의 파일이 변했을 때만 실행!
+      - 'backend/**'
   pull_request:
     branches: [ "main", "develop" ]
     paths:
@@ -19,6 +18,31 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: ankane/pgvector:v0.5.1
+        env:
+          POSTGRES_DB: devstagram_test
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: root
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U root -d devstagram_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     defaults:
       run:
@@ -38,11 +62,29 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U root -d devstagram_test; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+        env:
+          PGPASSWORD: root
+
+      - name: Enable vector extension
+        run: |
+          psql -h localhost -U root -d devstagram_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+        env:
+          PGPASSWORD: root
+
       - name: Build and Test with Gradle
         run: ./gradlew build
         env:
-          # GitHub Secrets에 저장된 값을 시스템 환경 변수로 할당합니다.
-          # 이렇게 하면 application.yml의 ${JWT_SECRET_KEY}가 이 값을 읽어갑니다.
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_ACCESS_TOKEN_EXPIRE_SECONDS: ${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}
 
