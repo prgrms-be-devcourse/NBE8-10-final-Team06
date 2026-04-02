@@ -50,4 +50,14 @@ public class Comment extends BaseEntity {
 
     @Formula("(SELECT count(*) FROM comment c WHERE c.parent_id = id AND c.is_deleted = false)")
     private long replyCount;
+
+    public void addLike() {
+        this.likeCount++;
+    }
+
+    public void removeLike() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
 }

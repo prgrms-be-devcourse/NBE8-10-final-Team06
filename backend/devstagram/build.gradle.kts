@@ -70,7 +70,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5")
-	implementation ("org.springframework.boot:spring-boot-starter-actuator")
+
+	implementation("com.pgvector:pgvector:0.1.6")
+	implementation("org.hibernate.orm:hibernate-vector:6.6.2.Final")
 
 	implementation("io.jsonwebtoken:jjwt-api:0.12.5")
 	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
@@ -78,10 +80,8 @@ dependencies {
 
 	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly("com.h2database:h2")
-	implementation ("org.springframework.boot:spring-boot-starter-data-redis")
 
 	compileOnly("org.projectlombok:lombok")
-	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	runtimeOnly("com.mysql:mysql-connector-j")
 	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")

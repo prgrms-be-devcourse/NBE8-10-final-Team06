@@ -153,7 +153,8 @@ public class PostService {
     @Transactional
     public Long createPost(Long userId, PostCreateReq req, List<MultipartFile> files) {
 
-        User user = userRepository.getReferenceById(userId);
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "유저를 찾을 수 없습니다."));
 
         Post post = Post.builder()
                 .title(req.title())
@@ -163,15 +164,11 @@ public class PostService {
 
         post = postRepository.save(post);
 
-        // 기술 태그 처리
         if (req.techIds() != null && !req.techIds().isEmpty()) {
             List<Technology> techs = technologyRepository.findAllById(req.techIds());
 
             for (Technology tech : techs) {
-
                 post.addTechTag(tech);
-
-                // 글쓴이의 기술 점수 업데이트 (POST 가중치 적용)
                 techScoreService.increaseScore(user, tech, "POST");
             }
         }
@@ -328,7 +325,8 @@ public class PostService {
 
     @Transactional
     public boolean togglePostLike(Long postId, Long memberId) {
-        User actor = userRepository.getReferenceById(memberId);
+        User actor =
+                userRepository.findById(memberId).orElseThrow(() -> new ServiceException("404-U-1", "유저를 찾을 수 없습니다."));
 
         // 비관적 락 등을 활용해 게시글 조회
         Post post = postRepository
@@ -377,7 +375,8 @@ public class PostService {
     @Transactional
     public boolean toggleScrap(Long postId, Long memberId) {
 
-        User actor = userRepository.getReferenceById(memberId);
+        User actor =
+                userRepository.findById(memberId).orElseThrow(() -> new ServiceException("404-U-1", "유저를 찾을 수 없습니다."));
 
         Post post = postRepository
                 .findByIdWithLock(postId)

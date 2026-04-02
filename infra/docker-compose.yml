@@ -35,13 +35,15 @@ services:
       # 1. 전체 설정 파일 매핑
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
-      # ⭐ 2. 바로 이 줄! (conf.d 폴더 전체를 매핑)
-      # 내 컴퓨터의 ./nginx/conf.d 폴더를 컨테이너의 /etc/nginx/conf.d로 연결해라!
+      # 2. conf.d 폴더 전체를 매핑 (service-env.inc Blue/Green 스위칭용)
       - ./nginx/conf.d:/etc/nginx/conf.d
 
-      # 3. 인증서 관련 매핑 (기존 도화님 설정)
+      # 3. 인증서 관련 매핑
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot:ro
+
+      # 4. 프론트엔드 빌드 결과물 (SPA 정적 파일 서빙)
+      - /home/ec2-user/frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - backend-blue
       - backend-green

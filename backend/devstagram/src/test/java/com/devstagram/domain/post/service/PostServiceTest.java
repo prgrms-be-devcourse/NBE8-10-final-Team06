@@ -88,7 +88,7 @@ class PostServiceTest {
         User mockUser = mock(User.class);
         ReflectionTestUtils.setField(mockUser, "id", userId);
 
-        given(userRepository.getReferenceById(userId)).willReturn(mockUser);
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
 
         Technology mockTech = mock(Technology.class);
         given(technologyRepository.findAllById(techIds)).willReturn(List.of(mockTech));
@@ -108,7 +108,7 @@ class PostServiceTest {
 
         // 3. then
         assertThat(postId).isEqualTo(1L);
-        verify(userRepository).getReferenceById(userId);
+        verify(userRepository).findById(userId);
         verify(postRepository, times(1)).save(any(Post.class));
         verify(techScoreService, times(1)).increaseScore(eq(mockUser), eq(mockTech), eq("POST"));
     }

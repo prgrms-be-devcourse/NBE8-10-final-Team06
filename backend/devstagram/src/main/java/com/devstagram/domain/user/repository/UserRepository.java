@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 import com.devstagram.domain.user.entity.User;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Long> {
+public interface UserRepository extends JpaRepository<User, Long>, UserRecommendationRepository {
 
     Optional<User> findByEmailAndIsDeletedFalse(String email);
 
@@ -63,4 +63,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u " + "WHERE u.nickname LIKE %:keyword% AND u.isDeleted = false")
     Slice<User> findByNicknameContaining(@Param("keyword") String keyword, Pageable pageable);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "UPDATE users SET tech_vector = CAST(:vector AS vector) WHERE id = :userId", nativeQuery = true)
+    void updateTechVector(@Param("userId") Long userId, @Param("vector") String vector);
 }
