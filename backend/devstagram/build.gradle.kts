@@ -62,10 +62,6 @@ checkstyle {
 }
 
 dependencies {
-	// AWS SDK v2 (S3 업로드)
-	implementation(platform("software.amazon.awssdk:bom:2.26.12"))
-	implementation("software.amazon.awssdk:s3")
-
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-websocket")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")

@@ -2,12 +2,10 @@ package com.devstagram.global.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@Profile("!prod")
 public class WebMvcConfig implements WebMvcConfigurer {
 
     // application.yml에 적어둔 로컬 저장 경로
