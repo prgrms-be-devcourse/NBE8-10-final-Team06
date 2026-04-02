@@ -60,6 +60,8 @@ class DmControllerAuthHeaderTest {
         CustomAuthenticationFilter filter = newFilter(jwtProvider, userSecurityService, rq, objectMapper);
 
         when(jwtProvider.isValid("test-token")).thenReturn(true);
+        when(jwtProvider.isAccessToken("test-token")).thenReturn(true);
+
         Claims claims = mock(Claims.class);
         when(claims.getSubject()).thenReturn("1");
         when(jwtProvider.payload("test-token")).thenReturn(claims);

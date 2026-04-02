@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,13 +27,19 @@ public class UserSecurityService {
     }
 
     public SecurityUser toSecurityUser(User user) {
+        // 관리자인지, 일반 유저인지 판별하는 로직 추가
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        if ("admin@test.com".equalsIgnoreCase(user.getEmail())) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        }
         return new SecurityUser(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
                 user.getApiKey(), // 여기에는 DB에 저장된 해싱된 값이 들어갑니다.
                 user.getPassword(),
-                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                authorities);
     }
 
     public MyInfoResponse getMyInfo(Long id) {

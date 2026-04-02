@@ -25,13 +25,14 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.*;
+import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.JwtProvider;
+import com.devstagram.global.security.RateLimitService;
 import com.devstagram.global.security.SecurityUser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -45,6 +46,9 @@ class CommentControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private RateLimitService rateLimitService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -71,11 +75,12 @@ class CommentControllerTest {
     void setUp() {
         // Rq Header & Cookie Mocking
         given(rq.getHeader(eq("Authorization"), anyString())).willReturn("Bearer dummy");
-        given(rq.getHeader(eq("X-API-KEY"), anyString())).willReturn("");
         given(rq.getCookieValue(anyString(), anyString())).willReturn("");
 
         // JWT Mocking
         given(jwtProvider.isValid(anyString())).willReturn(true);
+        given(jwtProvider.isAccessToken(anyString())).willReturn(true);
+
         Claims mockClaims = mock(Claims.class);
         given(mockClaims.getSubject()).willReturn("1");
         given(jwtProvider.payload(anyString())).willReturn(mockClaims);

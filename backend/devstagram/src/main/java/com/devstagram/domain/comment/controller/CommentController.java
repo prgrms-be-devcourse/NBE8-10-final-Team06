@@ -7,8 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.*;
+import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
 
