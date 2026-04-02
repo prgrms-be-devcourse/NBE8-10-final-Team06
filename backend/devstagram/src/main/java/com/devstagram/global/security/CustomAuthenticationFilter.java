@@ -69,19 +69,7 @@ public class CustomAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void work() {
-        String authorization = rq.getHeader("Authorization", "");
-        String accessToken = "";
-
-        if (!authorization.isBlank()) {
-            if (!authorization.startsWith("Bearer ")) {
-                throw new ServiceException("401-F-1", "Authorization 헤더 형식이 올바르지 않습니다.");
-            }
-            accessToken = authorization.split(" ", 2)[1].trim();
-        }
-
-        if (accessToken.isBlank()) {
-            accessToken = rq.getCookieValue("accessToken", "");
-        }
+        String accessToken = rq.getCookieValue("accessToken", "");
 
         if (accessToken.isBlank()) {
             return;
