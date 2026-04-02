@@ -23,7 +23,6 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.comment.dto.CommentInfoRes;
 import com.devstagram.domain.comment.dto.CommentLikeRes;
