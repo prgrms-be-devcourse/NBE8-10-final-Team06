@@ -1,14 +1,17 @@
 package com.devstagram.global.initData;
 
 import java.time.LocalDate;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.comment.Service.CommentService;
@@ -31,19 +34,15 @@ import com.devstagram.domain.story.entity.StoryMedia;
 import com.devstagram.domain.story.entity.StoryTag;
 import com.devstagram.domain.story.repository.StoryRepository;
 import com.devstagram.domain.story.repository.StoryTagRepository;
-import com.devstagram.domain.technology.entity.PostTechnology;
-import com.devstagram.domain.technology.entity.TechCategory;
+import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.entity.UserTechScore;
-import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.repository.UserTechScoreRepository;
-import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
-import com.devstagram.domain.user.repository.FollowRepository;
 import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.domain.user.service.AuthService;
 import com.devstagram.domain.user.service.FollowService;
@@ -55,6 +54,37 @@ import lombok.RequiredArgsConstructor;
 @Profile({"dev", "local"})
 @RequiredArgsConstructor
 public class BaseInitData implements ApplicationRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseInitData.class);
+
+    private static final int MIN_SEED_TECH_ROWS = 50;
+    private static final String DEMO_PASSWORD = "password123";
+    private static final String ADMIN_EMAIL = "admin@test.com";
+
+    private static final List<String> SEED_TECH_NAMES_FOR_SCORE_POOL = List.of(
+            "Java",
+            "Spring Boot",
+            "React",
+            "TypeScript",
+            "Node.js",
+            "PostgreSQL",
+            "Redis",
+            "MongoDB",
+            "Docker",
+            "Kubernetes",
+            "Amazon Web Services (AWS)");
+
+    private static final List<DemoAccountRow> DEMO_SIGNUPS = List.of(
+            new DemoAccountRow("admin", ADMIN_EMAIL, Resume.SENIOR),
+            new DemoAccountRow("user1", "user1@test.com", Resume.JUNIOR),
+            new DemoAccountRow("user2", "user2@test.com", Resume.UNDERGRADUATE),
+            new DemoAccountRow("user3", "user3@test.com", Resume.INTERMEDIATE),
+            new DemoAccountRow("user4", "user4@test.com", Resume.SENIOR),
+            new DemoAccountRow("user5", "user5@test.com", Resume.JUNIOR),
+            new DemoAccountRow("user6", "user6@test.com", Resume.INTERMEDIATE),
+            new DemoAccountRow("user7", "user7@test.com", Resume.SENIOR),
+            new DemoAccountRow("user8", "user8@test.com", Resume.UNDERGRADUATE),
+            new DemoAccountRow("search_target_kim", "search_target_kim@test.com", Resume.JUNIOR));
 
     private final AuthService authService;
     private final UserRepository userRepository;
@@ -69,221 +99,271 @@ public class BaseInitData implements ApplicationRunner {
     private final DmRoomUserRepository dmRoomUserRepository;
     private final DmRepository dmRepository;
     private final TechnologyRepository technologyRepository;
-    private final TechCategoryRepository techCategoryRepository;
     private final UserTechScoreRepository userTechScoreRepository;
-    private final FollowRepository followRepository;
     private final FeedService feedService;
-    private final TechScoreService techScoreService;
-    private final StringRedisTemplate redisTemplate;
+    private final StoryService storyService;
+
+    private record DemoAccountRow(String nickname, String email, Resume resume) {}
 
     @Override
     @Transactional
-    public void run(ApplicationArguments args) throws Exception {
-        // userTechScoreRepository.deleteAllInBatch();
-        // followRepository.deleteAllInBatch();
-        // postRepository.deleteAllInBatch();
-        // userRepository.deleteAllInBatch();
-
-        // initData();
+    public void run(ApplicationArguments args) {
+        if (shouldSkip()) {
+            return;
+        }
+        loadDemoDataset();
+        log.info(
+                "BaseInitData: 데모 데이터 적용 완료. admin={} / 비밀번호 공통={}",
+                ADMIN_EMAIL,
+                DEMO_PASSWORD);
     }
 
-    private void initData() throws Exception {
-        createTechMasterData();
-        createUsers();
-        createTechScores();
-        createFollows();
-        createPosts();
-        createStories();
-        createInteractions();
-        createDms();
+    private boolean shouldSkip() {
+        if (userRepository.findByEmailAndIsDeletedFalse(ADMIN_EMAIL).isPresent()) {
+            return true;
+        }
+        if (technologyRepository.count() < MIN_SEED_TECH_ROWS) {
+            log.warn(
+                    "BaseInitData 건너뜀: technology 행이 {}개 미만입니다. Docker Postgres 초기화 시 infra/init-data/insert_tech.sql 시드를 확인하세요.",
+                    MIN_SEED_TECH_ROWS);
+            return true;
+        }
+        return false;
     }
 
-    private void createTechMasterData() {
-        // 1. 카테고리 생성 (빌더 활용)
-        TechCategory backend = techCategoryRepository.save(
-                TechCategory.builder().name("Backend").color("#3E52D5").build());
-        TechCategory frontend = techCategoryRepository.save(
-                TechCategory.builder().name("Frontend").color("#61DAFB").build());
-        TechCategory infra = techCategoryRepository.save(
-                TechCategory.builder().name("Infra").color("#FF9900").build());
-
-        // 2. 세부 기술 생성
-        technologyRepository.save(Technology.builder()
-                .category(backend)
-                .name("Java")
-                .color("#E76F00")
-                .iconUrl("https://icon.url/java")
-                .build());
-        technologyRepository.save(Technology.builder()
-                .category(backend)
-                .name("Spring Boot")
-                .color("#6DB33F")
-                .iconUrl("https://icon.url/spring")
-                .build());
-        technologyRepository.save(Technology.builder()
-                .category(frontend)
-                .name("React")
-                .color("#61DAFB")
-                .iconUrl("https://icon.url/react")
-                .build());
-        technologyRepository.save(Technology.builder()
-                .category(infra)
-                .name("AWS")
-                .color("#FF9900")
-                .iconUrl("https://icon.url/aws")
-                .build());
-        technologyRepository.save(Technology.builder()
-                .category(infra)
-                .name("Docker")
-                .color("#2496ED")
-                .iconUrl("https://icon.url/docker")
-                .build());
+    private void loadDemoDataset() {
+        List<User> users = createUsers();
+        createTechScores(users);
+        createFollowGraph(users);
+        List<Post> posts = createPosts(users);
+        createStories(users);
+        createAdminStoryForHardDeleteDemo(userByEmail(ADMIN_EMAIL));
+        createPostInteractions(users, posts);
+        createStoryInteractions(users);
+        createArchivedStoryForAdmin(userByEmail(ADMIN_EMAIL));
+        createDmRoomsAndMessages(posts);
     }
 
-    private void createUsers() {
-        // 1. 닉네임 배열 (10명)
-        String[] nicknames = {
-            "admin", "user1", "user2", "user3", "user4",
-            "user5", "user6", "user7", "user8", "user9"
-        };
+    private Technology requireSeededTechnology(String techName) {
+        return technologyRepository
+                .findByName(techName)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Docker DB seed 기술이 없습니다: '"
+                                + techName
+                                + "'. Postgres 초기화 시 infra/init-data/insert_tech.sql 이 실행됐는지 확인하세요."));
+    }
 
-        // 2. 이메일 배열 (10명)
-        String[] emails = {
-            "admin@test.com", "user1@test.com", "user2@test.com", "user3@test.com", "user4@test.com",
-            "user5@test.com", "user6@test.com", "user7@test.com", "user8@test.com", "user9@test.com"
-        };
+    private List<Technology> seededTechnologyPoolForScores() {
+        List<Technology> pool = new ArrayList<>();
+        for (String name : SEED_TECH_NAMES_FOR_SCORE_POOL) {
+            pool.add(requireSeededTechnology(name));
+        }
+        return pool;
+    }
 
-        // 3. 이력/경력 상태 배열 (다양하게 섞음)
-        Resume[] resumes = {
-            Resume.SENIOR, // admin
-            Resume.JUNIOR, // user1
-            Resume.UNDERGRADUATE, // user2
-            Resume.INTERMEDIATE, // user3
-            Resume.SENIOR, // user4
-            Resume.JUNIOR, // user5
-            Resume.INTERMEDIATE, // user6
-            Resume.SENIOR, // user7
-            Resume.UNDERGRADUATE, // user8
-            Resume.JUNIOR // user9
-        };
-
-        // 4. 데이터 생성 루프
-        for (int i = 0; i < nicknames.length; i++) {
+    private List<User> createUsers() {
+        for (int i = 0; i < DEMO_SIGNUPS.size(); i++) {
+            DemoAccountRow row = DEMO_SIGNUPS.get(i);
             authService.signup(new SignupRequest(
-                    nicknames[i],
-                    emails[i],
-                    "password123", // 비밀번호는 공통
-                    LocalDate.of(1990 + (i % 10), (i % 12) + 1, (i % 28) + 1), // 생년월일 분산
-                    i % 2 == 0 ? Gender.MALE : Gender.FEMALE, // 성별 교차
-                    "https://github.com/" + nicknames[i], // 깃허브 주소
-                    resumes[i]));
+                    row.nickname(),
+                    row.email(),
+                    DEMO_PASSWORD,
+                    LocalDate.of(1990 + (i % 10), (i % 12) + 1, (i % 28) + 1),
+                    i % 2 == 0 ? Gender.MALE : Gender.FEMALE,
+                    "https://github.com/" + row.nickname(),
+                    row.resume()));
+        }
+        return userRepository.findAll();
+    }
+
+    private void createTechScores(List<User> users) {
+        List<Technology> pool = seededTechnologyPoolForScores();
+        if (users.isEmpty() || pool.isEmpty()) {
+            return;
+        }
+        for (User user : users) {
+            List<Technology> shuffled = new ArrayList<>(pool);
+            Collections.shuffle(shuffled);
+            for (int i = 0; i < Math.min(4, shuffled.size()); i++) {
+                Technology targetTech = shuffled.get(i);
+                UserTechScore score = new UserTechScore(user, targetTech, targetTech.getCategory());
+                score.increaseScore((int) (Math.random() * 90) + 10);
+                userTechScoreRepository.save(score);
+            }
         }
     }
 
-    private void createFollows() {
-        User admin =
-                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 =
-                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
-        User user2 =
-                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
-        User user3 =
-                userRepository.findByEmailAndIsDeletedFalse("user3@test.com").get();
+    private void createFollowGraph(List<User> users) {
+        User admin = userByEmail(ADMIN_EMAIL);
+        User u1 = userByEmail("user1@test.com");
+        User u2 = userByEmail("user2@test.com");
+        User u3 = userByEmail("user3@test.com");
+        User u4 = userByEmail("user4@test.com");
+        User u5 = userByEmail("user5@test.com");
+        User searchUser = userByEmail("search_target_kim@test.com");
 
-        followService.follow(admin.getId(), user1.getId());
-        followService.follow(admin.getId(), user2.getId());
-        followService.follow(admin.getId(), user3.getId());
-        followService.follow(user1.getId(), admin.getId());
-        followService.follow(user2.getId(), admin.getId());
-        followService.follow(user3.getId(), admin.getId());
-        followService.follow(user1.getId(), user2.getId());
-        followService.follow(user2.getId(), user1.getId());
+        followService.follow(admin.getId(), u1.getId());
+        followService.follow(admin.getId(), u2.getId());
+        followService.follow(admin.getId(), u3.getId());
+        followService.follow(admin.getId(), searchUser.getId());
+        followService.follow(u1.getId(), admin.getId());
+        followService.follow(u2.getId(), admin.getId());
+        followService.follow(u3.getId(), admin.getId());
+        followService.follow(u1.getId(), u2.getId());
+        followService.follow(u2.getId(), u1.getId());
+        followService.follow(u4.getId(), u5.getId());
+        followService.follow(u5.getId(), u4.getId());
+        followService.follow(searchUser.getId(), admin.getId());
+
+        for (User u : users) {
+            if (u.getId().equals(admin.getId()) || u.getId().equals(searchUser.getId())) {
+                continue;
+            }
+            followService.follow(searchUser.getId(), u.getId());
+        }
     }
 
-    private void addTagToPost(Post post, Technology tech) {
-        if (tech == null) return;
-
-        PostTechnology postTech = PostTechnology.builder()
-                .post(post)
-                .technology(tech)
-                .category(tech.getCategory())
-                .build();
-
-        post.getTechTags().add(postTech);
+    private List<List<Technology>> buildDemoPostTagSets() {
+        Technology java = requireSeededTechnology("Java");
+        Technology spring = requireSeededTechnology("Spring Boot");
+        Technology react = requireSeededTechnology("React");
+        Technology ts = requireSeededTechnology("TypeScript");
+        Technology node = requireSeededTechnology("Node.js");
+        Technology pg = requireSeededTechnology("PostgreSQL");
+        Technology redis = requireSeededTechnology("Redis");
+        Technology mongo = requireSeededTechnology("MongoDB");
+        Technology docker = requireSeededTechnology("Docker");
+        Technology k8s = requireSeededTechnology("Kubernetes");
+        Technology aws = requireSeededTechnology("Amazon Web Services (AWS)");
+        return List.of(
+                List.of(java, spring, pg),
+                List.of(react, ts, node),
+                List.of(docker, k8s, aws),
+                List.of(k8s, docker, redis),
+                List.of(pg, redis),
+                List.of(redis, mongo),
+                List.of(mongo, java),
+                List.of(aws, docker, pg),
+                List.of(node, ts),
+                List.of(java, react, docker),
+                List.of(spring, pg, aws),
+                List.of(react, spring, mongo),
+                List.of(java, docker));
     }
 
-    private void createPosts() {
+    private List<Post> createPosts(List<User> users) {
+        String[] titles = {
+            "Spring Boot 3.x 운영 팁",
+            "React 19 + TypeScript 프로젝트 구조",
+            "Docker로 로컬 DB 띄우기",
+            "Kubernetes 헬스체크 설정",
+            "PostgreSQL 인덱스 튜닝 노트",
+            "Redis 캐시 전략 정리",
+            "MongoDB 스키마 설계 회고",
+            "AWS VPC peering 정리",
+            "Node.js 스트림 처리",
+            "풀스택 데모 포스트 Alpha",
+            "풀스택 데모 포스트 Beta",
+            "검색용 키워드 devstagram_demo_post",
+            "admin 소유 게시글 수정·삭제 데모",
+        };
 
-        List<Technology> allTechs = technologyRepository.findAll();
+        String[] contents = {
+            "백엔드 운영 시 알아두면 좋은 설정들입니다.",
+            "프론트엔드 폴더 구조와 타입 안정성을 챙긴 예시입니다.",
+            "compose로 Postgres/Redis를 한 번에 올립니다.",
+            "liveness/readiness probe 예시입니다.",
+            "B-Tree vs GiST 선택 기준을 정리했습니다.",
+            "TTL, 캐시 스탬피드, 배치 갱신을 다뤘습니다.",
+            "문서형 DB 마이그레이션 시 주의점입니다.",
+            "서브넷·라우팅 테이블 구성 메모입니다.",
+            "Readable/Writable 스트림 파이프라인입니다.",
+            "피드·스크랩·좋아요 API를 한 번에 시험해 보세요.",
+            "댓글·대댓글·좋아요 시나리오용 본문입니다.",
+            "GET /api/users/search?keyword=devstagram_demo 로 검색해 보세요.",
+            "Swagger에서 PUT/DELETE /api/posts/{postId} 호출 시 본인 게시글 여부를 확인하세요.",
+        };
 
-        Map<String, Technology> techMap = allTechs.stream().collect(Collectors.toMap(Technology::getName, t -> t));
-
-        String[] titles = {"aaaaa", "bbbbb", "ccccc", "ddddd", "eeeee", "fffff"};
-        String[] contents = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF"};
         String[] imageUrls = {
             "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800",
             "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800",
             "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800",
             "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
             "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800",
-            "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800"
+            "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800",
+            "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800",
+            "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800",
+            "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800",
+            "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800",
+            "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800",
+            "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800",
+            "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=800",
         };
 
-        List<User> users = userRepository.findAll();
+        List<List<Technology>> tagSets = buildDemoPostTagSets();
+        User admin = userByEmail(ADMIN_EMAIL);
+        List<Post> saved = new ArrayList<>();
 
         for (int i = 0; i < titles.length; i++) {
-            User user = users.get(i % users.size());
+            User author = (i < 4 || i == 8) ? admin : users.get(i % users.size());
             Post post = Post.builder()
-                    .user(user)
+                    .user(author)
                     .title(titles[i])
                     .content(contents[i])
                     .build();
 
-            if (i % 2 == 0) {
-                addTagToPost(post, techMap.get("Java"));
-                addTagToPost(post, techMap.get("Spring Boot"));
-            } else {
-                addTagToPost(post, techMap.get("React"));
+            for (Technology t : tagSets.get(i)) {
+                post.addTechTag(t);
             }
-            addTagToPost(post, techMap.get("AWS"));
 
             postRepository.save(post);
+            saved.add(post);
 
-            PostMedia media = PostMedia.builder()
-                    .post(post)
-                    .sourceUrl(imageUrls[i])
-                    .mediaType(MediaType.jpg)
-                    .sequence((short) 1)
-                    .build();
-            postMediaRepository.save(media);
-
-            if (i == 0) {
-                PostMedia media2 = PostMedia.builder()
-                        .post(post)
-                        .sourceUrl("https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800")
-                        .mediaType(MediaType.jpg)
-                        .sequence((short) 2)
-                        .build();
-                postMediaRepository.save(media2);
+            savePrimaryPostMedia(post, imageUrls[i]);
+            if (i % 4 == 0) {
+                saveSecondaryPostMedia(post);
             }
+
+            feedService.registerPostToGlobalFeed(post);
+            feedService.deliverPostToFeeds(post);
         }
+
+        return saved;
     }
 
-    private void createStories() {
-        List<User> users = userRepository.findAll();
-        User admin =
-                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 =
-                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
+    private void savePrimaryPostMedia(Post post, String imageUrl) {
+        postMediaRepository.save(PostMedia.builder()
+                .post(post)
+                .sourceUrl(imageUrl)
+                .mediaType(MediaType.jpg)
+                .sequence((short) 1)
+                .build());
+    }
+
+    private void saveSecondaryPostMedia(Post post) {
+        postMediaRepository.save(PostMedia.builder()
+                .post(post)
+                .sourceUrl("https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800")
+                .mediaType(MediaType.jpg)
+                .sequence((short) 2)
+                .build());
+    }
+
+    private void createStories(List<User> users) {
+        User admin = userByEmail(ADMIN_EMAIL);
+        User user1 = userByEmail("user1@test.com");
 
         String[] storyUrls = {
             "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400",
             "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400",
-            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400"
+            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400",
+            "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400",
+            "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400",
+            "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400",
         };
 
         for (int i = 0; i < storyUrls.length; i++) {
-            User user = users.get(i % users.size());
+            User user = (i == 0) ? admin : users.get(i % users.size());
             StoryMedia media = StoryMedia.builder()
                     .mediaType(MediaType.jpg)
                     .sourceUrl(storyUrls[i])
@@ -291,65 +371,176 @@ public class BaseInitData implements ApplicationRunner {
 
             Story story = Story.builder()
                     .user(user)
-                    .content("스토리 " + (i + 1))
-                    .thumbnailUrl(storyUrls[i]) // 썸네일도 동일하게 설정
+                    .content("데모 스토리 " + (i + 1))
+                    .thumbnailUrl(storyUrls[i])
                     .storyMedia(media)
                     .build();
             storyRepository.save(story);
 
-            // 첫 번째 스토리에 admin이 user1을 태그함
-            if (i == 0 && user.equals(admin)) {
-                storyTagRepository.save(
-                        StoryTag.builder().story(story).target(user1).build());
-            }
-        }
-    }
-
-    private void createInteractions() {
-        List<Post> posts = postRepository.findAll();
-        List<User> users = userRepository.findAll();
-
-        for (Post post : posts) {
-            for (int i = 0; i < 3; i++) {
-                postService.togglePostLike(post.getId(), users.get(i).getId());
-            }
-        }
-
-        for (int i = 0; i < posts.size(); i++) {
-            Post post = posts.get(i);
-            Long commentId = commentService.createComment(
-                    post.getId(), users.get(0).getId(), new CommentCreateReq("아무도 내맘을 모르죠", null));
-            commentService.createComment(
-                    post.getId(), users.get(1).getId(), new CommentCreateReq("LOVELOVELOVE", commentId));
-
             if (i == 0) {
-                commentService.createComment(
-                        post.getId(), users.get(2).getId(), new CommentCreateReq("또 다시 보여줘야되", null));
+                storyTagRepository.save(StoryTag.builder().story(story).target(user1).build());
             }
         }
     }
 
-    private void createDms() {
-        User admin =
-                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").get();
-        User user1 =
-                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").get();
-        User user2 =
-                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").get();
+    private void createPostInteractions(List<User> users, List<Post> posts) {
+        if (posts.isEmpty()) {
+            return;
+        }
 
-        Post samplePost = postRepository.findAll().get(0);
-        Story sampleStory = storyRepository.findAll().get(0);
+        User admin = userByEmail(ADMIN_EMAIL);
+        User u1 = userByEmail("user1@test.com");
+        User u2 = userByEmail("user2@test.com");
+        Post firstPost = posts.getFirst();
 
-        // 1. 1:1 DM 방 (admin <-> user1)
+        seedPostLikesAndScraps(users, posts, admin, u1, u2, firstPost);
+        seedCommentsOnFirstPost(users, admin, u1, u2, firstPost);
+        seedCommentsOnOtherPosts(users, posts);
+    }
+
+    private void seedPostLikesAndScraps(
+            List<User> users, List<Post> posts, User admin, User u1, User u2, Post firstPost) {
+        for (Post post : posts) {
+            if (post.getId().equals(firstPost.getId())) {
+                for (User u : users) {
+                    postService.togglePostLike(post.getId(), u.getId());
+                }
+            } else {
+                postService.togglePostLike(post.getId(), admin.getId());
+                postService.togglePostLike(post.getId(), u1.getId());
+                if (users.size() > 2) {
+                    postService.togglePostLike(post.getId(), u2.getId());
+                }
+            }
+        }
+
+        postService.toggleScrap(posts.get(0).getId(), u1.getId());
+        if (posts.size() > 1) {
+            postService.toggleScrap(posts.get(1).getId(), u1.getId());
+        }
+        if (posts.size() > 2) {
+            postService.toggleScrap(posts.get(2).getId(), u2.getId());
+        }
+        postService.toggleScrap(posts.get(0).getId(), admin.getId());
+        if (posts.size() > 4) {
+            postService.toggleScrap(posts.get(3).getId(), admin.getId());
+        }
+    }
+
+    private void seedCommentsOnFirstPost(List<User> users, User admin, User u1, User u2, Post firstPost) {
+        commentService.createComment(
+                firstPost.getId(), admin.getId(), new CommentCreateReq("admin 단독 댓글(삭제·수정 테스트)", null));
+        for (int c = 0; c < 12; c++) {
+            User commenter = users.get(c % users.size());
+            commentService.createComment(
+                    firstPost.getId(), commenter.getId(), new CommentCreateReq("댓글 샘플 " + c, null));
+        }
+
+        Long likeDemoCommentId = commentService.createComment(
+                firstPost.getId(), admin.getId(), new CommentCreateReq("댓글 좋아요 API 데모", null));
+        commentService.toggleCommentLike(likeDemoCommentId, u1.getId());
+
+        Long threadRootId = commentService.createComment(
+                firstPost.getId(), admin.getId(), new CommentCreateReq("스레드 루트 댓글", null));
+        commentService.createComment(
+                firstPost.getId(), u1.getId(), new CommentCreateReq("대댓글 A", threadRootId));
+        commentService.createComment(
+                firstPost.getId(), u2.getId(), new CommentCreateReq("대댓글 B", threadRootId));
+        for (int r = 0; r < 6; r++) {
+            User replyAuthor = users.get((r + 3) % users.size());
+            commentService.createComment(
+                    firstPost.getId(),
+                    replyAuthor.getId(),
+                    new CommentCreateReq("대댓글 페이징 " + r, threadRootId));
+        }
+    }
+
+    private void seedCommentsOnOtherPosts(List<User> users, List<Post> posts) {
+        for (int p = 1; p < Math.min(4, posts.size()); p++) {
+            Post post = posts.get(p);
+            Long root = commentService.createComment(
+                    post.getId(), users.get(p % users.size()).getId(), new CommentCreateReq("포스트 " + p + " 댓글", null));
+            commentService.createComment(
+                    post.getId(),
+                    users.get((p + 1) % users.size()).getId(),
+                    new CommentCreateReq("답글", root));
+        }
+    }
+
+    private void createStoryInteractions(List<User> users) {
+        List<Story> activeStories =
+                storyRepository.findAll().stream().filter(s -> !s.isDeleted()).toList();
+        if (activeStories.isEmpty() || users.size() < 2) {
+            return;
+        }
+
+        Story first = activeStories.getFirst();
+        User viewer = users.stream()
+                .filter(u -> !u.getId().equals(first.getUser().getId()))
+                .findFirst()
+                .orElse(users.get(1));
+
+        storyService.recordSingleStoryView(first.getId(), viewer.getId());
+        storyService.patchStoryLike(first.getId(), viewer.getId());
+    }
+
+    private void createAdminStoryForHardDeleteDemo(User admin) {
+        String url = "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400";
+        StoryMedia media =
+                StoryMedia.builder().mediaType(MediaType.jpg).sourceUrl(url).build();
+        storyRepository.save(Story.builder()
+                .user(admin)
+                .content("HARD_DELETE_DEMO_STORY — hard-delete API 테스트용(호출 시 제거됨)")
+                .thumbnailUrl(url)
+                .storyMedia(media)
+                .build());
+    }
+
+    private void createArchivedStoryForAdmin(User admin) {
+        String url = "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=400";
+        StoryMedia media =
+                StoryMedia.builder().mediaType(MediaType.jpg).sourceUrl(url).build();
+        Story archived = Story.builder()
+                .user(admin)
+                .content("아카이브 데모용(소프트 삭제됨)")
+                .thumbnailUrl(url)
+                .storyMedia(media)
+                .build();
+        storyRepository.save(archived);
+        storyService.softDeleteStory(archived.getId(), admin.getId());
+    }
+
+    private void createDmRoomsAndMessages(List<Post> posts) {
+        User admin = userByEmail(ADMIN_EMAIL);
+        User user1 = userByEmail("user1@test.com");
+        User user2 = userByEmail("user2@test.com");
+
+        Post samplePost = posts.getFirst();
+        Story sampleStory = resolveSampleStoryForDmLink(admin);
+
+        seedDmRoomAdminUser1(admin, user1, samplePost, sampleStory);
+        seedDmGroupDemoRoom(admin, user1, user2);
+    }
+
+    private Story resolveSampleStoryForDmLink(User admin) {
+        return storyRepository
+                .findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(admin.getId())
+                .stream()
+                .findFirst()
+                .orElseGet(() -> storyRepository.findAll().stream()
+                        .filter(s -> !s.isDeleted())
+                        .findFirst()
+                        .orElseThrow());
+    }
+
+    private void seedDmRoomAdminUser1(User admin, User user1, Post samplePost, Story sampleStory) {
         DmRoom room1v1 = DmRoom.create1v1Room(user1.getNickname());
         dmRoomRepository.save(room1v1);
         dmRoomUserRepository.save(DmRoomUser.create(room1v1, admin, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(room1v1, user1, new Date()));
 
-        dmRepository.save(Dm.create(room1v1, admin, MessageType.TEXT, "1111111", null, true));
-        dmRepository.save(Dm.create(room1v1, user1, MessageType.TEXT, "22222222", null, true));
-
-        // 게시글 공유 메시지 추가
+        dmRepository.save(Dm.create(room1v1, admin, MessageType.TEXT, "1:1 텍스트 메시지", null, true));
+        dmRepository.save(Dm.create(room1v1, user1, MessageType.TEXT, "답장입니다", null, true));
         dmRepository.save(Dm.create(
                 room1v1,
                 admin,
@@ -357,8 +548,6 @@ public class BaseInitData implements ApplicationRunner {
                 "devstagram://post?id=" + samplePost.getId(),
                 "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=200",
                 true));
-
-        // 스토리 공유 메시지 추가 (v 파라미터는 현재 시간 밀리초)
         dmRepository.save(Dm.create(
                 room1v1,
                 user1,
@@ -366,128 +555,23 @@ public class BaseInitData implements ApplicationRunner {
                 "devstagram://story?id=" + sampleStory.getId() + "&v=" + System.currentTimeMillis(),
                 "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200",
                 true));
+        dmRepository.save(
+                Dm.create(room1v1, admin, MessageType.IMAGE, "https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400", null, true));
+    }
 
-        // 2. 그룹 DM 방 (admin, user1, user2)
-        DmRoom groupRoom = DmRoom.createGroupRoom("단체방");
+    private void seedDmGroupDemoRoom(User admin, User user1, User user2) {
+        DmRoom groupRoom = DmRoom.createGroupRoom("데모 그룹 채팅");
         dmRoomRepository.save(groupRoom);
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, admin, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, user1, new Date()));
         dmRoomUserRepository.save(DmRoomUser.create(groupRoom, user2, new Date()));
 
-        dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "5555555555555", null, true));
-        dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "6666666666666", null, true));
+        dmRepository.save(Dm.create(groupRoom, admin, MessageType.TEXT, "그룹방 오픈", null, true));
+        dmRepository.save(Dm.create(groupRoom, user1, MessageType.TEXT, "반갑습니다", null, true));
+        dmRepository.save(Dm.create(groupRoom, user2, MessageType.SYSTEM, "user2님이 참여했습니다.", null, true));
     }
 
-    private void createTechScores() {
-        List<User> users = userRepository.findAll();
-        List<Technology> techs = technologyRepository.findAll();
-
-        if (users.isEmpty() || techs.isEmpty()) return;
-
-        for (User user : users) {
-            // 한 유저에게 줄 기술들을 섞어서 중복 없이 선택
-            java.util.Collections.shuffle(techs);
-
-            // 상위 2개의 기술만 선택 (중복 발생 불가)
-            for (int i = 0; i < 2; i++) {
-                Technology targetTech = techs.get(i);
-
-                UserTechScore score = new UserTechScore(user, targetTech, targetTech.getCategory());
-                int randomScore = (int) (Math.random() * 90) + 10;
-                score.increaseScore(randomScore);
-
-                userTechScoreRepository.save(score);
-            }
-        }
-    }
-
-    private void createFeedScoringScenario() {
-        User admin =
-                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
-        User user5 =
-                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
-        Technology java = technologyRepository.findAll().get(0); // Java
-
-        techScoreService.increaseScore(admin, java, "POST");
-
-        Post techPost =
-                Post.builder().user(user5).title("Java 신기술").content("내용").build();
-        addTagToPost(techPost, java);
-        postRepository.save(techPost);
-
-        feedService.registerPostToGlobalFeed(techPost);
-        feedService.deliverPostToFeeds(techPost);
-    }
-
-    private void createNormalPost() {
-        User stranger =
-                userRepository.findByEmailAndIsDeletedFalse("user4@test.com").orElseThrow();
-        User admin =
-                userRepository.findByEmailAndIsDeletedFalse("admin@test.com").orElseThrow();
-
-        followService.follow(admin.getId(), stranger.getId());
-
-        Post normalPost = Post.builder()
-                .user(stranger)
-                .title("가중치 없는 일반 게시글")
-                .content("이제 admin의 팔로우 피드에 자연스럽게 노출됩니다.")
-                .build();
-
-        postRepository.save(normalPost);
-
-        feedService.registerPostToGlobalFeed(normalPost);
-        feedService.deliverPostToFeeds(normalPost);
-    }
-
-    private void createTechInterestScenario() {
-        User user1 =
-                userRepository.findByEmailAndIsDeletedFalse("user1@test.com").orElseThrow();
-        User user2 =
-                userRepository.findByEmailAndIsDeletedFalse("user2@test.com").orElseThrow();
-        User author =
-                userRepository.findByEmailAndIsDeletedFalse("user5@test.com").orElseThrow();
-
-        Technology java = technologyRepository.findById(1L).orElseThrow();
-        Technology spring = technologyRepository.findById(2L).orElseThrow();
-        Technology aws = technologyRepository.findById(4L).orElseThrow();
-        Technology docker = technologyRepository.findById(5L).orElseThrow();
-
-        for (int i = 0; i < 30; i++) {
-            // user1: Java, Spring Boot (Backend)
-            techScoreService.increaseScore(user1, java, "POST");
-            techScoreService.increaseScore(user1, spring, "POST");
-
-            // user2: AWS, Docker (Infra)
-            techScoreService.increaseScore(user2, aws, "POST");
-            techScoreService.increaseScore(user2, docker, "POST");
-        }
-
-        Post javaPost = Post.builder()
-                .user(author)
-                .title("2026년 Java 백엔드 로드맵")
-                .content("Java/Spring 중심")
-                .build();
-        addTagToPost(javaPost, java);
-        postRepository.save(javaPost);
-        feedService.registerPostToGlobalFeed(javaPost);
-        feedService.deliverPostToFeeds(javaPost);
-
-        Post infraPost = Post.builder()
-                .user(author)
-                .title("AWS와 Docker를 활용한 CI/CD")
-                .content("인프라 중심")
-                .build();
-        addTagToPost(infraPost, aws);
-        postRepository.save(infraPost);
-        feedService.registerPostToGlobalFeed(infraPost);
-        feedService.deliverPostToFeeds(infraPost);
-    }
-
-    private void boostPostToGlobalTop(Long postId) {
-        String postIdStr = String.valueOf(postId);
-        double superScore = 100_000_000_000.0;
-
-        redisTemplate.opsForZSet().add("posts:global:scores", postIdStr, superScore);
-        System.out.println(">>> [SUCCESS] ID " + postId + "번 게시글을 글로벌 전역 1등으로 설정했습니다.");
+    private User userByEmail(String email) {
+        return userRepository.findByEmailAndIsDeletedFalse(email).orElseThrow();
     }
 }
