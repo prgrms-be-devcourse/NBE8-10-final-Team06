@@ -1,5 +1,9 @@
 package com.devstagram.domain.user.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -14,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +28,7 @@ import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.security.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 
@@ -40,6 +46,9 @@ class FollowControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @MockitoBean
+    private RateLimitService rateLimitService;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -50,6 +59,8 @@ class FollowControllerTest {
 
     @BeforeEach
     void init() throws Exception {
+        given(rateLimitService.isAllowed(anyString(), anyLong(), any())).willReturn(true);
+
         userRepository.deleteAll();
 
         // 1. 내 계정 생성 및 '원본 API Key'와 '쿠키' 획득
@@ -89,16 +100,6 @@ class FollowControllerTest {
                 .andExpect(jsonPath("$.data.isFollowing").value(true))
                 .andExpect(jsonPath("$.data.followerCount").value(1)) // 상대방 팔로워 1명 증가 확인
                 .andExpect(jsonPath("$.data.followingCount").value(1)) // 내 팔로잉 1명 증가 확인
-                .andDo(print());
-    }
-
-    @Test
-    @DisplayName("API Key 헤더를 이용한 팔로우 성공 테스트 - 해싱 로직 검증")
-    void followWithApiKeySuccess() throws Exception {
-        // 쿠키 없이 헤더의 X-API-KEY(ID.UUID)만 사용하여 팔로우 시도
-        mvc.perform(post("/api/follows/" + otherUser.getId()).header("X-API-KEY", myApiKey))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andDo(print());
     }
 

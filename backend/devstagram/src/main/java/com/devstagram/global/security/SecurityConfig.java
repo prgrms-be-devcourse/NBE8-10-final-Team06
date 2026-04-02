@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
     private final CustomAuthenticationFilter customAuthenticationFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -31,6 +32,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(customAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         // 1. OPTIONS 요청(CORS 프리플라이트)은 모두 허용
@@ -45,7 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health")
                         .permitAll()
 
-                        // 3. ⭐ 핵심: 내 정보 조지는 반드시 인증(authenticated) 필요!
+                        // 3. 내 정보 조회는 반드시 인증(authenticated) 필요!
                         // /api/auth/** 보다 위에 있어야 먼저 적용됩니다.
                         .requestMatchers("/api/auth/me")
                         .authenticated()

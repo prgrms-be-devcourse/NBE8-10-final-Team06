@@ -1,5 +1,9 @@
 package com.devstagram.domain.user.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -15,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -24,6 +29,7 @@ import com.devstagram.domain.user.dto.SignupRequest;
 import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.security.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest
@@ -35,6 +41,9 @@ class AuthControllerTest {
     @Autowired
     private MockMvc mvc;
 
+    @MockitoBean
+    private RateLimitService rateLimitService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -43,6 +52,7 @@ class AuthControllerTest {
 
     @BeforeEach
     void init() {
+        given(rateLimitService.isAllowed(anyString(), anyLong(), any())).willReturn(true);
         userRepository.deleteAll();
     }
 
@@ -90,6 +100,7 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))
                 .andExpect(cookie().exists("accessToken"))
+                .andExpect(cookie().exists("refreshToken"))
                 .andDo(print());
     }
 
