@@ -35,8 +35,7 @@ public class S3StorageServiceImpl implements StorageService {
 
     private S3Client s3Client;
 
-    private static final List<String> ALLOWED_EXTENSIONS =
-            List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
+    private static final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
 
     @PostConstruct
     public void init() {
@@ -68,9 +67,8 @@ public class S3StorageServiceImpl implements StorageService {
             throw new ServiceException("400-S-3", "확장자가 없는 파일");
         }
 
-        String extension = originalFilename
-                .substring(originalFilename.lastIndexOf("."))
-                .toLowerCase();
+        String extension =
+                originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
 
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             log.warn("허용되지 않은 파일 업로드 시도: {}", originalFilename);
@@ -105,10 +103,8 @@ public class S3StorageServiceImpl implements StorageService {
         String key = extractKey(fileUrl);
 
         try {
-            s3Client.deleteObject(DeleteObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(key)
-                    .build());
+            s3Client.deleteObject(
+                    DeleteObjectRequest.builder().bucket(bucket).key(key).build());
             log.info("S3 파일 삭제 완료: {}", key);
         } catch (Exception e) {
             log.error("S3 파일 삭제 실패: {}", fileUrl, e);
