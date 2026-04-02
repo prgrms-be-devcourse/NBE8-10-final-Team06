@@ -14,8 +14,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
+import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.domain.dm.entity.Dm;
 import com.devstagram.domain.dm.entity.DmRoom;
 import com.devstagram.domain.dm.entity.DmRoomUser;
@@ -146,10 +146,9 @@ public class BaseInitData implements ApplicationRunner {
     private Technology requireSeededTechnology(String techName) {
         return technologyRepository
                 .findByName(techName)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Docker DB seed 기술이 없습니다: '"
-                                + techName
-                                + "'. Postgres 초기화 시 infra/init-data/insert_tech.sql 이 실행됐는지 확인하세요."));
+                .orElseThrow(() -> new IllegalStateException("Docker DB seed 기술이 없습니다: '"
+                        + techName
+                        + "'. Postgres 초기화 시 infra/init-data/insert_tech.sql 이 실행됐는지 확인하세요."));
     }
 
     private List<Technology> seededTechnologyPoolForScores() {
@@ -377,7 +376,8 @@ public class BaseInitData implements ApplicationRunner {
             storyRepository.save(story);
 
             if (i == 0) {
-                storyTagRepository.save(StoryTag.builder().story(story).target(user1).build());
+                storyTagRepository.save(
+                        StoryTag.builder().story(story).target(user1).build());
             }
         }
     }
@@ -439,18 +439,14 @@ public class BaseInitData implements ApplicationRunner {
                 firstPost.getId(), admin.getId(), new CommentCreateReq("댓글 좋아요 API 데모", null));
         commentService.toggleCommentLike(likeDemoCommentId, u1.getId());
 
-        Long threadRootId = commentService.createComment(
-                firstPost.getId(), admin.getId(), new CommentCreateReq("스레드 루트 댓글", null));
-        commentService.createComment(
-                firstPost.getId(), u1.getId(), new CommentCreateReq("대댓글 A", threadRootId));
-        commentService.createComment(
-                firstPost.getId(), u2.getId(), new CommentCreateReq("대댓글 B", threadRootId));
+        Long threadRootId =
+                commentService.createComment(firstPost.getId(), admin.getId(), new CommentCreateReq("스레드 루트 댓글", null));
+        commentService.createComment(firstPost.getId(), u1.getId(), new CommentCreateReq("대댓글 A", threadRootId));
+        commentService.createComment(firstPost.getId(), u2.getId(), new CommentCreateReq("대댓글 B", threadRootId));
         for (int r = 0; r < 6; r++) {
             User replyAuthor = users.get((r + 3) % users.size());
             commentService.createComment(
-                    firstPost.getId(),
-                    replyAuthor.getId(),
-                    new CommentCreateReq("대댓글 페이징 " + r, threadRootId));
+                    firstPost.getId(), replyAuthor.getId(), new CommentCreateReq("대댓글 페이징 " + r, threadRootId));
         }
     }
 
@@ -460,9 +456,7 @@ public class BaseInitData implements ApplicationRunner {
             Long root = commentService.createComment(
                     post.getId(), users.get(p % users.size()).getId(), new CommentCreateReq("포스트 " + p + " 댓글", null));
             commentService.createComment(
-                    post.getId(),
-                    users.get((p + 1) % users.size()).getId(),
-                    new CommentCreateReq("답글", root));
+                    post.getId(), users.get((p + 1) % users.size()).getId(), new CommentCreateReq("답글", root));
         }
     }
 
@@ -522,9 +516,7 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private Story resolveSampleStoryForDmLink(User admin) {
-        return storyRepository
-                .findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(admin.getId())
-                .stream()
+        return storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(admin.getId()).stream()
                 .findFirst()
                 .orElseGet(() -> storyRepository.findAll().stream()
                         .filter(s -> !s.isDeleted())
@@ -554,8 +546,13 @@ public class BaseInitData implements ApplicationRunner {
                 "devstagram://story?id=" + sampleStory.getId() + "&v=" + System.currentTimeMillis(),
                 "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200",
                 true));
-        dmRepository.save(
-                Dm.create(room1v1, admin, MessageType.IMAGE, "https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400", null, true));
+        dmRepository.save(Dm.create(
+                room1v1,
+                admin,
+                MessageType.IMAGE,
+                "https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400",
+                null,
+                true));
     }
 
     private void seedDmGroupDemoRoom(User admin, User user1, User user2) {
