@@ -1,10 +1,10 @@
 package com.devstagram.domain.user.service;
 
-import com.devstagram.domain.user.dto.AuthResult;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.devstagram.domain.user.dto.AuthResult;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.SignupRequest;
@@ -63,8 +63,7 @@ public class AuthService {
                     request.email(),
                     afterUserQuery - start,
                     afterPasswordCheck - afterUserQuery,
-                    afterPasswordCheck - start
-            );
+                    afterPasswordCheck - start);
 
             throw new ServiceException("401-U-1", "이메일 또는 비밀번호가 일치하지 않습니다.");
         }
@@ -73,11 +72,7 @@ public class AuthService {
         String accessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
         String refreshToken = jwtProvider.genRefreshToken(user.getId());
 
-        refreshTokenService.save(
-                user.getId(),
-                refreshToken,
-                jwtProvider.getRefreshTokenExpireSeconds()
-        );
+        refreshTokenService.save(user.getId(), refreshToken, jwtProvider.getRefreshTokenExpireSeconds());
 
         LoginResponse response = new LoginResponse(user.getEmail(), user.getNickname());
 
@@ -100,17 +95,13 @@ public class AuthService {
             throw new ServiceException("401-F-1", "저장된 리프레시 토큰과 일치하지 않습니다.");
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 사용자입니다."));
 
         String newAccessToken = jwtProvider.genAccessToken(user.getId(), user.getEmail(), user.getNickname());
         String newRefreshToken = jwtProvider.genRefreshToken(user.getId());
 
-        refreshTokenService.save(
-                user.getId(),
-                newRefreshToken,
-                jwtProvider.getRefreshTokenExpireSeconds()
-        );
+        refreshTokenService.save(user.getId(), newRefreshToken, jwtProvider.getRefreshTokenExpireSeconds());
 
         LoginResponse response = new LoginResponse(user.getEmail(), user.getNickname());
 

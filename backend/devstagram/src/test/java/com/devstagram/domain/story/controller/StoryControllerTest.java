@@ -30,6 +30,7 @@ import com.devstagram.domain.story.service.StoryService;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.enumtype.MediaType;
 import com.devstagram.global.rq.Rq;
+import com.devstagram.global.security.AuthRateLimitFilter;
 import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
 import com.devstagram.global.security.SecurityUser;
@@ -52,6 +53,9 @@ class StoryControllerTest {
 
     @MockitoBean
     private StoryService storyService;
+
+    @MockitoBean
+    private AuthRateLimitFilter authRateLimitFilter;
 
     @MockitoBean
     private CustomAuthenticationFilter customAuthenticationFilter;
@@ -85,6 +89,16 @@ class StoryControllerTest {
                     return null;
                 })
                 .when(customAuthenticationFilter)
+                .doFilter(any(), any(), any());
+
+        doAnswer(invocation -> {
+                    HttpServletRequest request = invocation.getArgument(0);
+                    HttpServletResponse response = invocation.getArgument(1);
+                    FilterChain filterChain = invocation.getArgument(2);
+                    filterChain.doFilter(request, response);
+                    return null;
+                })
+                .when(authRateLimitFilter)
                 .doFilter(any(), any(), any());
 
         given(rq.getHeader(anyString(), anyString())).willReturn("");

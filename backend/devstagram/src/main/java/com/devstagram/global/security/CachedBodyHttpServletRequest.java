@@ -10,6 +10,10 @@ import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 
+/**
+ * HTTP 요청의 Body 데이터를 한 번 읽어도 사라지지 않게 복사본을 보관하는 래퍼 클래스
+ * 기본 HttpServletRequest는 InputStream을 한 번만 읽을 수 있는 제약을 해결함
+ */
 public class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
     private final byte[] cachedBody;
@@ -35,8 +39,7 @@ public class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
             }
 
             @Override
-            public void setReadListener(ReadListener readListener) {
-            }
+            public void setReadListener(ReadListener readListener) {}
 
             @Override
             public int read() {

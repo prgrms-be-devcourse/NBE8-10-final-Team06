@@ -1,7 +1,5 @@
 package com.devstagram.domain.user.controller;
 
-import com.devstagram.domain.user.dto.AuthResult;
-import com.devstagram.global.security.JwtProvider;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.devstagram.domain.user.dto.AuthResult;
 import com.devstagram.domain.user.dto.LoginRequest;
 import com.devstagram.domain.user.dto.LoginResponse;
 import com.devstagram.domain.user.dto.MyInfoResponse;
@@ -19,6 +18,7 @@ import com.devstagram.domain.user.service.AuthService;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.rsdata.RsData;
+import com.devstagram.global.security.JwtProvider;
 import com.devstagram.global.security.SecurityUser;
 
 import jakarta.validation.Valid;

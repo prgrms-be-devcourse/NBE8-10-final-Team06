@@ -1,8 +1,10 @@
 package com.devstagram.domain.user.service;
 
 import java.time.Duration;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -15,11 +17,7 @@ public class RefreshTokenService {
 
     // 토큰 저장: 지정된 시간이 지나면 Redis에서 자동 삭제됨 (TTL)
     public void save(Long userId, String refreshToken, long expireSeconds) {
-        redisTemplate.opsForValue().set(
-                PREFIX + userId,
-                refreshToken,
-                Duration.ofSeconds(expireSeconds)
-        );
+        redisTemplate.opsForValue().set(PREFIX + userId, refreshToken, Duration.ofSeconds(expireSeconds));
     }
 
     // 토큰 조회: Redis에서 해당 유저의 토큰을 가져옴

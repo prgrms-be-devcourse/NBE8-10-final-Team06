@@ -1,5 +1,9 @@
 package com.devstagram.domain.user.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -18,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +37,7 @@ import com.devstagram.domain.user.entity.Gender;
 import com.devstagram.domain.user.entity.Resume;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.security.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.Cookie;
@@ -51,6 +57,9 @@ class UserControllerTest {
     @Autowired
     private UserRepository userRepository;
 
+    @MockitoBean
+    private RateLimitService rateLimitService;
+
     @Autowired
     private TechnologyRepository technologyRepository;
 
@@ -63,6 +72,8 @@ class UserControllerTest {
 
     @BeforeEach
     void init() throws Exception {
+        given(rateLimitService.isAllowed(anyString(), anyLong(), any())).willReturn(true);
+
         // 테스트용 사용자 초기화
         userRepository.deleteAll();
 

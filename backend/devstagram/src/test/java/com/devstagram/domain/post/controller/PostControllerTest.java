@@ -36,6 +36,7 @@ import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.JwtProvider;
+import com.devstagram.global.security.RateLimitService;
 import com.devstagram.global.security.SecurityUser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -49,6 +50,9 @@ class PostControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private RateLimitService rateLimitService;
 
     @MockitoBean
     private JwtProvider jwtProvider;
@@ -75,8 +79,13 @@ class PostControllerTest {
         given(rq.getHeader(eq("X-API-KEY"), anyString())).willReturn("");
         given(rq.getCookieValue(anyString(), anyString())).willReturn("");
 
+        // rate limit
+        given(rateLimitService.isAllowed(anyString(), anyLong(), any())).willReturn(true);
+
         // jwt
         given(jwtProvider.isValid(anyString())).willReturn(true);
+        given(jwtProvider.isAccessToken(anyString())).willReturn(true);
+
         Claims mockClaims = mock(Claims.class);
         given(mockClaims.getSubject()).willReturn("1");
         given(jwtProvider.payload(anyString())).willReturn(mockClaims);
