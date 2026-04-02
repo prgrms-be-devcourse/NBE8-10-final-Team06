@@ -1,4 +1,4 @@
-package com.devstagram.domain.comment.Service;
+package com.devstagram.domain.comment.service;
 
 import java.util.Collections;
 import java.util.List;

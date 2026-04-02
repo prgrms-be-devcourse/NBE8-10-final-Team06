@@ -1,16 +1,36 @@
 -- 0. 테이블이 없을 경우 생성 (부모 테이블 먼저)
+
 CREATE TABLE IF NOT EXISTS tech_category (
-                                             category_id BIGINT PRIMARY KEY,
-                                             category_name VARCHAR(255) NOT NULL,
-    color VARCHAR(50)
-    );
+    category_id BIGINT PRIMARY KEY,
+    category_name VARCHAR(255) NOT NULL,
+    color VARCHAR(50),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    modified_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT false
+);
 
 CREATE TABLE IF NOT EXISTS technology (
-                                          tech_id BIGINT PRIMARY KEY,
-                                          tech_name VARCHAR(255) NOT NULL,
+    tech_id BIGINT PRIMARY KEY,
+    tech_name VARCHAR(255) NOT NULL,
     category_id BIGINT REFERENCES tech_category(category_id),
-    color VARCHAR(50)
-    );
+    color VARCHAR(50),
+    icon_url VARCHAR(500),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    modified_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 기존에 있던 데이터 안 날리고 유지하되 컬럼만 보강
+ALTER TABLE tech_category
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE tech_category
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE tech_category
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE technology ADD COLUMN IF NOT EXISTS icon_url VARCHAR(500);
+ALTER TABLE technology
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE technology
+    ADD COLUMN IF NOT EXISTS modified_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
 -- 1. 카테고리 데이터 먼저 삽입 (부모 테이블)
 TRUNCATE TABLE tech_category RESTART IDENTITY CASCADE;

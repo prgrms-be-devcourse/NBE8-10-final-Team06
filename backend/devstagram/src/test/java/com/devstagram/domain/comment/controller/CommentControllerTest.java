@@ -25,8 +25,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.devstagram.domain.comment.Service.CommentService;
 import com.devstagram.domain.comment.dto.*;
+import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.domain.post.service.PostService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.service.UserSecurityService;
