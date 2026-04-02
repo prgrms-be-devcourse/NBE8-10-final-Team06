@@ -1,6 +1,5 @@
 -- 0. 테이블이 없을 경우 생성 (부모 테이블 먼저)
---    TechCategory/Technology 는 BaseEntity(created_at, modified_at) + TechCategory.is_deleted 를 사용한다.
---    -> 이 컬럼이 없어 JOIN FETCH 시 오류
+
 CREATE TABLE IF NOT EXISTS tech_category (
     category_id BIGINT PRIMARY KEY,
     category_name VARCHAR(255) NOT NULL,
@@ -20,7 +19,7 @@ CREATE TABLE IF NOT EXISTS technology (
     modified_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-
+-- 기존에 있던 데이터 안 날리고 유지하되 컬럼만 보강
 ALTER TABLE tech_category
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE tech_category

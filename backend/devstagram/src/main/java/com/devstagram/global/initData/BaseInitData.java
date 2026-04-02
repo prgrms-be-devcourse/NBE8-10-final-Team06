@@ -112,16 +112,14 @@ public class BaseInitData implements ApplicationRunner {
             return;
         }
         loadDemoDataset();
-        log.info(
-                "BaseInitData: 데모 데이터 적용 완료. admin={} / 비밀번호 공통={}",
-                ADMIN_EMAIL,
-                DEMO_PASSWORD);
     }
 
     private boolean shouldSkip() {
+        // 이미 관리자 이메일이 존재한다면 BaseInitData 들어간 걸로 간주하여 스킵 -> 중복으로 쌓이는거 막으려고
         if (userRepository.findByEmailAndIsDeletedFalse(ADMIN_EMAIL).isPresent()) {
             return true;
         }
+        // 기술 스택 데이터가 주입되지 않았다면 실행을 중단
         if (technologyRepository.count() < MIN_SEED_TECH_ROWS) {
             log.warn(
                     "BaseInitData 건너뜀: technology 행이 {}개 미만입니다. Docker Postgres 초기화 시 infra/init-data/insert_tech.sql 시드를 확인하세요.",
@@ -131,6 +129,7 @@ public class BaseInitData implements ApplicationRunner {
         return false;
     }
 
+    // 데이터 주입
     private void loadDemoDataset() {
         List<User> users = createUsers();
         createTechScores(users);
