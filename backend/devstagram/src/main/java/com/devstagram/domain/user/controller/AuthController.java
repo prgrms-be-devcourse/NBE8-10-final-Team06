@@ -1,5 +1,7 @@
 package com.devstagram.domain.user.controller;
 
+import com.devstagram.domain.user.dto.AuthResult;
+import com.devstagram.global.security.JwtProvider;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +31,7 @@ public class AuthController {
     private final AuthService authService;
     private final Rq rq;
     private final UserSecurityService userSecurityService;
+    private final JwtProvider jwtProvider;
 
     @PostMapping("/signup")
     public RsData<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
@@ -37,12 +40,31 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public RsData<String> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse loginResponse = authService.login(request);
+    public RsData<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        AuthResult result = authService.login(request);
 
-        rq.setCookie("accessToken", loginResponse.accessToken());
+        int accessTokenMaxAge = (int) jwtProvider.getAccessTokenExpireSeconds();
+        int refreshTokenMaxAge = (int) jwtProvider.getRefreshTokenExpireSeconds();
 
-        return RsData.success("로그인 성공", loginResponse.accessToken());
+        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge);
+        rq.setCookie("refreshToken", result.refreshToken(), refreshTokenMaxAge);
+
+        return RsData.success("로그인 성공", result.response());
+    }
+
+    @PostMapping("/refresh")
+    public RsData<LoginResponse> refresh() {
+        String refreshToken = rq.getCookieValue("refreshToken", "");
+
+        AuthResult result = authService.refresh(refreshToken);
+
+        int accessTokenMaxAge = (int) jwtProvider.getAccessTokenExpireSeconds();
+        int refreshTokenMaxAge = (int) jwtProvider.getRefreshTokenExpireSeconds();
+
+        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge);
+        rq.setCookie("refreshToken", result.refreshToken(), refreshTokenMaxAge);
+
+        return RsData.success("토큰 재발급 성공", result.response());
     }
 
     @GetMapping("/me")
@@ -53,9 +75,15 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public RsData<Void> logout() {
+    public RsData<Void> logout(@AuthenticationPrincipal SecurityUser user) {
+        if (user != null) {
+            authService.logout(user.getId());
+        }
+
         rq.deleteCookie("accessToken");
+        rq.deleteCookie("refreshToken");
         rq.deleteCookie("apiKey");
+
         return RsData.success("로그아웃 되었습니다.", null);
     }
 

@@ -99,6 +99,11 @@ jobs:
             echo "GITHUB_OWNER=${{ github.repository_owner }}" >> .env
             echo "IMAGE_VERSION=$VERSION" >> .env
             
+            # Redis 설정 추가
+            echo "REDIS_HOST=redis" >> .env
+            echo "REDIS_PORT=6379" >> .env
+            echo "JWT_REFRESH_TOKEN_EXPIRE_SECONDS=${{ secrets.JWT_REFRESH_TOKEN_EXPIRE_SECONDS }}" >> .env
+            
             # S3 관련 설정 추가
             echo "AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}" >> .env
             echo "AWS_ACCESS_KEY=managed-by-iam-role" >> .env
