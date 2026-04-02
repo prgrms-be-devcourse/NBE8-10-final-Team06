@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.devstagram.domain.comment.Service.CommentService;
+import com.devstagram.domain.comment.service.CommentService;
 import com.devstagram.domain.comment.dto.CommentCreateReq;
 import com.devstagram.domain.dm.entity.Dm;
 import com.devstagram.domain.dm.entity.DmRoom;
