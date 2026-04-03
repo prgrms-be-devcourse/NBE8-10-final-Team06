@@ -272,6 +272,82 @@ body {
   flex-shrink: 0;
 }
 
+/* 텍스트 전용(미디어 없음): 커뮤니티·게시판형 카드 */
+.post-card-feed--community {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  border-left: 4px solid #6366f1;
+}
+
+.post-card-feed-community-title {
+  margin: 0 0 10px;
+  font-size: clamp(1rem, 2.6vw, 1.12rem);
+  font-weight: 800;
+  line-height: 1.35;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.post-card-feed-community-title:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.post-card-feed-community-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.post-card-feed-community-excerpt {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: #334155;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+}
+
+.post-card-feed-community-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.post-card-feed-community-footer .post-card-feed-community-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #525252;
+}
+
+.post-card-feed-community-more {
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4f46e5;
+  cursor: pointer;
+}
+
+.post-card-feed-community-more:hover {
+  text-decoration: underline;
+}
+
 /* 데스크탑: vw 스케일 대신 고정 밀도(인스타 웹에 가까운 정보 밀도) */
 @media (min-width: 1024px) {
   .home-feed-column {

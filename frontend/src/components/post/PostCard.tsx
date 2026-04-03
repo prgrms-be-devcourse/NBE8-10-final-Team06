@@ -39,6 +39,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
   const currentMedia = post.medias?.[currentMediaIndex];
   const isKnownMissingMedia = currentMedia ? isAssetMarkedMissing(currentMedia.sourceUrl) : false;
+  const hasMedia = Boolean(post.medias && post.medias.length > 0);
 
   const isVideo = (mediaType: string) =>
     ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
@@ -86,158 +87,246 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
     }
   };
 
+  const postMenu = (
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <MoreHorizontal size={20} style={{ cursor: 'pointer' }} onClick={() => setShowMenu(!showMenu)} />
+      {showMenu && post.isMine && (
+        <div style={{ position: 'absolute', right: 0, top: '25px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 5, width: '100px' }}>
+          <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate(`/post/${post.id}/edit`)}>
+            <Edit size={14} /> 수정
+          </div>
+          <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', color: '#ed4956', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #efefef' }} onClick={handlePostDelete}>
+            <Trash2 size={14} /> 삭제
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <article
-      className="post-card-feed"
-      style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', position: 'relative' }}
+      className={hasMedia ? 'post-card-feed' : 'post-card-feed post-card-feed--community'}
+      style={{
+        backgroundColor: '#fff',
+        border: hasMedia ? '1px solid #dbdbdb' : undefined,
+        position: 'relative',
+      }}
     >
-      {/* 헤더 섹션 */}
-      <div className="post-card-feed-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>
-          <ProfileAvatar authorUserId={post.authorId} profileImageUrl={post.profileImageUrl} nickname={post.nickname} sizePx={32} />
-          
-          <strong style={{ fontSize: '0.9rem' }}>{post.nickname}</strong>
-        </div>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <MoreHorizontal size={20} style={{ cursor: 'pointer' }} onClick={() => setShowMenu(!showMenu)} />
-          {showMenu && post.isMine && (
-            <div style={{ position: 'absolute', right: 0, top: '25px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 5, width: '100px' }}>
-              <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate(`/post/${post.id}/edit`)}>
-                <Edit size={14} /> 수정
-              </div>
-              <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', color: '#ed4956', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #efefef' }} onClick={handlePostDelete}>
-                <Trash2 size={14} /> 삭제
-              </div>
+      {hasMedia ? (
+        <>
+          <div className="post-card-feed-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${post.nickname}`)}>
+              <ProfileAvatar authorUserId={post.authorId} profileImageUrl={post.profileImageUrl} nickname={post.nickname} sizePx={32} />
+              <strong style={{ fontSize: '0.9rem' }}>{post.nickname}</strong>
             </div>
-          )}
-        </div>
-      </div>
+            {postMenu}
+          </div>
 
-      {/* 미디어 슬라이더 */}
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', backgroundColor: '#000', display: 'flex', alignItems: 'center' }}>
-        {post.medias && post.medias.length > 0 ? (
-          (isMediaUnavailable || isKnownMissingMedia) ? (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              삭제된 미디어입니다.
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', backgroundColor: '#000', display: 'flex', alignItems: 'center' }}>
+            {(isMediaUnavailable || isKnownMissingMedia) ? (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                삭제된 미디어입니다.
+              </div>
+            ) : (
+              isVideo(post.medias![currentMediaIndex].mediaType) ? (
+                <video
+                  src={getFullUrl(post.medias![currentMediaIndex].sourceUrl)}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  muted
+                  playsInline
+                  controls
+                  onError={(e) => {
+                    const video = e.currentTarget;
+                    if (video.dataset.fallbackApplied === '1') return;
+                    const fallback = getFallbackUrl(post.medias![currentMediaIndex].sourceUrl);
+                    if (fallback) {
+                      video.dataset.fallbackApplied = '1';
+                      video.src = fallback;
+                      video.load();
+                      return;
+                    }
+                    markAssetMissing(post.medias![currentMediaIndex].sourceUrl);
+                    setIsMediaUnavailable(true);
+                  }}
+                  onClick={() => navigate(`/post/${post.id}`)}
+                />
+              ) : (
+                <img
+                  src={getFullUrl(post.medias![currentMediaIndex].sourceUrl)}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  alt="content"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.dataset.fallbackApplied === '1') return;
+                    const fallback = getFallbackUrl(post.medias![currentMediaIndex].sourceUrl);
+                    if (fallback) {
+                      img.dataset.fallbackApplied = '1';
+                      img.src = fallback;
+                      return;
+                    }
+                    markAssetMissing(post.medias![currentMediaIndex].sourceUrl);
+                    setIsMediaUnavailable(true);
+                  }}
+                  onClick={() => navigate(`/post/${post.id}`)}
+                />
+              )
+            )}
+            {post.medias!.length > 1 && (
+              <>
+                {currentMediaIndex > 0 && <button onClick={() => setCurrentMediaIndex(i => i - 1)} style={{ position: 'absolute', left: '10px', background: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '50%', padding: '5px', cursor: 'pointer' }}><ChevronLeft size={20} /></button>}
+                {currentMediaIndex < post.medias!.length - 1 && <button onClick={() => setCurrentMediaIndex(i => i + 1)} style={{ position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '50%', padding: '5px', cursor: 'pointer' }}><ChevronRight size={20} /></button>}
+              </>
+            )}
+          </div>
+
+          <div className="post-card-feed-section">
+            <div
+              className="post-card-feed-actions"
+              style={{ display: 'flex', gap: 'clamp(10px, 1.5vw, 14px)', marginBottom: '8px', alignItems: 'center' }}
+            >
+              <Heart
+                className="post-card-feed-action-icon"
+                size={24}
+                onClick={handleLike}
+                style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }}
+                fill={post.isLiked ? '#ed4956' : 'none'}
+              />
+              <MessageCircle
+                className="post-card-feed-action-icon"
+                size={24}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/post/${post.id}`)}
+              />
+              <button
+                type="button"
+                title="DM으로 공유"
+                aria-label="DM으로 공유"
+                onClick={() => setShowDmShare(true)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
+              >
+                <Forward className="post-card-feed-action-icon" size={24} />
+              </button>
+              <Bookmark
+                className="post-card-feed-action-icon"
+                size={24}
+                onClick={handleScrap}
+                style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'inherit' }}
+                fill={post.isScrapped ? '#ffd700' : 'none'}
+              />
             </div>
-          ) : (
-          isVideo(post.medias[currentMediaIndex].mediaType) ? (
-            <video
-              src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              muted
-              playsInline
-              controls
-              onError={(e) => {
-                const video = e.currentTarget;
-                if (video.dataset.fallbackApplied === '1') return;
-                const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
-                if (fallback) {
-                  video.dataset.fallbackApplied = '1';
-                  video.src = fallback;
-                  video.load();
-                  return;
-                }
-                markAssetMissing(post.medias[currentMediaIndex].sourceUrl);
-                setIsMediaUnavailable(true);
-              }}
+            <div
+              style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', cursor: 'pointer' }}
+              onClick={() => setShowLikers(true)}
+            >
+              좋아요 {post.likeCount || 0}개
+            </div>
+            <div style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{post.nickname}</span>
+              <span style={{ fontWeight: 'bold', display: 'block', margin: '4px 0' }}>{post.title}</span>
+              {post.techStacks && post.techStacks.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '8px 0' }}>
+                  {post.techStacks.map(tech => (
+                    <span
+                      key={tech.id}
+                      style={{
+                        fontSize: '0.7rem',
+                        color: tech.color,
+                        backgroundColor: `${tech.color}15`,
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        border: `1px solid ${tech.color}40`,
+                        fontWeight: '600',
+                      }}
+                    >
+                      #{tech.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{post.content}</p>
+            </div>
+            <div
+              style={{ color: '#8e8e8e', fontSize: '0.85rem', marginTop: '12px', cursor: 'pointer' }}
               onClick={() => navigate(`/post/${post.id}`)}
-            />
-          ) : (
-            <img
-              src={getFullUrl(post.medias[currentMediaIndex].sourceUrl)}
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              alt="content"
-              onError={(e) => {
-                const img = e.currentTarget;
-                if (img.dataset.fallbackApplied === '1') return;
-                const fallback = getFallbackUrl(post.medias[currentMediaIndex].sourceUrl);
-                if (fallback) {
-                  img.dataset.fallbackApplied = '1';
-                  img.src = fallback;
-                  return;
-                }
-                markAssetMissing(post.medias[currentMediaIndex].sourceUrl);
-                setIsMediaUnavailable(true);
-              }}
-              onClick={() => navigate(`/post/${post.id}`)}
-            />
-          )
-          )
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>이미지가 없습니다.</div>
-        )}
-        
-        {post.medias && post.medias.length > 1 && (
-          <>
-            {currentMediaIndex > 0 && <button onClick={() => setCurrentMediaIndex(i => i - 1)} style={{ position: 'absolute', left: '10px', background: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '50%', padding: '5px', cursor: 'pointer' }}><ChevronLeft size={20} /></button>}
-            {currentMediaIndex < post.medias.length - 1 && <button onClick={() => setCurrentMediaIndex(i => i + 1)} style={{ position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.7)', border: 'none', borderRadius: '50%', padding: '5px', cursor: 'pointer' }}><ChevronRight size={20} /></button>}
-          </>
-        )}
-      </div>
+            >
+              {post.commentCount > 0
+                ? `댓글 ${post.commentCount}개 모두 보기`
+                : '댓글 작성하기...'}
+            </div>
+            <div style={{ color: '#8e8e8e', fontSize: '0.7rem', marginTop: '8px' }}>
+              {new Date(post.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="post-card-feed-section" style={{ padding: 'clamp(12px, 2vw, 18px)' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '10px' }}>
+            {postMenu}
+          </div>
 
-      {/* 액션 버튼 및 본문 */}
-      <div className="post-card-feed-section">
-        <div
-          className="post-card-feed-actions"
-          style={{ display: 'flex', gap: 'clamp(10px, 1.5vw, 14px)', marginBottom: '8px', alignItems: 'center' }}
-        >
-          <Heart
-            className="post-card-feed-action-icon"
-            size={24}
-            onClick={handleLike}
-            style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }}
-            fill={post.isLiked ? '#ed4956' : 'none'}
-          />
-          <MessageCircle
-            className="post-card-feed-action-icon"
-            size={24}
-            style={{ cursor: 'pointer' }}
+          <h2
+            className="post-card-feed-community-title"
+            tabIndex={0}
             onClick={() => navigate(`/post/${post.id}`)}
-          />
-          <button
-            type="button"
-            title="DM으로 공유"
-            aria-label="DM으로 공유"
-            onClick={() => setShowDmShare(true)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(`/post/${post.id}`);
+              }
+            }}
           >
-            <Forward className="post-card-feed-action-icon" size={24} />
-          </button>
-          <Bookmark
-            className="post-card-feed-action-icon"
-            size={24}
-            onClick={handleScrap}
-            style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'inherit' }}
-            fill={post.isScrapped ? '#ffd700' : 'none'}
-          />
-        </div>
-        
-        <div 
-          style={{ fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', cursor: 'pointer' }}
-          onClick={() => setShowLikers(true)}
-        >
-          좋아요 {post.likeCount || 0}개
-        </div>
-        
-        <div style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
-          <span style={{ fontWeight: 'bold', marginRight: '8px' }}>{post.nickname}</span>
-          <span style={{ fontWeight: 'bold', display: 'block', margin: '4px 0' }}>{post.title}</span>
-          
-          {/* 기술 스택 태그 추가 */}
+            {post.title}
+          </h2>
+
+          <div className="post-card-feed-community-meta">
+            <ProfileAvatar authorUserId={post.authorId} profileImageUrl={post.profileImageUrl} nickname={post.nickname} sizePx={26} />
+            <button
+              type="button"
+              onClick={() => navigate(`/profile/${post.nickname}`)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                font: 'inherit',
+                color: '#475569',
+                fontWeight: 600,
+              }}
+            >
+              {post.nickname}
+            </button>
+            <span aria-hidden>·</span>
+            <time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString()}</time>
+            <span aria-hidden>·</span>
+            <button
+              type="button"
+              onClick={() => navigate(`/post/${post.id}`)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                font: 'inherit',
+                color: 'inherit',
+              }}
+            >
+              댓글 {post.commentCount ?? 0}
+            </button>
+          </div>
+
           {post.techStacks && post.techStacks.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', margin: '8px 0' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
               {post.techStacks.map(tech => (
-                <span 
-                  key={tech.id} 
-                  style={{ 
-                    fontSize: '0.7rem', 
-                    color: tech.color, 
-                    backgroundColor: `${tech.color}15`, // 배경은 옅게
-                    padding: '2px 8px', 
-                    borderRadius: '10px', 
+                <span
+                  key={tech.id}
+                  style={{
+                    fontSize: '0.72rem',
+                    color: tech.color,
+                    backgroundColor: `${tech.color}15`,
+                    padding: '3px 9px',
+                    borderRadius: '10px',
                     border: `1px solid ${tech.color}40`,
-                    fontWeight: '600'
+                    fontWeight: 600,
                   }}
                 >
                   #{tech.name}
@@ -245,24 +334,68 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
               ))}
             </div>
           )}
-          
-          <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{post.content}</p>
-        </div>
 
-        {/* 댓글 개수 표시 */}
-        <div 
-          style={{ color: '#8e8e8e', fontSize: '0.85rem', marginTop: '12px', cursor: 'pointer' }} 
-          onClick={() => navigate(`/post/${post.id}`)}
-        >
-          {post.commentCount > 0 
-            ? `댓글 ${post.commentCount}개 모두 보기` 
-            : '댓글 작성하기...'}
+          <p className="post-card-feed-community-excerpt">{post.content}</p>
+
+          <div className="post-card-feed-community-footer">
+            <div className="post-card-feed-community-stat">
+              <Heart
+                size={20}
+                className="post-card-feed-action-icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleLike();
+                }}
+                style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : '#64748b' }}
+                fill={post.isLiked ? '#ed4956' : 'none'}
+              />
+              <button
+                type="button"
+                onClick={() => setShowLikers(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              >
+                좋아요 {post.likeCount ?? 0}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="post-card-feed-community-stat"
+              onClick={() => navigate(`/post/${post.id}`)}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+            >
+              <MessageCircle size={20} className="post-card-feed-action-icon" style={{ color: '#64748b' }} />
+              댓글 {post.commentCount ?? 0}
+            </button>
+            <button
+              type="button"
+              title="DM으로 공유"
+              aria-label="DM으로 공유"
+              onClick={() => setShowDmShare(true)}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
+            >
+              <Forward size={20} className="post-card-feed-action-icon" style={{ color: '#64748b' }} />
+            </button>
+            <Bookmark
+              size={20}
+              className="post-card-feed-action-icon"
+              onClick={handleScrap}
+              style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ca8a04' : '#64748b' }}
+              fill={post.isScrapped ? '#ca8a04' : 'none'}
+            />
+          </div>
+
+          <button type="button" className="post-card-feed-community-more" onClick={() => navigate(`/post/${post.id}`)}>
+            게시글 전체 보기 →
+          </button>
         </div>
-        
-        <div style={{ color: '#8e8e8e', fontSize: '0.7rem', marginTop: '8px' }}>
-          {new Date(post.createdAt).toLocaleDateString()}
-        </div>
-      </div>
+      )}
 
       {/* 좋아요 모달 */}
       {showLikers && (

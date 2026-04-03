@@ -16,7 +16,7 @@ import { isTechAdminSession } from '../util/techAdmin';
 import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
-import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
+import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2, Users } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
@@ -989,6 +989,36 @@ const ProfilePage: React.FC = () => {
                       />
                     )
                   )}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: 'rgba(0,0,0,0.3)',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      color: '#fff',
+                      gap: '20px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Heart size={20} fill="white" /> {post.likeCount}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <MessageCircle size={20} fill="white" /> {post.commentCount}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1080,6 +1110,37 @@ const ProfilePage: React.FC = () => {
                     }}
                   />
                 )}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    color: '#fff',
+                    gap: '20px',
+                    zIndex: 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Heart size={20} fill="white" /> {story.totalLikeCount}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Users size={20} /> {(story.viewers ?? []).length}
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -1099,7 +1160,8 @@ const ProfilePage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    zIndex: 2,
                   }}
                   title="스토리 삭제"
                 >

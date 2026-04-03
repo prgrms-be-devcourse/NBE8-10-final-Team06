@@ -10,10 +10,10 @@ import {
 } from '../types/post';
 
 export const postApi = {
-  create: (req: PostCreateRequest, files: File[]) => {
+  create: (req: PostCreateRequest, files: File[] = []) => {
     const formData = new FormData();
     appendJsonRequestPart(formData, req);
-    appendFileParts(formData, files);
+    if (files.length > 0) appendFileParts(formData, files);
     return client.post<RsData<number>>('/posts', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then(res => res.data);

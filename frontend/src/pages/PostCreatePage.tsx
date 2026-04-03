@@ -85,10 +85,6 @@ const PostCreatePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedFiles.length === 0) {
-      alert('최소 하나 이상의 이미지를 선택해주세요.');
-      return;
-    }
 
     try {
       setIsSubmitting(true);
@@ -121,7 +117,9 @@ const PostCreatePage: React.FC = () => {
           
           {/* 미디어 선택 */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>사진/동영상 (최대 5개)</label>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>
+              사진/동영상 <span style={{ fontWeight: 400, color: '#8e8e8e' }}>(선택 · 최대 5개)</span>
+            </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {previews.map((src, index) => (
                 <div key={index} style={{ position: 'relative', width: '80px', height: '80px' }}>
