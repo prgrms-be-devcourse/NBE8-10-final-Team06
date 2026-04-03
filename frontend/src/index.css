@@ -101,6 +101,34 @@ body {
   background-color: #efefef;
   cursor: pointer;
   overflow: hidden;
+  border-radius: clamp(6px, 1.2vw, 10px);
+}
+
+.profile-tab-thumb-textonly {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 10px 10px 12px;
+  box-sizing: border-box;
+  background: linear-gradient(165deg, #f1f5f9 0%, #f8fafc 100%);
+  border-left: 4px solid #6366f1;
+  z-index: 0;
+}
+
+.profile-tab-thumb-title {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  font-size: clamp(1.02rem, 4.5vw, 1.28rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: #0f172a;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .profile-tab-load-more {

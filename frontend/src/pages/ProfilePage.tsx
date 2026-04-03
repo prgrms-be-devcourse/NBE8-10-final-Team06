@@ -14,7 +14,7 @@ import { storyApi } from '../api/story';
 import { dmApi } from '../api/dm';
 import { isTechAdminSession } from '../util/techAdmin';
 import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
-import { PostFeedProfileRes } from '../types/post';
+import { PostFeedProfileRes, PostFeedResponse } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
 import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2, Users } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
@@ -36,6 +36,103 @@ const RESUME_MAP: Record<Resume, string> = {
 };
 
 const BLACKLIST = new Set<string>();
+
+const isProfileGridVideo = (mediaType: string) =>
+  ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
+
+/** 미디어 없는 그리드 카드 제목: 이 길이(자) 초과 시 "..." */
+const PROFILE_GRID_TITLE_MAX_CHARS = 15;
+
+/** 프로필 그리드(게시물·저장됨): 썸네일 또는 미디어 없을 때 제목 타일 */
+const ProfilePostGridThumb: React.FC<{ post: PostFeedProfileRes }> = ({ post }) => {
+  const navigate = useNavigate();
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
+  const first = post.medias?.[0];
+  const rawTitle = String(post.title ?? '').trim();
+  const titleText =
+    rawTitle.length === 0
+      ? '제목 없음'
+      : rawTitle.length > PROFILE_GRID_TITLE_MAX_CHARS
+        ? `${rawTitle.slice(0, PROFILE_GRID_TITLE_MAX_CHARS)}...`
+        : rawTitle;
+
+  return (
+    <div className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
+      {first ? (
+        isProfileGridVideo(first.mediaType) ? (
+          <video
+            src={getFullUrl(first.sourceUrl)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            muted
+            playsInline
+            onError={(e) => {
+              const video = e.currentTarget;
+              if (video.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(first.sourceUrl);
+              if (fallback) {
+                video.dataset.fallbackApplied = '1';
+                video.src = fallback;
+                video.load();
+              }
+            }}
+          />
+        ) : (
+          <img
+            src={getFullUrl(first.sourceUrl)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            alt=""
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(first.sourceUrl);
+              if (fallback) {
+                img.dataset.fallbackApplied = '1';
+                img.src = fallback;
+              }
+            }}
+          />
+        )
+      ) : (
+        <div className="profile-tab-thumb-textonly">
+          <p className="profile-tab-thumb-title">{titleText}</p>
+        </div>
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          opacity: 0,
+          transition: 'opacity 0.2s',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: '#fff',
+          gap: '20px',
+          zIndex: 1,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0';
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Heart size={20} fill="white" /> {post.likeCount}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <MessageCircle size={20} fill="white" /> {post.commentCount}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProfilePage: React.FC = () => {
   const { nickname: urlNickname } = useParams<{ nickname: string }>();
   const { nickname: myNickname, isLoggedIn, userId: myUserId, setSessionProfileImageUrl } = useAuthStore();
@@ -71,9 +168,6 @@ const ProfilePage: React.FC = () => {
 
   const getFullUrl = (url: string) => resolveAssetUrl(url);
   const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
-
-  const isVideo = (mediaType: string) =>
-    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const targetNickname = urlNickname || myNickname;
   const isMe = myNickname === targetNickname;
@@ -281,8 +375,9 @@ const ProfilePage: React.FC = () => {
   }, [fetchFollowLists]);
 
   const mapScrapToGrid = useCallback(
-    (p: { id: number; medias: PostFeedProfileRes['medias']; techStacks: PostFeedProfileRes['techStacks']; likeCount: number; commentCount: number }) => ({
+    (p: PostFeedResponse): PostFeedProfileRes => ({
       id: p.id,
+      title: p.title,
       medias: p.medias,
       techStacks: p.techStacks,
       likeCount: p.likeCount,
@@ -894,47 +989,7 @@ const ProfilePage: React.FC = () => {
           <>
             <div className="profile-tab-grid-3">
               {profile.posts.content.map((post) => (
-                <div key={post.id} className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
-                  {post.medias[0] && (
-                    isVideo(post.medias[0].mediaType) ? (
-                      <video
-                        src={getFullUrl(post.medias[0].sourceUrl)}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        muted
-                        playsInline
-                        onError={(e) => {
-                          const video = e.currentTarget;
-                          if (video.dataset.fallbackApplied === '1') return;
-                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                          if (fallback) {
-                            video.dataset.fallbackApplied = '1';
-                            video.src = fallback;
-                            video.load();
-                          }
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src={getFullUrl(post.medias[0].sourceUrl)}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        alt="thumb"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.dataset.fallbackApplied === '1') return;
-                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                          if (fallback) {
-                            img.dataset.fallbackApplied = '1';
-                            img.src = fallback;
-                          }
-                        }}
-                      />
-                    )
-                  )}
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', gap: '20px' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={20} fill="white" /> {post.likeCount}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><MessageCircle size={20} fill="white" /> {post.commentCount}</div>
-                  </div>
-                </div>
+                <ProfilePostGridThumb key={post.id} post={post} />
               ))}
             </div>
             {!profile.posts.last && profile.posts.content.length > 0 && (
@@ -953,73 +1008,7 @@ const ProfilePage: React.FC = () => {
           <>
             <div className="profile-tab-grid-3">
               {scrappedPosts.map((post) => (
-                <div key={post.id} className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
-                  {post.medias[0] && (
-                    isVideo(post.medias[0].mediaType) ? (
-                      <video
-                        src={getFullUrl(post.medias[0].sourceUrl)}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        muted
-                        playsInline
-                        onError={(e) => {
-                          const video = e.currentTarget;
-                          if (video.dataset.fallbackApplied === '1') return;
-                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                          if (fallback) {
-                            video.dataset.fallbackApplied = '1';
-                            video.src = fallback;
-                            video.load();
-                          }
-                        }}
-                      />
-                    ) : (
-                      <img
-                        src={getFullUrl(post.medias[0].sourceUrl)}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        alt="thumb"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.dataset.fallbackApplied === '1') return;
-                          const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                          if (fallback) {
-                            img.dataset.fallbackApplied = '1';
-                            img.src = fallback;
-                          }
-                        }}
-                      />
-                    )
-                  )}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: 'rgba(0,0,0,0.3)',
-                      opacity: 0,
-                      transition: 'opacity 0.2s',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      color: '#fff',
-                      gap: '20px',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '0';
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Heart size={20} fill="white" /> {post.likeCount}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <MessageCircle size={20} fill="white" /> {post.commentCount}
-                    </div>
-                  </div>
-                </div>
+                <ProfilePostGridThumb key={post.id} post={post} />
               ))}
             </div>
             {!scrapsLast && scrappedPosts.length > 0 && (
