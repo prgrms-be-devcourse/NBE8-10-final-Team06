@@ -25,6 +25,7 @@ import ProfileAvatar from '../components/common/ProfileAvatar';
 import TechRadarChart from '../components/profile/TechRadarChart';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../util/profilePostCount';
+import { isRemoteStoryMediaUrl } from '../util/storyMediaUrl';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -614,18 +615,24 @@ const ProfilePage: React.FC = () => {
     } catch (err) { alert('채팅방을 시작할 수 없습니다.'); }
   };
 
-  const handleHardDeleteStory = async (storyId: number) => {
+  const handleHardDeleteStory = async (story: StoryDetailResponse) => {
+    if (isRemoteStoryMediaUrl(story.mediaUrl)) {
+      alert(
+        '이 스토리는 외부 이미지·동영상 주소(https://…)로 저장되어 있습니다. 서버가 로컬 파일만 삭제하도록 되어 있어 완전 삭제 시 오류가 납니다. DB·스토리지까지 지우려면 백엔드에서 외부 URL인 경우 파일 삭제 단계를 건너뛰도록 수정이 필요합니다.'
+      );
+      return;
+    }
     if (!window.confirm('이 만료 스토리를 완전히 삭제하시겠습니까?')) return;
     try {
-      const res = await storyApi.hardDelete(storyId);
+      const res = await storyApi.hardDelete(story.storyId);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        setArchivedStories(prev => prev.filter(story => story.storyId !== storyId));
+        setArchivedStories((prev) => prev.filter((s) => s.storyId !== story.storyId));
       } else {
         alert(res.msg || '스토리 삭제에 실패했습니다.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('스토리 하드 삭제 실패:', err);
-      alert('스토리 삭제에 실패했습니다.');
+      alert(getApiErrorMessage(err, '스토리 삭제에 실패했습니다.'));
     }
   };
 
@@ -1028,7 +1035,20 @@ const ProfilePage: React.FC = () => {
         {activeTab === 'archive' && (
           <div className="profile-tab-grid-3">
             {archivedStories.map((story) => (
-              <div key={story.storyId} className="profile-tab-thumb" style={{ aspectRatio: '9/16' }}>
+              <div
+                key={story.storyId}
+                className="profile-tab-thumb"
+                style={{ aspectRatio: '9/16', cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/story/archive/${story.storyId}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/story/archive/${story.storyId}`);
+                  }
+                }}
+              >
                 {story.mediaType.toLowerCase().includes('mp4') || story.mediaType.toLowerCase().includes('webm') || story.mediaType.toLowerCase().includes('mov') ? (
                   <video
                     src={getFullUrl(story.mediaUrl)}
@@ -1062,7 +1082,10 @@ const ProfilePage: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => handleHardDeleteStory(story.storyId)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleHardDeleteStory(story);
+                  }}
                   style={{
                     position: 'absolute',
                     top: '8px',

@@ -352,27 +352,6 @@ const DmChatPage: React.FC = () => {
     (nextVal: string) => {
       const actor = effectiveSelfIdRef.current;
       const rid = roomId != null ? Number(roomId) : NaN;
-      // #region agent log
-      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-        body: JSON.stringify({
-          sessionId: '4d4e2f',
-          location: 'DmChatPage.tsx:applyTypingForInputValue:enter',
-          message: 'applyTyping enter',
-          data: {
-            hypothesisId: 'H1-H4',
-            runId: 'pre-fix',
-            valLen: nextVal.length,
-            trimEmpty: nextVal.trim() === '',
-            sessionActive: typingSessionActiveRef.current,
-            isMeTypingRef: isMeTypingRef.current,
-            ridOk: Number.isFinite(rid) && isResolvedDmUserId(actor),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
 
       if (nextVal.trim() === '') {
@@ -391,19 +370,6 @@ const DmChatPage: React.FC = () => {
           const selfUid = toDmPositiveUserId(actor);
           return selfUid != null && prevUid === selfUid ? null : prev;
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-          body: JSON.stringify({
-            sessionId: '4d4e2f',
-            location: 'DmChatPage.tsx:applyTypingForInputValue:empty',
-            message: 'publish stop empty input',
-            data: { hypothesisId: 'H5', runId: 'post-fix', hadTypingSession, sessionClearedBeforePublish: true },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         if (hadTypingSession) {
           console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
         }
@@ -418,19 +384,6 @@ const DmChatPage: React.FC = () => {
       if (!isMeTypingRef.current) {
         setIsMeTyping(true);
         publish(typingDest, typingBody);
-        // #region agent log
-        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-          body: JSON.stringify({
-            sessionId: '4d4e2f',
-            location: 'DmChatPage.tsx:applyTypingForInputValue:firstStart',
-            message: 'publish start first_keystroke',
-            data: { hypothesisId: 'H1-H3', runId: 'pre-fix' },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
         typingSessionActiveRef.current = true;
         lastTypingStartSentAtRef.current = now;
@@ -439,19 +392,6 @@ const DmChatPage: React.FC = () => {
         now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
       ) {
         publish(typingDest, typingBody);
-        // #region agent log
-        fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-          body: JSON.stringify({
-            sessionId: '4d4e2f',
-            location: 'DmChatPage.tsx:applyTypingForInputValue:keepalive',
-            message: 'publish start keepalive',
-            data: { hypothesisId: 'H4', runId: 'pre-fix', deltaMs: now - lastTypingStartSentAtRef.current },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
         lastTypingStartSentAtRef.current = now;
       }
@@ -769,71 +709,12 @@ const DmChatPage: React.FC = () => {
     const nextVal = e.target.value;
     setInputValue(nextVal);
     const native = e.nativeEvent as InputEvent;
-    // #region agent log
-    fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-      body: JSON.stringify({
-        sessionId: '4d4e2f',
-        location: 'DmChatPage.tsx:handleInputChange',
-        message: 'onChange',
-        data: {
-          hypothesisId: 'H2-H3',
-          runId: 'pre-fix',
-          isComposing: native.isComposing === true,
-          valLen: nextVal.length,
-          trimEmpty: nextVal.trim() === '',
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (native.isComposing) return;
     applyTypingForInputValue(nextVal);
   };
 
   const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
-    const el = e.currentTarget;
-    const v = el.value;
-    // #region agent log
-    fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-      body: JSON.stringify({
-        sessionId: '4d4e2f',
-        location: 'DmChatPage.tsx:handleCompositionEnd:sync',
-        message: 'compositionEnd sync',
-        data: {
-          hypothesisId: 'H1',
-          runId: 'pre-fix',
-          valLen: v.length,
-          trimEmpty: v.trim() === '',
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    queueMicrotask(() => {
-      const vLater = el.value;
-      fetch('http://127.0.0.1:7895/ingest/39e8840a-d8da-47b2-a626-4b296d79ccf8', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4d4e2f' },
-        body: JSON.stringify({
-          sessionId: '4d4e2f',
-          location: 'DmChatPage.tsx:handleCompositionEnd:microtask',
-          message: 'compositionEnd vs microtask input value',
-          data: {
-            hypothesisId: 'H1',
-            runId: 'pre-fix',
-            valLenSync: v.length,
-            valLenLater: vLater.length,
-            mismatch: v !== vLater,
-            laterTrimEmpty: vLater.trim() === '',
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    });
-    // #endregion
+    const v = e.currentTarget.value;
     applyTypingForInputValue(v);
   };
 

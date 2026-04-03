@@ -1,5 +1,19 @@
 import axios from "axios";
 
+/** 로그인·가입·중복 검사 rate limit 안내 (백엔드 429) */
+export const RATE_LIMIT_USER_MESSAGE =
+  "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+
+function isAuthRateLimitPath(url: string | undefined): boolean {
+  if (!url) return false;
+  return (
+    url.includes("/auth/login") ||
+    url.includes("/auth/signup") ||
+    url.includes("/auth/check-email") ||
+    url.includes("/auth/check-nickname")
+  );
+}
+
 /**
  * Axios / RsData / Spring 검증 오류 등에서 사용자에게 보여줄 문자열을 뽑습니다.
  */
@@ -8,6 +22,9 @@ export function getApiErrorMessage(
   fallback = "요청 처리 중 오류가 발생했습니다."
 ): string {
   if (axios.isAxiosError(error)) {
+    if (error.response?.status === 429 && isAuthRateLimitPath(error.config?.url)) {
+      return RATE_LIMIT_USER_MESSAGE;
+    }
     const data = error.response?.data;
     if (data && typeof data === "object") {
       const msg = (data as { msg?: unknown }).msg;

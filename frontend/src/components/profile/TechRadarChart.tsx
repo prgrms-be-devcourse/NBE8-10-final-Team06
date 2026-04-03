@@ -152,8 +152,8 @@ const TechRadarChart: React.FC<TechRadarChartProps> = ({
       >
         <svg
           width="100%"
-          height="auto"
           viewBox={`0 0 ${size} ${size}`}
+          preserveAspectRatio="xMidYMid meet"
           style={{ width: '100%', maxWidth: '100%', aspectRatio: '1', display: 'block' }}
           role="img"
           aria-label="기술 스택 숙련도 방사형 차트"

@@ -12,7 +12,14 @@ const StoryBar: React.FC = () => {
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
   const [myStories, setMyStories] = useState<StoryDetailResponse[]>([]);
   const navigate = useNavigate();
-  const { nickname, isLoggedIn, userId, setLogin, profileImageUrl: sessionProfileImageUrl } = useAuthStore();
+  const {
+    nickname,
+    isLoggedIn,
+    userId,
+    setSessionUserId,
+    setSessionNickname,
+    profileImageUrl: sessionProfileImageUrl,
+  } = useAuthStore();
   
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -27,15 +34,8 @@ const StoryBar: React.FC = () => {
           const meRes = await authApi.me();
           if (meRes.resultCode?.includes('-S-') || meRes.resultCode?.startsWith('200')) {
             currentUserId = meRes.data.id;
-            const token = localStorage.getItem('accessToken') || '';
-            const rawApiKey = localStorage.getItem('apiKey');
-            setLogin(
-              meRes.data.nickname,
-              token,
-              rawApiKey === null ? undefined : rawApiKey,
-              currentUserId,
-              undefined
-            );
+            setSessionUserId(currentUserId);
+            setSessionNickname(meRes.data.nickname);
           }
         }
 
@@ -64,7 +64,7 @@ const StoryBar: React.FC = () => {
     };
 
     fetchData();
-  }, [isLoggedIn, userId, nickname, setLogin]);
+  }, [isLoggedIn, userId, nickname, setSessionUserId, setSessionNickname]);
 
   const hasActiveMyStory = myStories.length > 0;
   // 다른 사용자들의 피드 (내 닉네임 중복 제거)
