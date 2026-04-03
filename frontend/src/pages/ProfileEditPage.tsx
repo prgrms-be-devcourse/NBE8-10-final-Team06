@@ -9,6 +9,7 @@ import BottomNav from '../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
 import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 import { getApiErrorMessage } from '../util/apiError';
+import { isRsDataSuccess } from '../util/rsData';
 import { syncMyProfileImageFromUserApi } from '../services/syncMyProfileImage';
 import { performClientWithdraw } from '../services/performClientWithdraw';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
@@ -50,13 +51,17 @@ const ProfileEditPage: React.FC = () => {
       setLoadError(null);
       try {
         setLoading(true);
-        const techRes = await technologyApi.getTechnologies();
-        if (techRes.resultCode?.includes('-S-') || techRes.resultCode?.startsWith('200')) {
-          setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
+        try {
+          const techRes = await technologyApi.getTechnologies();
+          if (isRsDataSuccess(techRes)) {
+            setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
+          }
+        } catch {
+          setAllTechs([]);
         }
 
         const res = await userApi.getProfile(myNickname);
-        if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        if (isRsDataSuccess(res)) {
           const d = res.data;
           if (!d) {
             setLoadError('프로필 데이터가 비어 있습니다.');
@@ -79,9 +84,8 @@ const ProfileEditPage: React.FC = () => {
         } else {
           setLoadError(res.msg || '프로필을 불러오지 못했습니다.');
         }
-      } catch (err: any) {
-        console.error('데이터 로드 실패:', err);
-        setLoadError(err.response?.data?.msg || '프로필을 불러오지 못했습니다.');
+      } catch (err: unknown) {
+        setLoadError(getApiErrorMessage(err, '프로필을 불러오지 못했습니다.'));
       } finally {
         setLoading(false);
       }
@@ -111,7 +115,7 @@ const ProfileEditPage: React.FC = () => {
     try {
       setSubmitting(true);
       const res = await userApi.updateProfile(form, profileImage || undefined);
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+      if (isRsDataSuccess(res)) {
         const nextNick = form.nickname.trim();
         await syncMyProfileImageFromUserApi({ force: true, nicknameOverride: nextNick });
         if (myUserId != null && nextNick && nextNick !== myNickname?.trim()) {

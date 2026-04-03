@@ -12,6 +12,7 @@ import { toggleFollowRelation } from '../services/followToggle';
 import { postApi } from '../api/post';
 import { storyApi } from '../api/story';
 import { dmApi } from '../api/dm';
+import { isTechAdminSession } from '../util/techAdmin';
 import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
 import { PostFeedProfileRes } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
@@ -34,7 +35,6 @@ const RESUME_MAP: Record<Resume, string> = {
 };
 
 const BLACKLIST = new Set<string>();
-
 const ProfilePage: React.FC = () => {
   const { nickname: urlNickname } = useParams<{ nickname: string }>();
   const { nickname: myNickname, isLoggedIn, userId: myUserId, setSessionProfileImageUrl } = useAuthStore();
@@ -52,6 +52,7 @@ const ProfilePage: React.FC = () => {
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech' | 'archive'>('posts');
+  const [techAdminAllowed, setTechAdminAllowed] = useState(false);
   const [scrappedPosts, setScrappedPosts] = useState<PostFeedProfileRes[]>([]);
   const [scrapsLast, setScrapsLast] = useState(true);
   const [scrapsPage, setScrapsPage] = useState(0);
@@ -81,6 +82,22 @@ const ProfilePage: React.FC = () => {
     if (!isMe || !profile || myUserId == null || Number(profile.userId) !== Number(myUserId)) return;
     setSessionProfileImageUrl(profile.profileImageUrl ?? null);
   }, [isMe, profile, myUserId, setSessionProfileImageUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!isMe) {
+        if (!cancelled) setTechAdminAllowed(false);
+        return;
+      }
+      const ok = await isTechAdminSession(myNickname);
+      if (!cancelled) setTechAdminAllowed(ok);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMe, myNickname]);
 
   /** 빠른 라우트 전환 시 이전 getProfile 응답이 늦게 와도 상태를 덮어쓰지 않게 함 */
   const profileLoadGen = useRef(0);
@@ -987,6 +1004,17 @@ const ProfilePage: React.FC = () => {
               <p className="profile-tab-section-desc">
                 각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
               </p>
+              {techAdminAllowed && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/technologies/manage')}
+                    style={{ padding: '10px 14px', background: '#fff', border: '1px solid #dbdbdb', borderRadius: 8, cursor: 'pointer', fontWeight: 800 }}
+                  >
+                    기술 관리
+                  </button>
+                </div>
+              )}
               {profile.topTechScores && profile.topTechScores.length > 0 ? (
                 <TechRadarChart scores={profile.topTechScores} maxScore={100} />
               ) : (

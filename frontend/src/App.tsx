@@ -16,6 +16,8 @@ import PostEditPage from './pages/PostEditPage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileEditPage from './pages/ProfileEditPage';
 import SearchPage from './pages/SearchPage';
+import TechManagePage from './pages/technology/TechManagePage';
+import TechCategoryManagePage from './pages/technology/TechCategoryManagePage';
 import { useAuthStore } from './store/useAuthStore';
 import './App.css';
 
@@ -55,6 +57,10 @@ function App() {
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/profile/:nickname" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/profile/edit" element={<PrivateRoute><ProfileEditPage /></PrivateRoute>} />
+
+        {/* Technology / Tech Tags 관리 */}
+        <Route path="/technologies/manage" element={<PrivateRoute><TechManagePage /></PrivateRoute>} />
+        <Route path="/technologies/categories/manage" element={<PrivateRoute><TechCategoryManagePage /></PrivateRoute>} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

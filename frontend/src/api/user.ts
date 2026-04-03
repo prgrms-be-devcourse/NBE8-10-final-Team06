@@ -1,7 +1,7 @@
 import client from './client';
 import { RsData, Slice } from '../types/common';
 import { appendJsonRequestPart } from '../util/formDataParts';
-import { UserProfileResponse, ProfileUpdateRequest, UserSearchResponse } from '../types/user';
+import { UserProfileResponse, ProfileUpdateRequest, UserSearchResponse, UserRecommendResponse } from '../types/user';
 import { followApi, FOLLOW_CHANGED_EVENT } from './follow';
 
 export { FOLLOW_CHANGED_EVENT };
@@ -51,6 +51,15 @@ export const userApi = {
       params: { keyword, page, size: 20, _: Date.now() },
       headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     }).then(res => res.data),
+
+  // 사용자 추천 목록 조회
+  getUserRecommendations: () =>
+    client
+      .get<RsData<UserRecommendResponse[]>>('/users/recommendations', {
+        params: { _: Date.now() },
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      })
+      .then((res) => res.data),
 
   follow: followApi.follow,
   unfollow: followApi.unfollow,

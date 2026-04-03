@@ -7,6 +7,7 @@ import PostCard from '../components/post/PostCard';
 import { useAuthStore } from '../store/useAuthStore';
 import MainLayout from '../components/layout/MainLayout';
 import { getApiErrorMessage } from '../util/apiError';
+import UserRecommendationsSection from '../components/user/UserRecommendationsSection';
 
 const HomePage: React.FC = () => {
   const [posts, setPosts] = useState<PostFeedResponse[]>([]);
@@ -60,54 +61,68 @@ const HomePage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="home-feed-column">
-        {isLoggedIn && <StoryBar />}
+      <div className="home-two-column-layout">
+        <div className="home-feed-left">
+          <div className="home-feed-column" style={{ marginLeft: 0, marginRight: 0 }}>
+            {isLoggedIn && <StoryBar />}
 
-        <div style={{ marginTop: '20px' }}>
-          {posts.map(post => <PostCard key={post.id} post={post} />)}
+            <div style={{ marginTop: '20px' }}>
+              {posts.map(post => <PostCard key={post.id} post={post} />)}
+            </div>
+
+            {isLoading && <p style={{ textAlign: 'center', padding: '20px' }}>데이터 로드 중...</p>}
+
+            {feedError && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#ed4956' }}>
+                <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>{feedError}</p>
+                <button
+                  type="button"
+                  onClick={() => { void fetchFeed(0); }}
+                  style={{ marginTop: '10px', padding: '8px 16px', backgroundColor: '#0095f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  다시 시도
+                </button>
+              </div>
+            )}
+
+            {!isLoading && !feedError && posts.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '100px 20px', color: '#8e8e8e' }}>
+                <p>표시할 게시물이 없습니다.</p>
+              </div>
+            )}
+
+            {!isLast && posts.length > 0 && !feedError && (
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => {
+                  if (isLoading) return;
+                  setPage((p) => {
+                    const next = p + 1;
+                    void fetchFeed(next);
+                    return next;
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '20px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#0095f6',
+                  fontWeight: 'bold',
+                  cursor: isLoading ? 'wait' : 'pointer',
+                  opacity: isLoading ? 0.6 : 1,
+                }}
+              >
+                더 보기
+              </button>
+            )}
+          </div>
         </div>
 
-        {isLoading && <p style={{ textAlign: 'center', padding: '20px' }}>데이터 로드 중...</p>}
-        
-        {feedError && (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#ed4956' }}>
-            <p style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>{feedError}</p>
-            <button type="button" onClick={() => { void fetchFeed(0); }} style={{ marginTop: '10px', padding: '8px 16px', backgroundColor: '#0095f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>다시 시도</button>
-          </div>
-        )}
-
-        {!isLoading && !feedError && posts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '100px 20px', color: '#8e8e8e' }}>
-            <p>표시할 게시물이 없습니다.</p>
-          </div>
-        )}
-
-        {!isLast && posts.length > 0 && !feedError && (
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => {
-              if (isLoading) return;
-              setPage((p) => {
-                const next = p + 1;
-                void fetchFeed(next);
-                return next;
-              });
-            }}
-            style={{
-              width: '100%',
-              padding: '20px',
-              border: 'none',
-              backgroundColor: 'transparent',
-              color: '#0095f6',
-              fontWeight: 'bold',
-              cursor: isLoading ? 'wait' : 'pointer',
-              opacity: isLoading ? 0.6 : 1,
-            }}
-          >
-            더 보기
-          </button>
-        )}
+        <div className="home-recommend-right">
+          <UserRecommendationsSection title="추천" />
+        </div>
       </div>
     </MainLayout>
   );

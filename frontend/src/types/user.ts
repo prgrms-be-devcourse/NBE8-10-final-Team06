@@ -26,6 +26,16 @@ export interface UserSearchResponse {
 }
 
 /**
+ * com.devstagram.domain.user.dto.UserRecommendResponse
+ */
+export interface UserRecommendResponse {
+  userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
+  isFollowing: boolean;
+}
+
+/**
  * com.devstagram.domain.user.entity.Gender
  */
 export enum Gender {

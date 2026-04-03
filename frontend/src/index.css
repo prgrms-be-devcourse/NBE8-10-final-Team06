@@ -153,6 +153,34 @@ body {
   box-sizing: border-box;
 }
 
+/* 홈: 좌측 피드 + 우측 추천(데스크탑) / 모바일은 아래로 누적 */
+.home-two-column-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  width: 100%;
+}
+
+.home-feed-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-recommend-right {
+  width: 340px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .home-two-column-layout {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .home-recommend-right {
+    width: 100%;
+  }
+}
+
 /* 스토리: 중간 창까지는 유동, 넓은 화면에서는 vw 무한 성장 방지(확대된 모바일 느낌 제거) */
 .story-bar {
   display: flex;

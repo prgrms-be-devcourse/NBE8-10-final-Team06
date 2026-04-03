@@ -6,6 +6,7 @@ import { technologyApi } from '../api/technology';
 import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 import { getApiErrorMessage } from '../util/apiError';
+import { isRsDataSuccess } from '../util/rsData';
 
 const PostCreatePage: React.FC = () => {
   const [title, setTitle] = useState('');
@@ -18,15 +19,16 @@ const PostCreatePage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // 1. 기술 스택 목록 로드
   useEffect(() => {
     const fetchTechs = async () => {
       try {
         const res = await technologyApi.getTechnologies();
-        if (res.resultCode.startsWith('200')) {
-          setAllTechs(res.data);
+        if (isRsDataSuccess(res)) {
+          setAllTechs(Array.isArray(res.data) ? res.data : []);
         }
-      } catch (err) { console.error('기술 스택 로드 실패:', err); }
+      } catch {
+        setAllTechs([]);
+      }
     };
     fetchTechs();
   }, []);
@@ -96,7 +98,7 @@ const PostCreatePage: React.FC = () => {
         techIds: selectedTechIds
       }, selectedFiles);
 
-      if (res.resultCode.includes('-S-') || res.resultCode.startsWith('200')) {
+      if (isRsDataSuccess(res)) {
         alert('게시글이 생성되었습니다.');
         navigate('/');
       }
