@@ -87,6 +87,9 @@ jobs:
         env:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           JWT_ACCESS_TOKEN_EXPIRE_SECONDS: ${{ secrets.JWT_ACCESS_TOKEN_EXPIRE_SECONDS }}
+          JWT_REFRESH_TOKEN_EXPIRE_SECONDS: ${{ secrets.JWT_REFRESH_TOKEN_EXPIRE_SECONDS }}
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
 
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v4
