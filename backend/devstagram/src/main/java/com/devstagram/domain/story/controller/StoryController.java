@@ -51,9 +51,11 @@ public class StoryController {
     // 스토리 단건 조회 (시청 기록 저장)
     @PostMapping("/{storyId}/view")
     public RsData<StoryDetailResponse> recordStoryView(
-            @AuthenticationPrincipal SecurityUser securityUser, @PathVariable Long storyId) {
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @PathVariable Long storyId,
+            @RequestParam Long targetUserId) {
 
-        StoryDetailResponse response = storyService.recordSingleStoryView(storyId, securityUser.getId());
+        StoryDetailResponse response = storyService.recordSingleStoryView(storyId, securityUser.getId(), targetUserId);
 
         return RsData.success("스토리 시청 기록 성공", response);
     }
