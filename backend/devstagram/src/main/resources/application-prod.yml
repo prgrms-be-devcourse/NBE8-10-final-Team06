@@ -38,3 +38,8 @@ cloud:
       secret-key: ${AWS_SECRET_KEY}   # IAM 사용자 비밀 키
     stack:
       auto: false
+
+custom:
+  cookie:
+    secure: true
+    same-site: None

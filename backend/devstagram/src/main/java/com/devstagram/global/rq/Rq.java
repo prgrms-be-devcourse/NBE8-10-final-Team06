@@ -1,5 +1,6 @@
 package com.devstagram.global.rq;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,12 @@ public class Rq {
 
     private final HttpServletRequest request;
     private final HttpServletResponse response;
+
+    @Value("${custom.cookie.secure:false}")
+    private boolean secure;
+
+    @Value("${custom.cookie.same-site:Lax}")
+    private String sameSite;
 
     public String getHeader(String name, String defaultValue) {
         String value = request.getHeader(name);
@@ -43,10 +50,10 @@ public class Rq {
     public void setCookie(String name, String value, int maxAge) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
+                .secure(secure)
                 .path("/")
                 .maxAge(maxAge)
-                .sameSite("None")
+                .sameSite(sameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -55,10 +62,10 @@ public class Rq {
     public void deleteCookie(String name) {
         ResponseCookie cookie = ResponseCookie.from(name, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(secure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("None")
+                .sameSite(sameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
