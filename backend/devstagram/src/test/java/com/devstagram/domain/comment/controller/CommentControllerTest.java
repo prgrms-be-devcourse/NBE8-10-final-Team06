@@ -73,9 +73,7 @@ class CommentControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Rq Header & Cookie Mocking
-        given(rq.getHeader(eq("Authorization"), anyString())).willReturn("Bearer dummy");
-        given(rq.getCookieValue(anyString(), anyString())).willReturn("");
+        given(rq.getCookieValue(eq("accessToken"), anyString())).willReturn("dummy-access-token");
 
         // JWT Mocking
         given(jwtProvider.isValid(anyString())).willReturn(true);

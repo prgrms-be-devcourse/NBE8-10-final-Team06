@@ -200,6 +200,8 @@ class StoryControllerTest {
     @DisplayName("스토리 시청 기록 성공")
     void recordStoryView_Success() throws Exception {
         Long storyId = 10L;
+        Long targetUserId = 2L;
+
         StoryDetailResponse detailResponse = StoryDetailResponse.builder()
                 .storyId(storyId)
                 .content("시청 기록 테스트")
@@ -207,9 +209,14 @@ class StoryControllerTest {
                 .isLiked(false)
                 .build();
 
-        given(storyService.recordSingleStoryView(eq(storyId), eq(1L))).willReturn(detailResponse);
+        // given
+        given(storyService.recordSingleStoryView(eq(storyId), eq(1L), eq(targetUserId)))
+                .willReturn(detailResponse);
 
-        mockMvc.perform(post("/api/story/{storyId}/view", storyId).with(csrf()).with(user(mockSecurityUser)))
+        mockMvc.perform(post("/api/story/{storyId}/view", storyId)
+                        .param("targetUserId", targetUserId.toString())
+                        .with(csrf())
+                        .with(user(mockSecurityUser)))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-S-1"))

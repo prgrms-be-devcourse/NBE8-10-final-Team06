@@ -499,7 +499,8 @@ public class BaseInitData implements ApplicationRunner {
                 .findFirst()
                 .orElse(users.get(1));
 
-        storyService.recordSingleStoryView(first.getId(), viewer.getId());
+        storyService.recordSingleStoryView(
+                first.getId(), viewer.getId(), first.getUser().getId());
         storyService.patchStoryLike(first.getId(), viewer.getId());
     }
 

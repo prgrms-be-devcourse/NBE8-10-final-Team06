@@ -23,9 +23,11 @@ import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StoryService {
     private final StoryRepository storyRepository;
     private final StoryTagRepository storyTagRepository;
@@ -121,20 +123,34 @@ public class StoryService {
 
     // 스토리 단건 조회(StoryViewed 생성)
     @Transactional
-    public StoryDetailResponse recordSingleStoryView(Long storyId, Long currentUserId) {
+    public StoryDetailResponse recordSingleStoryView(Long storyId, Long currentUserId, Long targetUserId) {
 
-        Story story =
-                storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
+        // 1. 스토리 조회 시도
+        Story story = storyRepository.findById(storyId).orElse(null);
+
+        // [STEP 1] 스토리가 DB에 아예 없을 때 (하드 딜리트 된 경우 - 회원 탈퇴 등)
+        if (story == null) {
+            // targetUserId로 유저를 조회해서 탈퇴 여부 확인
+            User targetUser = userRepository
+                    .findById(targetUserId)
+                    .orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리입니다."));
+
+            if (targetUser.isDeleted()) {
+                throw new ServiceException("403-F-3", "탈퇴한 사용자의 콘텐츠입니다.");
+            }
+
+            // 유저는 멀쩡한데 스토리만 없는 경우
+            throw new ServiceException("404-F-1", "이미 삭제된 스토리입니다.");
+        }
 
         if (story.isDeleted()) {
-            throw new ServiceException("404-F-2", "만료된 스토리");
+            throw new ServiceException("404-F-2", "만료된 스토리입니다.");
         }
 
         User currentUser =
-                userRepository.findById(currentUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저"));
+                userRepository.findById(currentUserId).orElseThrow(() -> new ServiceException("404-U-1", "존재하지 않는 유저"));
 
         StoryViewed storyViewed = createStoryViewed(story, currentUser);
-        // 조회 기록 처리
 
         return toDetailResponse(story, currentUserId, storyViewed.isLiked());
     }
@@ -156,9 +172,9 @@ public class StoryService {
         }
     }
 
+    // 단건 삭제
     @Transactional
     public void hardDeleteStory(Long storyId, Long userId) {
-
         Story story =
                 storyRepository.findById(storyId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 스토리"));
 
@@ -166,11 +182,35 @@ public class StoryService {
             throw new ServiceException("403-F-1", "본인 스토리만 삭제 가능");
         }
 
-        // 하드 딜리트 시 미디어 파일도 같이 삭제
-        if (story.getStoryMedia() != null && story.getStoryMedia().getSourceUrl() != null) {
-            storageService.delete(story.getStoryMedia().getSourceUrl());
-        }
+        deleteStoryInternal(story);
+    }
 
+    // 전체 삭제 (회원 탈퇴시)
+    @Transactional
+    public void deleteAllStoriesByUserId(Long userId) {
+        List<Story> stories = storyRepository.findAllByUserId(userId);
+
+        for (Story story : stories) {
+            deleteStoryInternal(story);
+        }
+    }
+
+    // 삭제 로직
+    private void deleteStoryInternal(Story story) {
+        if (story.getStoryMedia() != null && story.getStoryMedia().getSourceUrl() != null) {
+            String url = story.getStoryMedia().getSourceUrl();
+
+            // 외부 인터넷 주소(http...)는 물리적 삭제(s3 삭제) 과정을 건너뜁니다.
+            if (!url.startsWith("http")) {
+                try {
+                    storageService.delete(url);
+                } catch (Exception e) {
+                    // 파일이 서버에 실제로 없을 경우에도 로그만 남기고 다음 단계(DB 삭제)로 진행
+                    log.warn("물리 파일 삭제 실패(무시하고 DB 삭제 진행): {}", url);
+                }
+            }
+        }
+        // 이 코드는 if문 밖에 있으므로, 외부 파일이든 내부 파일이든 DB에서는 확실히 지워집니다!
         storyRepository.delete(story);
     }
 
