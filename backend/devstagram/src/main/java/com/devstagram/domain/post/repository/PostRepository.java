@@ -37,9 +37,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     void decrementLikeCount(@Param("postId") Long postId);
 
     // 상세조회
-    @Query("select p from Post p " +
-            "join fetch p.user " +
-            "where p.id = :id and p.isDeleted = false")
+    @Query("select p from Post p " + "join fetch p.user " + "where p.id = :id and p.isDeleted = false")
     Optional<Post> findPost(@Param("id") Long id);
 
     // 특정 ID 리스트 조회: 삭제되지 않은 것만
