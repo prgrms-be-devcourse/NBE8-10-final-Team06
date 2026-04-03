@@ -3,7 +3,7 @@ spring:
     # 도커 데스크탑으로 띄운 Postgres 주소
     url: jdbc:postgresql://localhost:5432/devstagram
     username: ${SPRING_DATASOURCE_USERNAME:root}
-    password: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
     driver-class-name: org.postgresql.Driver
 
   data:
@@ -19,3 +19,16 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: true
+
+#로컬에서 S3를 테스트하기 위한 용도
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}
+    region:
+      static: ap-northeast-2
+    stack:
+      auto: false
+    s3:
+      bucket: ${AWS_S3_BUCKET}
