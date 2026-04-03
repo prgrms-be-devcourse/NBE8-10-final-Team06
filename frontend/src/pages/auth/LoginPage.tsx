@@ -34,8 +34,8 @@ const LoginPage: React.FC = () => {
         const meRes = await authApi.me();
 
         if (isRsDataSuccess(meRes) && meRes.data) {
-          const { nickname, id, profileImageUrl } = meRes.data;
-          setLogin(nickname, id, profileImageUrl ?? null);
+          const { nickname, id } = meRes.data;
+          setLogin(nickname, id);
           void syncMyProfileImageFromUserApi();
           navigate('/');
         } else {

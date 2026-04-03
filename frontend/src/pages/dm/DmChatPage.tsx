@@ -7,7 +7,7 @@ import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { useStomp } from '../../hooks/useStomp';
-import type { SignupResponse } from '../../types/auth';
+import type { AuthMeResponse } from '../../types/auth';
 import {
   DmMessageResponse,
   MessageType,
@@ -58,10 +58,9 @@ import {
 const DM_POLL_INTERVAL_IN_ROOM_MS = 2_500;
 const DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS = 2_000;
 
-/** /auth/me data.id 와 일부 환경의 userId 별칭 */
-function readMeUserId(data: SignupResponse): number | null {
-  const ext = data as SignupResponse & { userId?: unknown };
-  const raw: unknown = ext.id ?? ext.userId;
+/** /auth/me(MyInfoResponse) data.id 와 일부 환경의 userId 별칭 */
+function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | null {
+  const raw: unknown = data.id ?? data.userId;
   if (raw == null) return null;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : null;

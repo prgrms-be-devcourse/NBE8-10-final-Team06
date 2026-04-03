@@ -1,4 +1,7 @@
 // src/api/auth.ts
+/**
+ * 인증 API. 로그인·refresh는 JWT를 HttpOnly 쿠키로만 내려주고, GET /auth/me 는 백엔드 MyInfoResponse(id, nickname, email)만 반환한다.
+ */
 import client from './client';
 import { refreshClient } from './refreshClient';
 import {
@@ -32,23 +35,10 @@ export const authApi = {
     return response.data;
   },
 
-  /**
-   * 백엔드는 MyInfoResponse(id, nickname, email)만 줌.
-   * DmChatPage 등 기존 코드 호환을 위해 SignupResponse 형태로 정규화(apiKey는 빈 문자열).
-   */
-  me: async (): Promise<RsData<SignupResponse>> => {
+  /** GET /auth/me — 백엔드 MyInfoResponse(id, nickname, email)만. 프로필 이미지는 별도 사용자 API·syncMyProfileImage 등으로 조회. */
+  me: async (): Promise<RsData<AuthMeResponse>> => {
     const response: AxiosResponse<RsData<AuthMeResponse>> = await client.get('/auth/me');
-    const body = response.data;
-    return {
-      ...body,
-      data: {
-        id: body.data.id,
-        nickname: body.data.nickname,
-        email: body.data.email,
-        apiKey: '',
-        profileImageUrl: undefined,
-      },
-    };
+    return response.data;
   },
 
   // 로그아웃 API (POST /api/auth/logout)

@@ -42,8 +42,8 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
         const res = await authApi.me();
         if (cancelled) return;
         if (isRsDataSuccess(res) && res.data) {
-          const { id, nickname, profileImageUrl } = res.data;
-          useAuthStore.getState().setLogin(nickname, id, profileImageUrl ?? null);
+          const { id, nickname } = res.data;
+          useAuthStore.getState().setLogin(nickname, id);
         }
       } catch {
         /* 401·refresh 실패 시 인터셉터가 로그인 이동할 수 있음 */
