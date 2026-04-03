@@ -10,6 +10,7 @@ import { useDmStore } from '../../store/useDmStore';
 import { setPendingDmBatch } from '../../services/dmPendingSend';
 import { buildStorySharePayload } from '../../util/dmDeepLinks';
 import { getApiErrorMessage } from '../../util/apiError';
+import { isRemoteStoryMediaUrl } from '../../util/storyMediaUrl';
 import { isRsDataSuccess } from '../../util/rsData';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
@@ -211,7 +212,14 @@ const StoryViewer: React.FC = () => {
   };
 
   const handleHardDelete = async () => {
-    if (!currentStory || !window.confirm('영구 삭제하시겠습니까?')) return;
+    if (!currentStory) return;
+    if (isRemoteStoryMediaUrl(currentStory.mediaUrl)) {
+      alert(
+        '외부 주소(https://…) 미디어는 서버 로컬 파일 삭제 단계에서 오류가 날 수 있습니다. 완전 삭제를 쓰려면 백엔드에서 외부 URL일 때 파일 삭제를 건너뛰도록 수정해야 합니다.'
+      );
+      return;
+    }
+    if (!window.confirm('영구 삭제하시겠습니까?')) return;
     try {
       const res = await storyApi.hardDelete(currentStory.storyId);
       if (res.resultCode.startsWith('200')) {

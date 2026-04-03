@@ -69,4 +69,6 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
         AND s.expiredAt > :now
     """)
     LocalDateTime findLastStoryCreatedAt(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+
+    List<Story> findAllByUserId(Long userId);
 }

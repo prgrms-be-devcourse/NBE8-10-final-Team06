@@ -129,7 +129,7 @@ function buildRadarGeom(scores: TechScoreDto[], maxScore: number, size: number):
 const TechRadarChart: React.FC<TechRadarChartProps> = ({
   scores,
   maxScore = DEFAULT_MAX,
-  size = 320,
+  size = 360,
 }) => {
   const { pathD, dots, labels, grid, count } = useMemo(
     () => buildRadarGeom(scores, maxScore, size),
@@ -141,45 +141,54 @@ const TechRadarChart: React.FC<TechRadarChartProps> = ({
   const list = scores.filter((s) => s.techName && Number.isFinite(s.score));
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <svg
-        width="100%"
-        height="auto"
-        viewBox={`0 0 ${size} ${size}`}
-        style={{ maxWidth: 360, aspectRatio: '1' }}
-        role="img"
-        aria-label="기술 스택 숙련도 방사형 차트"
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 'min(100%, 360px)',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+        }}
       >
-        {grid}
-        {pathD ? (
-          <path
-            d={pathD}
-            fill="rgba(0, 149, 246, 0.22)"
-            stroke="#0095f6"
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
-        ) : null}
-        {dots.map((d) => (
-          <circle
-            key={d.key}
-            cx={d.x}
-            cy={d.y}
-            r={4}
-            fill="#0095f6"
-            stroke="#fff"
-            strokeWidth={1.5}
-          />
-        ))}
-        {labels}
-      </svg>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${size} ${size}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{ width: '100%', maxWidth: '100%', aspectRatio: '1', display: 'block' }}
+          role="img"
+          aria-label="기술 스택 숙련도 방사형 차트"
+        >
+          {grid}
+          {pathD ? (
+            <path
+              d={pathD}
+              fill="rgba(0, 149, 246, 0.22)"
+              stroke="#0095f6"
+              strokeWidth={2}
+              strokeLinejoin="round"
+            />
+          ) : null}
+          {dots.map((d) => (
+            <circle
+              key={d.key}
+              cx={d.x}
+              cy={d.y}
+              r={4}
+              fill="#0095f6"
+              stroke="#fff"
+              strokeWidth={1.5}
+            />
+          ))}
+          {labels}
+        </svg>
+      </div>
       <ul
         style={{
           listStyle: 'none',
           padding: 0,
           margin: '16px 0 0',
           width: '100%',
-          maxWidth: 360,
+          maxWidth: '100%',
           display: 'grid',
           gap: 8,
           gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',

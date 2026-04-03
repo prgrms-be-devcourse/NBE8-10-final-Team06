@@ -60,6 +60,8 @@ public class BaseInitData implements ApplicationRunner {
     private static final int MIN_SEED_TECH_ROWS = 50;
     private static final String DEMO_PASSWORD = "password123";
     private static final String ADMIN_EMAIL = "admin@test.com";
+    /** 사진 없는 admin 데모 글(댓글·좋아요 시드 대상). 제목으로 식별하지 않고 목록 마지막에만 추가한다. */
+    private static final String ADMIN_TEXT_ONLY_POST_TITLE = "이미지 없는 공지·토론용 데모 글";
 
     private static final List<String> SEED_TECH_NAMES_FOR_SCORE_POOL = List.of(
             "Java",
@@ -326,6 +328,18 @@ public class BaseInitData implements ApplicationRunner {
             feedService.deliverPostToFeeds(post);
         }
 
+        Post adminTextOnly = Post.builder()
+                .user(admin)
+                .title(ADMIN_TEXT_ONLY_POST_TITLE)
+                .content("프로필 그리드·피드에서 텍스트 전용 카드 UI를 확인할 수 있습니다.\n" + "좋아요·댓글 시드가 포함되어 있습니다.")
+                .build();
+        adminTextOnly.addTechTag(requireSeededTechnology("Java"));
+        adminTextOnly.addTechTag(requireSeededTechnology("Spring Boot"));
+        postRepository.save(adminTextOnly);
+        saved.add(adminTextOnly);
+        feedService.registerPostToGlobalFeed(adminTextOnly);
+        feedService.deliverPostToFeeds(adminTextOnly);
+
         return saved;
     }
 
@@ -395,6 +409,7 @@ public class BaseInitData implements ApplicationRunner {
         seedPostLikesAndScraps(users, posts, admin, u1, u2, firstPost);
         seedCommentsOnFirstPost(users, admin, u1, u2, firstPost);
         seedCommentsOnOtherPosts(users, posts);
+        seedCommentsOnAdminTextOnlyPost(posts.getLast(), admin, u1, u2);
     }
 
     private void seedPostLikesAndScraps(
@@ -460,6 +475,17 @@ public class BaseInitData implements ApplicationRunner {
         }
     }
 
+    private void seedCommentsOnAdminTextOnlyPost(Post post, User admin, User u1, User u2) {
+        if (!ADMIN_TEXT_ONLY_POST_TITLE.equals(post.getTitle())) {
+            return;
+        }
+        commentService.createComment(post.getId(), u1.getId(), new CommentCreateReq("텍스트 전용 글 — 공감합니다", null));
+        commentService.createComment(post.getId(), u2.getId(), new CommentCreateReq("이미지 없이도 잘 보이네요.", null));
+        Long root = commentService.createComment(
+                post.getId(), admin.getId(), new CommentCreateReq("시드용 안내 댓글(답글 달기 데모)", null));
+        commentService.createComment(post.getId(), u1.getId(), new CommentCreateReq("답글: 확인했습니다", root));
+    }
+
     private void createStoryInteractions(List<User> users) {
         List<Story> activeStories =
                 storyRepository.findAll().stream().filter(s -> !s.isDeleted()).toList();
@@ -473,7 +499,8 @@ public class BaseInitData implements ApplicationRunner {
                 .findFirst()
                 .orElse(users.get(1));
 
-        storyService.recordSingleStoryView(first.getId(), viewer.getId());
+        storyService.recordSingleStoryView(
+                first.getId(), viewer.getId(), first.getUser().getId());
         storyService.patchStoryLike(first.getId(), viewer.getId());
     }
 

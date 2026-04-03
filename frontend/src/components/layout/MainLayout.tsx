@@ -5,6 +5,7 @@ import BottomNav from './BottomNav';
 interface MainLayoutProps {
   children: React.ReactNode;
   title?: string;
+  /** 지정 시 app-shell 상한을 덮어씀 (예: 검색 페이지 600px) */
   maxWidth?: string;
   hideHeader?: boolean;
 }
@@ -12,7 +13,7 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ 
   children, 
   title = "Devstagram", 
-  maxWidth = "935px",
+  maxWidth,
   hideHeader = false 
 }) => {
   const navigate = useNavigate();
@@ -27,15 +28,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           borderBottom: '1px solid #dbdbdb',
           zIndex: 900
         }}>
-          <div style={{
-            maxWidth: '935px',
-            margin: '0 auto',
-            height: '60px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '0 20px'
-          }}>
+          <div
+            className="app-shell"
+            style={{
+              height: '60px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '0 20px',
+            }}
+          >
             <h2 
               style={{ fontSize: '1.5rem', fontWeight: 'bold', cursor: 'pointer', margin: 0 }} 
               onClick={() => navigate('/')}
@@ -46,11 +48,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         </header>
       )}
 
-      <main style={{ 
-        maxWidth: maxWidth, 
-        margin: '0 auto', 
-        padding: '30px 20px 0' 
-      }}>
+      <main
+        className="app-shell"
+        style={{
+          padding: '30px 20px 0',
+          ...(maxWidth ? { maxWidth } : {}),
+        }}
+      >
         {children}
       </main>
 

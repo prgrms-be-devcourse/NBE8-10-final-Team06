@@ -33,7 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 
 /**
- * "헤더에 유저(Authorization: Bearer ...)"를 넣었을 때
+ * accessToken 쿠키가 있을 때
  * CustomAuthenticationFilter 가 SecurityContext 를 세팅하는지, 그리고 DM 컨트롤러가 그 값을 쓰는지 검증.
  */
 class DmControllerAuthHeaderTest {
@@ -44,13 +44,13 @@ class DmControllerAuthHeaderTest {
     }
 
     @Test
-    void customAuthFilter_setsSecurityContext_fromAuthorizationHeader() throws Exception {
+    void customAuthFilter_setsSecurityContext_fromAccessTokenCookie() throws Exception {
         JwtProvider jwtProvider = mock(JwtProvider.class);
         UserSecurityService userSecurityService = mock(UserSecurityService.class);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/dm/rooms");
-        request.addHeader("Authorization", "Bearer test-token");
+        request.setCookies(new jakarta.servlet.http.Cookie("accessToken", "test-token"));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
 

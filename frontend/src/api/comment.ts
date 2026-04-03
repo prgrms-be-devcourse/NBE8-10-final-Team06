@@ -1,13 +1,22 @@
 import client from './client';
 import { RsData, Slice } from '../types/common';
-import { 
-  CommentInfoResponse, 
-  CommentCreateRequest, 
+import {
+  CommentInfoResponse,
+  CommentCreateRequest,
   CommentUpdateRequest,
-  ReplyInfoResponse 
+  ReplyInfoResponse,
+  CommentLikeResponse,
 } from '../types/comment';
 
 export const commentApi = {
+  /** GET /posts/{postId}/comments — 게시글 본문과 별도 댓글 페이지 */
+  getComments: (postId: number, pageNumber: number = 0) =>
+    client
+      .get<RsData<Slice<CommentInfoResponse>>>(`/posts/${postId}/comments`, {
+        params: { pageNumber },
+      })
+      .then((res) => res.data),
+
   // 댓글/답글 작성
   create: (postId: number, req: CommentCreateRequest) =>
     client.post<RsData<number>>(`/posts/${postId}/comments`, req).then(res => res.data),
@@ -22,7 +31,7 @@ export const commentApi = {
 
   // 댓글 좋아요 토글
   toggleLike: (commentId: number) =>
-    client.post<RsData<void>>(`/comments/${commentId}`).then(res => res.data),
+    client.post<RsData<CommentLikeResponse>>(`/comments/${commentId}`).then((res) => res.data),
 
   // 답글 조회
   getReplies: (commentId: number, page: number = 0) =>

@@ -82,7 +82,6 @@ public class AuthController {
 
         rq.deleteCookie("accessToken");
         rq.deleteCookie("refreshToken");
-        rq.deleteCookie("apiKey");
 
         return RsData.success("로그아웃 되었습니다.", null);
     }

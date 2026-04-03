@@ -139,12 +139,14 @@ class StoryServiceTest {
     void recordSingleStoryView_Success() {
         // given
         Long storyId = 10L;
-        Long userId = 1L;
-        User user = User.builder().nickname("viewer").build();
-        ReflectionTestUtils.setField(user, "id", userId);
+        Long currentUserId = 1L;
+        Long targetUserId = 2L;
+
+        User currentUser = User.builder().nickname("viewer").build();
+        ReflectionTestUtils.setField(currentUser, "id", currentUserId);
 
         User author = User.builder().nickname("author").build();
-        ReflectionTestUtils.setField(author, "id", 2L);
+        ReflectionTestUtils.setField(author, "id", targetUserId);
 
         StoryMedia media = StoryMedia.builder()
                 .sourceUrl("test.jpg")
@@ -155,15 +157,18 @@ class StoryServiceTest {
         ReflectionTestUtils.setField(story, "viewers", new ArrayList<>());
         ReflectionTestUtils.setField(story, "tags", new ArrayList<>());
 
+        // findById 결과가 있음 (정상 상황)
         given(storyRepository.findById(storyId)).willReturn(Optional.of(story));
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(storyViewedRepository.findByStoryIdAndUserId(storyId, userId)).willReturn(Optional.empty());
+        given(userRepository.findById(currentUserId)).willReturn(Optional.of(currentUser));
+        given(storyViewedRepository.findByStoryIdAndUserId(storyId, currentUserId))
+                .willReturn(Optional.empty());
 
-        StoryViewed viewed = StoryViewed.builder().story(story).user(user).build();
+        StoryViewed viewed =
+                StoryViewed.builder().story(story).user(currentUser).build();
         given(storyViewedRepository.save(any(StoryViewed.class))).willReturn(viewed);
 
         // when
-        StoryDetailResponse response = storyService.recordSingleStoryView(storyId, userId);
+        StoryDetailResponse response = storyService.recordSingleStoryView(storyId, currentUserId, targetUserId);
 
         // then
         assertThat(response.storyId()).isEqualTo(storyId);

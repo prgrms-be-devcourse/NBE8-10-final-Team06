@@ -30,6 +30,8 @@ export interface TechTagRes {
  */
 export interface PostFeedProfileRes {
   id: number;
+  /** 프로필 그리드 썸네일용; 구 API에 없을 수 있음 */
+  title?: string;
   medias: PostMediaResponse[];
   techStacks: TechTagRes[];
   likeCount: number;
@@ -54,6 +56,8 @@ export interface PostFeedResponse {
   likeCount: number;
   commentCount: number;
   createdAt: string;
+  /** 추천 피드 스코어 (백엔드 PostFeedRes) */
+  feedScore?: number;
 }
 
 /**

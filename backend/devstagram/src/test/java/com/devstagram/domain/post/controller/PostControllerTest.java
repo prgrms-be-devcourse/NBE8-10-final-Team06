@@ -74,10 +74,7 @@ class PostControllerTest {
 
     @BeforeEach
     void setUp() {
-
-        given(rq.getHeader(eq("Authorization"), anyString())).willReturn("Bearer dummy");
-        given(rq.getHeader(eq("X-API-KEY"), anyString())).willReturn("");
-        given(rq.getCookieValue(anyString(), anyString())).willReturn("");
+        given(rq.getCookieValue(eq("accessToken"), anyString())).willReturn("dummy-access-token");
 
         // rate limit
         given(rateLimitService.isAllowed(anyString(), anyLong(), any())).willReturn(true);

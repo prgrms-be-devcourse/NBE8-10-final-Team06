@@ -9,7 +9,9 @@ import BottomNav from '../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
 import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
 import { getApiErrorMessage } from '../util/apiError';
+import { isRsDataSuccess } from '../util/rsData';
 import { syncMyProfileImageFromUserApi } from '../services/syncMyProfileImage';
+import { performClientWithdraw } from '../services/performClientWithdraw';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
 
 const RESUME_MAP: Record<Resume, string> = {
@@ -39,6 +41,9 @@ const ProfileEditPage: React.FC = () => {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawConfirmText, setWithdrawConfirmText] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,13 +51,17 @@ const ProfileEditPage: React.FC = () => {
       setLoadError(null);
       try {
         setLoading(true);
-        const techRes = await technologyApi.getTechnologies();
-        if (techRes.resultCode?.includes('-S-') || techRes.resultCode?.startsWith('200')) {
-          setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
+        try {
+          const techRes = await technologyApi.getTechnologies();
+          if (isRsDataSuccess(techRes)) {
+            setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
+          }
+        } catch {
+          setAllTechs([]);
         }
 
         const res = await userApi.getProfile(myNickname);
-        if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        if (isRsDataSuccess(res)) {
           const d = res.data;
           if (!d) {
             setLoadError('프로필 데이터가 비어 있습니다.');
@@ -75,9 +84,8 @@ const ProfileEditPage: React.FC = () => {
         } else {
           setLoadError(res.msg || '프로필을 불러오지 못했습니다.');
         }
-      } catch (err: any) {
-        console.error('데이터 로드 실패:', err);
-        setLoadError(err.response?.data?.msg || '프로필을 불러오지 못했습니다.');
+      } catch (err: unknown) {
+        setLoadError(getApiErrorMessage(err, '프로필을 불러오지 못했습니다.'));
       } finally {
         setLoading(false);
       }
@@ -107,7 +115,7 @@ const ProfileEditPage: React.FC = () => {
     try {
       setSubmitting(true);
       const res = await userApi.updateProfile(form, profileImage || undefined);
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+      if (isRsDataSuccess(res)) {
         const nextNick = form.nickname.trim();
         await syncMyProfileImageFromUserApi({ force: true, nicknameOverride: nextNick });
         if (myUserId != null && nextNick && nextNick !== myNickname?.trim()) {
@@ -274,7 +282,141 @@ const ProfileEditPage: React.FC = () => {
             {submitting ? '저장 중...' : '완료'}
           </button>
         </form>
+
+        <section
+          style={{
+            marginTop: '48px',
+            paddingTop: '24px',
+            borderTop: '1px solid #efefef',
+          }}
+          aria-labelledby="withdraw-section-title"
+        >
+          <h3 id="withdraw-section-title" style={{ fontSize: '0.85rem', color: '#ed4956', fontWeight: 600, marginBottom: '8px' }}>
+            위험 구역
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: '#8e8e8e', marginBottom: '12px' }}>
+            탈퇴 시 계정과 관련된 데이터는 복구할 수 없을 수 있습니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setWithdrawConfirmText('');
+              setShowWithdrawModal(true);
+            }}
+            style={{
+              padding: '10px 16px',
+              backgroundColor: '#fff',
+              color: '#ed4956',
+              border: '1px solid #ed4956',
+              borderRadius: '4px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
+            회원 탈퇴
+          </button>
+        </section>
       </main>
+
+      {showWithdrawModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="withdraw-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 3000,
+            padding: '20px',
+          }}
+          onClick={(e) => e.target === e.currentTarget && !withdrawing && setShowWithdrawModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              maxWidth: '400px',
+              width: '100%',
+              padding: '20px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="withdraw-modal-title" style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>
+              회원 탈퇴
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: '#262626', marginBottom: '12px', lineHeight: 1.5 }}>
+              정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <p style={{ fontSize: '0.8rem', color: '#8e8e8e', marginBottom: '8px' }}>
+              계속하려면 아래에 <strong>탈퇴</strong>를 입력하세요.
+            </p>
+            <input
+              type="text"
+              value={withdrawConfirmText}
+              onChange={(e) => setWithdrawConfirmText(e.target.value)}
+              placeholder="탈퇴"
+              disabled={withdrawing}
+              autoComplete="off"
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px',
+                border: '1px solid #dbdbdb',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                fontSize: '0.9rem',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                disabled={withdrawing}
+                onClick={() => setShowWithdrawModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dbdbdb',
+                  borderRadius: '4px',
+                  background: '#fff',
+                  cursor: withdrawing ? 'not-allowed' : 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={withdrawing || withdrawConfirmText.trim() !== '탈퇴'}
+                onClick={async () => {
+                  setWithdrawing(true);
+                  try {
+                    await performClientWithdraw(navigate);
+                  } finally {
+                    setWithdrawing(false);
+                    setShowWithdrawModal(false);
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  background: '#ed4956',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: withdrawing || withdrawConfirmText.trim() !== '탈퇴' ? 'not-allowed' : 'pointer',
+                  opacity: withdrawConfirmText.trim() !== '탈퇴' ? 0.5 : 1,
+                }}
+              >
+                {withdrawing ? '처리 중...' : '탈퇴하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <BottomNav />
     </div>
   );
