@@ -18,9 +18,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@Profile("test")
 @Service
-@Profile("!prod")
+@Profile("!local")
 public class LocalStorageServiceImpl implements StorageService {
 
     // application.yml 파일에 적어둔 저장 경로를 빼옴
