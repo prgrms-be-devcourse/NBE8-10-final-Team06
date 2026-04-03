@@ -35,11 +35,11 @@ ALTER TABLE technology
 -- 1. 카테고리 데이터 먼저 삽입 (부모 테이블)
 TRUNCATE TABLE tech_category RESTART IDENTITY CASCADE;
 
-INSERT INTO tech_category (category_id, category_name, color) VALUES
-                                                                  (1, 'Programming Languages', '#FFFFFF'),
-                                                                  (2, 'Web Frameworks', '#FFFFFF'),
-                                                                  (3, 'Databases', '#FFFFFF'),
-                                                                  (4, 'Cloud & Tools', '#FFFFFF');
+INSERT INTO tech_category (category_id, category_name, color, is_deleted) VALUES
+                                                                  (1, 'Programming Languages', '#FFFFFF', false),
+                                                                  (2, 'Web Frameworks', '#FFFFFF', false),
+                                                                  (3, 'Databases', '#FFFFFF', false),
+                                                                  (4, 'Cloud & Tools', '#FFFFFF', false);
 
 -- 2. Category 1: Programming Languages (1~42)
 INSERT INTO technology (tech_id, tech_name, category_id, color) VALUES
