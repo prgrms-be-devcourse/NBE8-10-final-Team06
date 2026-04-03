@@ -18,6 +18,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
+@Profile("test")
 @Service
 @Profile("!prod")
 public class LocalStorageServiceImpl implements StorageService {
