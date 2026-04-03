@@ -21,6 +21,33 @@ function roomListTitle(room: DmRoomSummaryResponse, myUserId: number | null): st
   return other?.nickname ?? room.roomName ?? '채팅';
 }
 
+function resolveParticipantDisplayLabel(
+  userId: number,
+  indexZeroBased: number,
+  selectedUserMap: Map<number, UserSearchResponse>,
+  searchResults: UserSearchResponse[],
+  rooms: DmRoomSummaryResponse[]
+): string {
+  const user =
+    selectedUserMap.get(userId) ||
+    searchResults.find((u) => u.userId === userId) ||
+    rooms.flatMap((r) => r.participants).find((p) => p.userId === userId);
+  const nick = user?.nickname?.trim();
+  return nick && nick.length > 0 ? nick : `참여자${indexZeroBased + 1}`;
+}
+
+function buildDefaultGroupRoomName(
+  selectedUserIds: number[],
+  selectedUserMap: Map<number, UserSearchResponse>,
+  searchResults: UserSearchResponse[],
+  rooms: DmRoomSummaryResponse[]
+): string {
+  const labels = selectedUserIds.map((id, i) =>
+    resolveParticipantDisplayLabel(id, i, selectedUserMap, searchResults, rooms)
+  );
+  return `${labels.join(', ')} 의 채팅방`;
+}
+
 const DmListPage: React.FC = () => {
   const myUserId = useAuthStore((s) => s.userId);
   const { rooms, setRooms, markAsRead } = useDmStore();
@@ -29,6 +56,7 @@ const DmListPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResponse[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [selectedUserMap, setSelectedUserMap] = useState<Map<number, UserSearchResponse>>(new Map());
   const [groupName, setGroupName] = useState('');
   
   const navigate = useNavigate();
@@ -65,18 +93,40 @@ const DmListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchKeyword]);
 
+  useEffect(() => {
+    if (searchResults.length === 0) return;
+    setSelectedUserMap((prev) => {
+      const next = new Map(prev);
+      for (const user of searchResults) {
+        if (selectedUserIds.includes(user.userId)) {
+          next.set(user.userId, user);
+        }
+      }
+      return next;
+    });
+  }, [searchResults, selectedUserIds]);
+
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setSearchKeyword('');
     setSearchResults([]);
     setSelectedUserIds([]);
+    setSelectedUserMap(new Map());
     setGroupName('');
   };
 
   const toggleUserSelection = (userId: number) => {
-    setSelectedUserIds(prev => 
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    );
+    const selectedUser = searchResults.find((u) => u.userId === userId);
+    setSelectedUserIds((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+    setSelectedUserMap((prev) => {
+      const next = new Map(prev);
+      if (selectedUser) {
+        next.set(userId, selectedUser);
+      } else if (next.has(userId) && selectedUserIds.includes(userId)) {
+        next.delete(userId);
+      }
+      return next;
+    });
   };
 
   const handleCreateRoom = async () => {
@@ -86,7 +136,12 @@ const DmListPage: React.FC = () => {
       if (selectedUserIds.length === 1) {
         res = await dmApi.create1v1Room(selectedUserIds[0]);
       } else {
-        res = await dmApi.createGroupRoom(selectedUserIds, groupName.trim() || undefined);
+        const trimmed = groupName.trim();
+        const name =
+          trimmed.length > 0
+            ? trimmed
+            : buildDefaultGroupRoomName(selectedUserIds, selectedUserMap, searchResults, rooms);
+        res = await dmApi.createGroupRoom(selectedUserIds, name);
       }
       if (res.resultCode.startsWith('200')) {
         closeCreateModal();
@@ -113,7 +168,7 @@ const DmListPage: React.FC = () => {
   return (
     <div style={{ paddingBottom: '60px', backgroundColor: '#fafafa', minHeight: '100vh' }}>
       <header style={{ position: 'sticky', top: 0, backgroundColor: '#fff', borderBottom: '1px solid #dbdbdb', zIndex: 900 }}>
-        <div style={{ maxWidth: '935px', margin: '0 auto', height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
+        <div className="app-shell" style={{ height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
           <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} color="#262626" /></button>
           <strong style={{ fontSize: '1rem', fontWeight: 'bold' }}>메시지</strong>
           <button onClick={() => setShowCreateModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Edit size={24} color="#262626" /></button>
@@ -121,26 +176,30 @@ const DmListPage: React.FC = () => {
       </header>
 
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: '400px', height: '500px', backgroundColor: '#fff', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="dm-create-modal-overlay" onClick={closeCreateModal} role="presentation">
+          <div className="dm-create-modal-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="dm-create-modal-title">
             <div style={{ padding: '10px 15px', borderBottom: '1px solid #dbdbdb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <X size={24} style={{ cursor: 'pointer' }} onClick={closeCreateModal} />
-              <strong style={{ fontSize: '1rem' }}>새로운 메시지</strong>
+              <strong id="dm-create-modal-title" style={{ fontSize: '1rem' }}>새로운 메시지</strong>
               <button onClick={handleCreateRoom} disabled={selectedUserIds.length === 0} style={{ background: 'none', border: 'none', color: '#0095f6', fontWeight: 'bold', cursor: 'pointer', opacity: selectedUserIds.length > 0 ? 1 : 0.5 }}>다음</button>
             </div>
             {selectedUserIds.length > 1 && (
               <div style={{ padding: '10px 15px', borderBottom: '1px solid #dbdbdb' }}>
-                <input placeholder="그룹 이름 (선택 사항)" value={groupName} onChange={(e) => setGroupName(e.target.value)} style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.9rem' }} />
+                <input
+                  placeholder="그룹 이름 (비우면 참여자 기준으로 자동 생성)"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.9rem' }}
+                />
               </div>
             )}
             <div style={{ padding: '10px 15px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #dbdbdb' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>받는 사람:</span>
               <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                {selectedUserIds.map(id => {
-                  const user = searchResults.find(u => u.userId === id) || rooms.flatMap(r => r.participants).find(p => p.userId === id);
+                {selectedUserIds.map((id, idx) => {
                   return (
                     <span key={id} style={{ backgroundColor: '#e0f1ff', color: '#0095f6', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {user?.nickname || id}
+                      {resolveParticipantDisplayLabel(id, idx, selectedUserMap, searchResults, rooms)}
                       <X size={12} style={{ cursor: 'pointer' }} onClick={() => toggleUserSelection(id)} />
                     </span>
                   );
@@ -163,7 +222,7 @@ const DmListPage: React.FC = () => {
         </div>
       )}
 
-      <main style={{ maxWidth: '935px', margin: '0 auto', backgroundColor: '#fff', minHeight: 'calc(100vh - 60px - 60px)', borderLeft: '1px solid #dbdbdb', borderRight: '1px solid #dbdbdb' }}>
+      <main className="app-shell" style={{ backgroundColor: '#fff', minHeight: 'calc(100vh - 60px - 60px)', borderLeft: '1px solid #dbdbdb', borderRight: '1px solid #dbdbdb' }}>
         {isLoading ? (
           <p style={{ textAlign: 'center', padding: '40px', color: '#8e8e8e' }}>로딩 중...</p>
         ) : rooms.length === 0 ? (

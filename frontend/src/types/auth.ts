@@ -23,4 +23,15 @@ export interface SignupResponse {
   profileImageUrl?: string | null;
 }
 
-export type LoginResponse = string;
+/** POST /api/auth/login · /api/auth/refresh 본문 data (쿠키에 JWT) */
+export interface LoginResponse {
+  email: string;
+  nickname: string;
+}
+
+/** GET /api/auth/me 본문 data */
+export interface AuthMeResponse {
+  id: number;
+  nickname: string;
+  email: string;
+}

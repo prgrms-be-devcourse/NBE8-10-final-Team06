@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CommentInfoResponse, ReplyInfoResponse } from '../../types/comment';
 import { commentApi } from '../../api/comment';
@@ -23,19 +23,38 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
   const [replyText, setReplyText] = useState('');
   const [loadingReplies, setLoadingReplies] = useState(false);
 
+  useEffect(() => {
+    setComment(initialComment);
+    setEditText((prev) => (isEditMode ? prev : initialComment.content));
+  }, [
+    initialComment.id,
+    initialComment.content,
+    initialComment.isLiked,
+    initialComment.likeCount,
+    initialComment.replyCount,
+    initialComment.modifiedAt,
+    initialComment.nickname,
+    isEditMode,
+  ]);
+
   const toggleLike = async () => {
     try {
       const res = await commentApi.toggleLike(comment.id);
-      if (res.resultCode.includes('-S-')) {
-        const isNowLiked = !comment.isLiked;
-        setComment(prev => ({ 
-          ...prev, 
-          isLiked: isNowLiked,
-          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
-        }));
+      if (res.resultCode.includes('-S-') || res.resultCode.startsWith('200')) {
+        const d = res.data;
+        if (d && typeof d.isLiked === 'boolean' && typeof d.likeCount === 'number') {
+          setComment((prev) => ({ ...prev, isLiked: d.isLiked, likeCount: d.likeCount }));
+        } else {
+          const isNowLiked = !comment.isLiked;
+          setComment((prev) => ({
+            ...prev,
+            isLiked: isNowLiked,
+            likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1),
+          }));
+        }
       }
-    } catch (err) { 
-      console.error('댓글 좋아요 실패:', err); 
+    } catch (err) {
+      console.error('댓글 좋아요 실패:', err);
     }
   };
 
@@ -79,16 +98,19 @@ const CommentItem: React.FC<CommentItemProps> = ({ postId, comment: initialComme
     try {
       const res = await commentApi.toggleLike(replyId);
       if (res.resultCode.includes('-S-') || res.resultCode.startsWith('200')) {
-        setReplies(prev =>
-          prev.map(reply =>
-            reply.id === replyId
-              ? {
-                  ...reply,
-                  isLiked: !reply.isLiked,
-                  likeCount: !reply.isLiked ? reply.likeCount + 1 : Math.max(0, reply.likeCount - 1)
-                }
-              : reply
-          )
+        const d = res.data;
+        setReplies((prev) =>
+          prev.map((reply) => {
+            if (reply.id !== replyId) return reply;
+            if (d && typeof d.isLiked === 'boolean' && typeof d.likeCount === 'number') {
+              return { ...reply, isLiked: d.isLiked, likeCount: d.likeCount };
+            }
+            return {
+              ...reply,
+              isLiked: !reply.isLiked,
+              likeCount: !reply.isLiked ? reply.likeCount + 1 : Math.max(0, reply.likeCount - 1),
+            };
+          })
         );
       }
     } catch (err) {

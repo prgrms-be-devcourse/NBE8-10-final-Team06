@@ -1,6 +1,7 @@
 import client from './client';
 import { RsData, Slice } from '../types/common';
-import { UserProfileResponse, ProfileUpdateRequest, UserSearchResponse } from '../types/user';
+import { appendJsonRequestPart } from '../util/formDataParts';
+import { UserProfileResponse, ProfileUpdateRequest, UserSearchResponse, UserRecommendResponse } from '../types/user';
 import { followApi, FOLLOW_CHANGED_EVENT } from './follow';
 
 export { FOLLOW_CHANGED_EVENT };
@@ -35,7 +36,7 @@ export const userApi = {
   // 내 프로필 정보 수정
   updateProfile: (req: ProfileUpdateRequest, profileImage?: File) => {
     const formData = new FormData();
-    formData.append('request', new Blob([JSON.stringify(req)], { type: 'application/json' }));
+    appendJsonRequestPart(formData, req);
     if (profileImage) {
       formData.append('profileImage', profileImage);
     }
@@ -51,6 +52,15 @@ export const userApi = {
       headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
     }).then(res => res.data),
 
+  // 사용자 추천 목록 조회
+  getUserRecommendations: () =>
+    client
+      .get<RsData<UserRecommendResponse[]>>('/users/recommendations', {
+        params: { _: Date.now() },
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      })
+      .then((res) => res.data),
+
   follow: followApi.follow,
   unfollow: followApi.unfollow,
   isFollowing: followApi.isFollowing,
@@ -58,4 +68,7 @@ export const userApi = {
   getFollowings: followApi.getFollowings,
   getFollowerCount: followApi.getFollowerCount,
   getFollowingCount: followApi.getFollowingCount,
+
+  /** DELETE /api/users/me */
+  withdraw: () => client.delete<RsData<void>>('/users/me').then((res) => res.data),
 };

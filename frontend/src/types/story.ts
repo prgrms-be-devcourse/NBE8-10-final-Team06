@@ -50,6 +50,8 @@ export interface StoryCreateRequest {
   file: File;
   mediaType: MediaType;
   tagUserIds?: number[];
+  /** 동영상 등 썸네일 URL (선택) */
+  thumbnailUrl?: string;
 }
 
 export interface StoryCreateResponse {

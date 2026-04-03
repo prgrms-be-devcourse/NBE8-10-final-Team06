@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { X, Camera, ChevronLeft } from 'lucide-react';
+import { Camera, ChevronLeft } from 'lucide-react';
 import { postApi } from '../api/post';
+import { technologyApi } from '../api/technology';
 import { PostUpdateRequest } from '../types/post';
+import { TechTagRes } from '../types/post';
 import BottomNav from '../components/layout/BottomNav';
 import { resolveAssetUrl } from '../util/assetUrl';
 import { getApiErrorMessage } from '../util/apiError';
+import { isRsDataSuccess } from '../util/rsData';
 
 const PostEditPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -17,25 +20,53 @@ const PostEditPage: React.FC = () => {
   const [content, setContent] = useState('');
   const [previews, setPreviews] = useState<string[]>([]);
   const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
+  const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
+
+  const toggleTech = (techId: number) => {
+    setSelectedTechIds((prev) =>
+      prev.includes(techId) ? prev.filter((id) => id !== techId) : [...prev, techId]
+    );
+  };
 
   useEffect(() => {
     const fetchPost = async () => {
       if (!postId) return;
       try {
-        const res = await postApi.getDetail(Number(postId));
-        if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-          setTitle(res.data.title);
-          setContent(res.data.content);
-          setPreviews(res.data.medias.map(m => resolveAssetUrl(m.sourceUrl)));
+        setLoading(true);
+        let techRes: Awaited<ReturnType<typeof technologyApi.getTechnologies>> | null = null;
+        try {
+          techRes = await technologyApi.getTechnologies();
+        } catch {
+          setAllTechs([]);
         }
-      } catch (err) {
-        console.error(err);
+        if (techRes && isRsDataSuccess(techRes)) {
+          setAllTechs(Array.isArray(techRes.data) ? techRes.data : []);
+        } else if (techRes) {
+          setAllTechs([]);
+        }
+
+        const postRes = await postApi.getDetail(Number(postId));
+
+        if (isRsDataSuccess(postRes)) {
+          setTitle(postRes.data.title);
+          setContent(postRes.data.content);
+          setPreviews(postRes.data.medias.map((m) => resolveAssetUrl(m.sourceUrl)));
+
+          const stacks = Array.isArray(postRes.data.techStacks) ? postRes.data.techStacks : [];
+          setSelectedTechIds(stacks.map((t) => t.id));
+        } else {
+          alert(postRes.msg || '게시글을 불러올 수 없습니다.');
+          navigate(-1);
+        }
+      } catch {
         alert('게시글을 불러올 수 없습니다.');
         navigate(-1);
       } finally {
         setLoading(false);
       }
     };
+
     fetchPost();
   }, [postId, navigate]);
 
@@ -59,16 +90,19 @@ const PostEditPage: React.FC = () => {
 
     try {
       setSubmitting(true);
-      const req: PostUpdateRequest = { title: nextTitle, content: nextContent, techIds: [] }; // techIds는 현재 목록 API 부재로 빈 배열 유지
+      const req: PostUpdateRequest = {
+        title: nextTitle,
+        content: nextContent,
+        techIds: selectedTechIds,
+      };
       const res = await postApi.update(Number(postId), req, newFiles);
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+      if (isRsDataSuccess(res)) {
         alert('게시글이 수정되었습니다.');
         navigate(`/post/${postId}`, { replace: true });
         return;
       }
       alert(res.msg || '수정에 실패했습니다.');
     } catch (err: unknown) {
-      console.error(err);
       alert(getApiErrorMessage(err, '수정에 실패했습니다.'));
     } finally {
       setSubmitting(false);
@@ -109,6 +143,35 @@ const PostEditPage: React.FC = () => {
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>내용</label>
             <textarea value={content} onChange={e => setContent(e.target.value)} rows={6} style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px', boxSizing: 'border-box', resize: 'none' }} required />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>기술 태그</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {allTechs.map((tech) => {
+                const isSelected = selectedTechIds.includes(tech.id);
+                return (
+                  <button
+                    key={tech.id}
+                    type="button"
+                    onClick={() => toggleTech(tech.id)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${tech.color}`,
+                      backgroundColor: isSelected ? tech.color : '#fff',
+                      color: isSelected ? '#fff' : tech.color,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    #{tech.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button type="submit" disabled={submitting} style={{ width: '100%', padding: '12px', backgroundColor: '#0095f6', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: submitting ? 0.7 : 1 }}>

@@ -7,7 +7,7 @@ import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDmStore } from '../../store/useDmStore';
 import { useStomp } from '../../hooks/useStomp';
-import type { SignupResponse } from '../../types/auth';
+import type { AuthMeResponse } from '../../types/auth';
 import {
   DmMessageResponse,
   MessageType,
@@ -58,10 +58,9 @@ import {
 const DM_POLL_INTERVAL_IN_ROOM_MS = 2_500;
 const DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS = 2_000;
 
-/** /auth/me data.id 와 일부 환경의 userId 별칭 */
-function readMeUserId(data: SignupResponse): number | null {
-  const ext = data as SignupResponse & { userId?: unknown };
-  const raw: unknown = ext.id ?? ext.userId;
+/** /auth/me(MyInfoResponse) data.id 와 일부 환경의 userId 별칭 */
+function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | null {
+  const raw: unknown = data.id ?? data.userId;
   if (raw == null) return null;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -219,21 +218,26 @@ const DmChatPage: React.FC = () => {
   /** STOMP typing 이벤트 — 말풍선 좌우는 렌더 시 `senderId`(userId) 로 `computeDmMessageIsMe` 와 동일 규칙 적용 */
   const [remoteTyping, setRemoteTyping] = useState<{ userId: number; text: string } | null>(null);
   const [isMeTyping, setIsMeTyping] = useState(false);
+  /** `handleInputChange`/`applyTypingForInputValue` 에서 stale closure 없이 타이핑 세션 판별 */
+  const isMeTypingRef = useRef(false);
+  isMeTypingRef.current = isMeTyping;
   /**
    * 로컬 타이핑 중 본인 STOMP 에코만 숨김.
    * 타이핑 payload 의 userId 가 `/auth/me` 와 맞거나 JWT(`effectiveSelfId`) 와 맞는 경우가 있어 둘 다 에코 후보로 본다.
    */
   const showPeerTypingFromRemote = useMemo(() => {
     if (!remoteTyping) return false;
-    if (!isMeTyping) return true;
+
     const remoteU = toDmPositiveUserId(remoteTyping.userId);
     if (remoteU == null) return true;
+
     const echoMe = toDmPositiveUserId(selfIdForTypingEcho);
     const jwtSelf = toDmPositiveUserId(bubbleSelfUserId);
     if (echoMe != null && remoteU === echoMe) return false;
     if (jwtSelf != null && remoteU === jwtSelf) return false;
+
     return true;
-  }, [remoteTyping, isMeTyping, bubbleSelfUserId, selfIdForTypingEcho]);
+  }, [remoteTyping, bubbleSelfUserId, selfIdForTypingEcho]);
 
   const remoteTypingPeerProfile = useMemo((): DmRoomParticipantSummary | null => {
     if (!remoteTyping) return null;
@@ -343,6 +347,69 @@ const DmChatPage: React.FC = () => {
     reconnectKey: stompReconnectKey,
   });
 
+  const applyTypingForInputValue = useCallback(
+    (nextVal: string) => {
+      const actor = effectiveSelfIdRef.current;
+      const rid = roomId != null ? Number(roomId) : NaN;
+      if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
+
+      if (nextVal.trim() === '') {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = null;
+        }
+        const hadTypingSession = typingSessionActiveRef.current || isMeTypingRef.current;
+        /** 에코가 `publish(stop)` 직전에 처리되면 `typingSessionActiveRef` 가 true 로 남아 자기 stop 이 무시될 수 있음 */
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
+        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+        setRemoteTyping((prev) => {
+          if (prev == null) return prev;
+          const prevUid = toDmPositiveUserId(prev.userId);
+          const selfUid = toDmPositiveUserId(actor);
+          return selfUid != null && prevUid === selfUid ? null : prev;
+        });
+        if (hadTypingSession) {
+          console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
+        }
+        setIsMeTyping(false);
+        return;
+      }
+
+      const typingDest = dmStompAppTyping(rid);
+      const typingBody = { roomId: rid, userId: actor, status: 'start' as const };
+      const now = Date.now();
+
+      if (!isMeTypingRef.current) {
+        setIsMeTyping(true);
+        publish(typingDest, typingBody);
+        console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
+        typingSessionActiveRef.current = true;
+        lastTypingStartSentAtRef.current = now;
+      } else if (
+        typingSessionActiveRef.current &&
+        now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
+      ) {
+        publish(typingDest, typingBody);
+        console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
+        lastTypingStartSentAtRef.current = now;
+      }
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsMeTyping(false);
+        if (typingSessionActiveRef.current) {
+          typingSessionActiveRef.current = false;
+          lastTypingStartSentAtRef.current = 0;
+          publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+          console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'idle_timeout' });
+        }
+        typingTimeoutRef.current = null;
+      }, DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS);
+    },
+    [roomId, publish]
+  );
+
   const mergeFreshSliceIntoMessages = useCallback((rid: number, slice: DmMessageSliceResponse) => {
     const normalized = normalizeDmMessagesFromApi(slice.messages ?? []);
     pruneShareBackupByServer(rid, normalized);
@@ -420,6 +487,8 @@ const DmChatPage: React.FC = () => {
         isResolvedDmUserId(actor) &&
         typingSessionActiveRef.current
       ) {
+        typingSessionActiveRef.current = false;
+        lastTypingStartSentAtRef.current = 0;
         publish(dmStompAppTyping(prevNum), { roomId: prevNum, userId: actor, status: 'stop' });
       }
     }
@@ -625,10 +694,10 @@ const DmChatPage: React.FC = () => {
       typingTimeoutRef.current = null;
     }
     if (typingSessionActiveRef.current && isResolvedDmUserId(actor)) {
-      publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-      console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
       typingSessionActiveRef.current = false;
       lastTypingStartSentAtRef.current = 0;
+      publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
+      console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
     }
     setIsMeTyping(false);
     // 하단 이동
@@ -638,56 +707,14 @@ const DmChatPage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextVal = e.target.value;
     setInputValue(nextVal);
-    const actor = effectiveSelfIdRef.current;
-    const rid = roomId != null ? Number(roomId) : NaN;
-    if (!Number.isFinite(rid) || !isResolvedDmUserId(actor)) return;
+    const native = e.nativeEvent as InputEvent;
+    if (native.isComposing) return;
+    applyTypingForInputValue(nextVal);
+  };
 
-    if (nextVal.trim() === '') {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
-      if (typingSessionActiveRef.current) {
-        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'input_cleared' });
-        typingSessionActiveRef.current = false;
-        lastTypingStartSentAtRef.current = 0;
-      }
-      setIsMeTyping(false);
-      return;
-    }
-
-    const typingDest = dmStompAppTyping(rid);
-    const typingBody = { roomId: rid, userId: actor, status: 'start' as const };
-    const now = Date.now();
-
-    if (!isMeTyping) {
-      setIsMeTyping(true);
-      publish(typingDest, typingBody);
-      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'first_keystroke' });
-      typingSessionActiveRef.current = true;
-      lastTypingStartSentAtRef.current = now;
-    } else if (
-      typingSessionActiveRef.current &&
-      now - lastTypingStartSentAtRef.current >= DM_CLIENT_TYPING_START_REFRESH_MS
-    ) {
-      // 백엔드는 마지막 start 기준 3초 후 자동 stop — 연속 입력 중에도 주기적으로 start 로 타이머 리셋
-      publish(typingDest, typingBody);
-      console.log('[DM typing][send_start]', { roomId: rid, userId: actor, reason: 'keepalive' });
-      lastTypingStartSentAtRef.current = now;
-    }
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsMeTyping(false);
-      if (typingSessionActiveRef.current) {
-        publish(dmStompAppTyping(rid), { roomId: rid, userId: actor, status: 'stop' });
-        console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'idle_timeout' });
-        typingSessionActiveRef.current = false;
-        lastTypingStartSentAtRef.current = 0;
-      }
-      typingTimeoutRef.current = null;
-    }, DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS);
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    const v = e.currentTarget.value;
+    applyTypingForInputValue(v);
   };
 
   const handleLeaveRoom = async () => {
@@ -705,7 +732,17 @@ const DmChatPage: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#fff', maxWidth: '935px', margin: '0 auto', borderLeft: '1px solid #dbdbdb', borderRight: '1px solid #dbdbdb' }}>
+    <div
+      className="app-shell"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        backgroundColor: '#fff',
+        borderLeft: '1px solid #dbdbdb',
+        borderRight: '1px solid #dbdbdb',
+      }}
+    >
       <header style={{ height: '60px', borderBottom: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', backgroundColor: '#fff', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => navigate('/dm')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
@@ -818,7 +855,14 @@ const DmChatPage: React.FC = () => {
       <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
           <ImageIcon size={24} color="#262626" style={{ cursor: 'pointer' }} />
-          <input type="text" value={inputValue} onChange={handleInputChange} placeholder="메시지 입력..." style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1rem' }} />
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onCompositionEnd={handleCompositionEnd}
+            placeholder="메시지 입력..."
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '1rem' }}
+          />
           <button type="submit" disabled={!inputValue.trim()} style={{ background: 'none', border: 'none', color: inputValue.trim() ? '#0095f6' : '#b2dffc', fontWeight: 'bold', fontSize: '1rem' }}>보내기</button>
         </form>
         <div

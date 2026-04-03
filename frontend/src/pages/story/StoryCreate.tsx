@@ -13,6 +13,7 @@ const StoryCreate: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   
   const [taggedUsers, setTaggedUsers] = useState<StoryFeedResponse[]>([]);
   const [availableUsers, setAvailableUsers] = useState<StoryFeedResponse[]>([]);
@@ -38,11 +39,14 @@ const StoryCreate: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
+      setThumbnailUrl('');
       const reader = new FileReader();
       reader.onloadend = () => setPreviewUrl(reader.result as string);
       reader.readAsDataURL(selectedFile);
     }
   };
+
+  const isVideoMedia = file?.type.startsWith('video') === true;
 
   const toggleTagUser = (user: StoryFeedResponse) => {
     if (taggedUsers.find(u => u.userId === user.userId)) {
@@ -66,7 +70,8 @@ const StoryCreate: React.FC = () => {
         file,
         content,
         mediaType: extension,
-        tagUserIds: taggedUsers.map(u => u.userId)
+        tagUserIds: taggedUsers.map((u) => u.userId),
+        thumbnailUrl: thumbnailUrl.trim() || undefined,
       });
 
       if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
@@ -187,6 +192,28 @@ const StoryCreate: React.FC = () => {
                 resize: 'none'
               }}
             />
+
+            {isVideoMedia && (
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ fontSize: '0.75rem', color: '#8e8e8e', display: 'block', marginBottom: '6px' }}>
+                  썸네일 URL (선택)
+                </label>
+                <input
+                  type="url"
+                  value={thumbnailUrl}
+                  onChange={(e) => setThumbnailUrl(e.target.value)}
+                  placeholder="https://..."
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    border: '1px solid #dbdbdb',
+                    borderRadius: '4px',
+                    padding: '10px',
+                    fontSize: '0.9rem',
+                  }}
+                />
+              </div>
+            )}
             
             <button 
               type="button"

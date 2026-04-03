@@ -12,10 +12,11 @@ import { toggleFollowRelation } from '../services/followToggle';
 import { postApi } from '../api/post';
 import { storyApi } from '../api/story';
 import { dmApi } from '../api/dm';
+import { isTechAdminSession } from '../util/techAdmin';
 import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
-import { PostFeedProfileRes } from '../types/post';
+import { PostFeedProfileRes, PostFeedResponse } from '../types/post';
 import { StoryDetailResponse } from '../types/story';
-import { Settings, Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2 } from 'lucide-react';
+import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2, Users } from 'lucide-react';
 import UserListModal from '../components/profile/UserListModal';
 import MainLayout from '../components/layout/MainLayout';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
@@ -23,6 +24,8 @@ import { getApiErrorMessage } from '../util/apiError';
 import ProfileAvatar from '../components/common/ProfileAvatar';
 import TechRadarChart from '../components/profile/TechRadarChart';
 import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
+import { getProfilePostCountLabel } from '../util/profilePostCount';
+import { isRemoteStoryMediaUrl } from '../util/storyMediaUrl';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -33,6 +36,102 @@ const RESUME_MAP: Record<Resume, string> = {
 };
 
 const BLACKLIST = new Set<string>();
+
+const isProfileGridVideo = (mediaType: string) =>
+  ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
+
+/** 미디어 없는 그리드 카드 제목: 이 길이(자) 초과 시 "..." */
+const PROFILE_GRID_TITLE_MAX_CHARS = 15;
+
+/** 프로필 그리드(게시물·저장됨): 썸네일 또는 미디어 없을 때 제목 타일 */
+const ProfilePostGridThumb: React.FC<{ post: PostFeedProfileRes }> = ({ post }) => {
+  const navigate = useNavigate();
+  const getFullUrl = (url: string) => resolveAssetUrl(url);
+  const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
+  const first = post.medias?.[0];
+  const rawTitle = String(post.title ?? '').trim();
+  const titleText =
+    rawTitle.length === 0
+      ? '제목 없음'
+      : rawTitle.length > PROFILE_GRID_TITLE_MAX_CHARS
+        ? `${rawTitle.slice(0, PROFILE_GRID_TITLE_MAX_CHARS)}...`
+        : rawTitle;
+
+  return (
+    <div className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
+      {first ? (
+        isProfileGridVideo(first.mediaType) ? (
+          <video
+            src={getFullUrl(first.sourceUrl)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            muted
+            playsInline
+            onError={(e) => {
+              const video = e.currentTarget;
+              if (video.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(first.sourceUrl);
+              if (fallback) {
+                video.dataset.fallbackApplied = '1';
+                video.src = fallback;
+                video.load();
+              }
+            }}
+          />
+        ) : (
+          <img
+            src={getFullUrl(first.sourceUrl)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            alt=""
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.dataset.fallbackApplied === '1') return;
+              const fallback = getFallbackUrl(first.sourceUrl);
+              if (fallback) {
+                img.dataset.fallbackApplied = '1';
+                img.src = fallback;
+              }
+            }}
+          />
+        )
+      ) : (
+        <div className="profile-tab-thumb-textonly">
+          <p className="profile-tab-thumb-title">{titleText}</p>
+        </div>
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0,0,0,0.3)',
+          opacity: 0,
+          transition: 'opacity 0.2s',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: '#fff',
+          gap: '20px',
+          zIndex: 1,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0';
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Heart size={20} fill="white" /> {post.likeCount}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <MessageCircle size={20} fill="white" /> {post.commentCount}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ProfilePage: React.FC = () => {
   const { nickname: urlNickname } = useParams<{ nickname: string }>();
@@ -51,7 +150,13 @@ const ProfilePage: React.FC = () => {
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'posts' | 'scraps' | 'tech' | 'archive'>('posts');
+  const [techAdminAllowed, setTechAdminAllowed] = useState(false);
   const [scrappedPosts, setScrappedPosts] = useState<PostFeedProfileRes[]>([]);
+  const [scrapsLast, setScrapsLast] = useState(true);
+  const [scrapsPage, setScrapsPage] = useState(0);
+  const [scrapsLoadingMore, setScrapsLoadingMore] = useState(false);
+  const [scrapsTotalElements, setScrapsTotalElements] = useState<number | null>(null);
+  const [postsLoadingMore, setPostsLoadingMore] = useState(false);
   const [archivedStories, setArchivedStories] = useState<StoryDetailResponse[]>([]);
   const [followers, setFollowers] = useState<FollowUserResponse[]>([]);
   const [followings, setFollowings] = useState<FollowUserResponse[]>([]);
@@ -64,9 +169,6 @@ const ProfilePage: React.FC = () => {
   const getFullUrl = (url: string) => resolveAssetUrl(url);
   const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
 
-  const isVideo = (mediaType: string) =>
-    ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
-
   const targetNickname = urlNickname || myNickname;
   const isMe = myNickname === targetNickname;
 
@@ -75,6 +177,22 @@ const ProfilePage: React.FC = () => {
     if (!isMe || !profile || myUserId == null || Number(profile.userId) !== Number(myUserId)) return;
     setSessionProfileImageUrl(profile.profileImageUrl ?? null);
   }, [isMe, profile, myUserId, setSessionProfileImageUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!isMe) {
+        if (!cancelled) setTechAdminAllowed(false);
+        return;
+      }
+      const ok = await isTechAdminSession(myNickname);
+      if (!cancelled) setTechAdminAllowed(ok);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMe, myNickname]);
 
   /** 빠른 라우트 전환 시 이전 getProfile 응답이 늦게 와도 상태를 덮어쓰지 않게 함 */
   const profileLoadGen = useRef(0);
@@ -256,19 +374,85 @@ const ProfilePage: React.FC = () => {
     }
   }, [fetchFollowLists]);
 
-  const fetchScraps = useCallback(async () => {
+  const mapScrapToGrid = useCallback(
+    (p: PostFeedResponse): PostFeedProfileRes => ({
+      id: p.id,
+      title: p.title,
+      medias: p.medias,
+      techStacks: p.techStacks,
+      likeCount: p.likeCount,
+      commentCount: p.commentCount,
+    }),
+    []
+  );
+
+  const fetchScrapsInitial = useCallback(async () => {
     if (!isMe) return;
     try {
       const res = await postApi.getScraps(0);
-      if (res.resultCode?.includes('-S-')) {
-        const mapped = res.data.content.map((p: any) => ({
-          id: p.id, medias: p.medias, techStacks: p.techStacks,
-          likeCount: p.likeCount, commentCount: p.commentCount
-        }));
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const data = res.data;
+        const mapped = (data.content ?? []).map((p) => mapScrapToGrid(p));
         setScrappedPosts(mapped);
+        setScrapsLast(data.last);
+        setScrapsPage(0);
+        setScrapsTotalElements(typeof data.totalElements === 'number' ? data.totalElements : null);
       }
-    } catch (err) { console.error('스크랩 로드 실패', err); }
-  }, [isMe]);
+    } catch (err) {
+      console.error('스크랩 로드 실패', err);
+    }
+  }, [isMe, mapScrapToGrid]);
+
+  const loadMoreProfilePosts = useCallback(async () => {
+    const name = targetNicknameRef.current;
+    if (!name || postsLoadingMore || !profileRef.current?.posts || profileRef.current.posts.last) return;
+    setPostsLoadingMore(true);
+    try {
+      const nextPage = profileRef.current.posts.number + 1;
+      const res = await userApi.getProfile(name, nextPage);
+      if (!(res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) || !res.data) return;
+      if (targetNicknameRef.current !== name) return;
+      const data = res.data;
+      setProfile((prev) => {
+        if (!prev || prev.userId !== data.userId) return data;
+        const inc = data.posts;
+        return {
+          ...data,
+          posts: {
+            ...inc,
+            content: [...prev.posts.content, ...inc.content],
+            first: prev.posts.first,
+            numberOfElements: prev.posts.content.length + inc.content.length,
+          },
+        };
+      });
+    } catch (err) {
+      console.error('게시물 추가 로드 실패', err);
+    } finally {
+      setPostsLoadingMore(false);
+    }
+  }, [postsLoadingMore]);
+
+  const loadMoreScraps = useCallback(async () => {
+    if (!isMe || scrapsLast || scrapsLoadingMore) return;
+    setScrapsLoadingMore(true);
+    try {
+      const nextPage = scrapsPage + 1;
+      const res = await postApi.getScraps(nextPage);
+      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const data = res.data;
+        const mapped = (data.content ?? []).map((p) => mapScrapToGrid(p));
+        setScrappedPosts((prev) => [...prev, ...mapped]);
+        setScrapsLast(data.last);
+        setScrapsPage(nextPage);
+        if (typeof data.totalElements === 'number') setScrapsTotalElements(data.totalElements);
+      }
+    } catch (err) {
+      console.error('스크랩 추가 로드 실패', err);
+    } finally {
+      setScrapsLoadingMore(false);
+    }
+  }, [isMe, scrapsLast, scrapsLoadingMore, scrapsPage, mapScrapToGrid]);
 
   const fetchArchivedStories = useCallback(async () => {
     if (!isMe) return;
@@ -440,10 +624,9 @@ const ProfilePage: React.FC = () => {
   }, [targetNickname, fetchFollowLists]);
 
   useEffect(() => {
-    if (isMe && activeTab === 'scraps' && scrappedPosts.length === 0) {
-      fetchScraps();
-    }
-  }, [isMe, activeTab, fetchScraps, scrappedPosts.length]);
+    if (!isMe || activeTab !== 'scraps') return;
+    void fetchScrapsInitial();
+  }, [isMe, activeTab, fetchScrapsInitial]);
 
   useEffect(() => {
     if (isMe && activeTab === 'archive' && archivedStories.length === 0) {
@@ -527,18 +710,24 @@ const ProfilePage: React.FC = () => {
     } catch (err) { alert('채팅방을 시작할 수 없습니다.'); }
   };
 
-  const handleHardDeleteStory = async (storyId: number) => {
+  const handleHardDeleteStory = async (story: StoryDetailResponse) => {
+    if (isRemoteStoryMediaUrl(story.mediaUrl)) {
+      alert(
+        '이 스토리는 외부 이미지·동영상 주소(https://…)로 저장되어 있습니다. 서버가 로컬 파일만 삭제하도록 되어 있어 완전 삭제 시 오류가 납니다. DB·스토리지까지 지우려면 백엔드에서 외부 URL인 경우 파일 삭제 단계를 건너뛰도록 수정이 필요합니다.'
+      );
+      return;
+    }
     if (!window.confirm('이 만료 스토리를 완전히 삭제하시겠습니까?')) return;
     try {
-      const res = await storyApi.hardDelete(storyId);
+      const res = await storyApi.hardDelete(story.storyId);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        setArchivedStories(prev => prev.filter(story => story.storyId !== storyId));
+        setArchivedStories((prev) => prev.filter((s) => s.storyId !== story.storyId));
       } else {
         alert(res.msg || '스토리 삭제에 실패했습니다.');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('스토리 하드 삭제 실패:', err);
-      alert('스토리 삭제에 실패했습니다.');
+      alert(getApiErrorMessage(err, '스토리 삭제에 실패했습니다.'));
     }
   };
 
@@ -588,7 +777,16 @@ const ProfilePage: React.FC = () => {
 
   return (
     <MainLayout title={profile.nickname}>
-      <header style={{ display: 'flex', alignItems: 'flex-start', gap: '40px', marginBottom: '44px' }}>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 'clamp(20px, 4vw, 40px)',
+          marginBottom: '44px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
         {profileStoryRing.hasActiveStories ? (
           <div
             role="button"
@@ -646,8 +844,8 @@ const ProfilePage: React.FC = () => {
             style={{ border: '1px solid #dbdbdb', flexShrink: 0, alignSelf: 'flex-start' }}
           />
         )}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
             <span style={{ fontSize: '1.8rem', fontWeight: '300' }}>{profile.nickname}</span>
             {isMe ? (
               <>
@@ -662,8 +860,8 @@ const ProfilePage: React.FC = () => {
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: '40px', marginBottom: '20px' }}>
-            <span>게시물 <strong>{profile.postCount}</strong></span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'clamp(16px, 4vw, 40px)', marginBottom: '20px' }}>
+            <span>게시물 <strong>{getProfilePostCountLabel(profile)}</strong></span>
             <span style={{ cursor: 'pointer' }} onClick={() => setModalConfig({ title: '팔로워', id: profile.userId, type: 'followers' })}>
               팔로워 <strong>{profile.followerCount}</strong>
             </span>
@@ -684,123 +882,192 @@ const ProfilePage: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ borderTop: '1px solid #dbdbdb', display: 'flex', justifyContent: 'center', gap: '60px' }}>
-        <button onClick={() => setActiveTab('posts')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'posts' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Grid size={12} /> 게시물</button>
-        <button onClick={() => setActiveTab('tech')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'tech' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><BarChart2 size={12} /> 기술 레벨</button>
-        {isMe && <button onClick={() => setActiveTab('scraps')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'scraps' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Bookmark size={12} /> 저장됨</button>}
-        {isMe && <button onClick={() => setActiveTab('archive')} style={{ background: 'none', border: 'none', padding: '15px 0', borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none', marginTop: '-1px', cursor: 'pointer', color: activeTab === 'archive' ? '#262626' : '#8e8e8e', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '5px' }}><Clock3 size={12} /> 만료 스토리</button>}
+      <div className={`profile-tab-grid ${isMe ? 'profile-tab-grid--cols-4' : 'profile-tab-grid--cols-2'}`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('posts')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '15px 8px',
+            borderTop: activeTab === 'posts' ? '1px solid #262626' : 'none',
+            marginTop: '-1px',
+            cursor: 'pointer',
+            color: activeTab === 'posts' ? '#262626' : '#8e8e8e',
+            fontWeight: 'bold',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px',
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Grid size={12} /> 게시물
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('tech')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '15px 8px',
+            borderTop: activeTab === 'tech' ? '1px solid #262626' : 'none',
+            marginTop: '-1px',
+            cursor: 'pointer',
+            color: activeTab === 'tech' ? '#262626' : '#8e8e8e',
+            fontWeight: 'bold',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px',
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <BarChart2 size={12} /> 기술 레벨
+        </button>
+        {isMe && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('scraps')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '15px 8px',
+              borderTop: activeTab === 'scraps' ? '1px solid #262626' : 'none',
+              marginTop: '-1px',
+              cursor: 'pointer',
+              color: activeTab === 'scraps' ? '#262626' : '#8e8e8e',
+              fontWeight: 'bold',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+              minWidth: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Bookmark size={12} /> 저장됨
+            {activeTab === 'scraps' && scrapsTotalElements != null ? (
+              <span style={{ fontWeight: 600, color: '#8e8e8e' }}>({scrapsTotalElements})</span>
+            ) : null}
+          </button>
+        )}
+        {isMe && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('archive')}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: '15px 8px',
+              borderTop: activeTab === 'archive' ? '1px solid #262626' : 'none',
+              marginTop: '-1px',
+              cursor: 'pointer',
+              color: activeTab === 'archive' ? '#262626' : '#8e8e8e',
+              fontWeight: 'bold',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+              minWidth: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Clock3 size={12} /> 만료 스토리
+          </button>
+        )}
       </div>
 
-      <div style={{ marginTop: '20px' }}>
+      <div className="profile-tab-body">
         {activeTab === 'posts' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
-            {profile.posts.content.map(post => (
-              <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ position: 'relative', aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && (
-                  isVideo(post.medias[0].mediaType) ? (
-                    <video
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      muted
-                      playsInline
-                      onError={(e) => {
-                        const video = e.currentTarget;
-                        if (video.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          video.dataset.fallbackApplied = '1';
-                          video.src = fallback;
-                          video.load();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      alt="thumb"
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        if (img.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          img.dataset.fallbackApplied = '1';
-                          img.src = fallback;
-                        }
-                      }}
-                    />
-                  )
-                )}
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', gap: '20px' }} onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={20} fill="white" /> {post.likeCount}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><MessageCircle size={20} fill="white" /> {post.commentCount}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="profile-tab-grid-3">
+              {profile.posts.content.map((post) => (
+                <ProfilePostGridThumb key={post.id} post={post} />
+              ))}
+            </div>
+            {!profile.posts.last && profile.posts.content.length > 0 && (
+              <button
+                type="button"
+                className="profile-tab-load-more"
+                onClick={() => void loadMoreProfilePosts()}
+                disabled={postsLoadingMore}
+              >
+                {postsLoadingMore ? '불러오는 중…' : '게시물 더 보기'}
+              </button>
+            )}
+          </>
         )}
         {activeTab === 'scraps' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
-            {scrappedPosts.map(post => (
-              <div key={post.id} onClick={() => navigate(`/post/${post.id}`)} style={{ aspectRatio: '1/1', backgroundColor: '#efefef', cursor: 'pointer', overflow: 'hidden' }}>
-                {post.medias[0] && (
-                  isVideo(post.medias[0].mediaType) ? (
-                    <video
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      muted
-                      playsInline
-                      onError={(e) => {
-                        const video = e.currentTarget;
-                        if (video.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          video.dataset.fallbackApplied = '1';
-                          video.src = fallback;
-                          video.load();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={getFullUrl(post.medias[0].sourceUrl)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      alt="thumb"
-                      onError={(e) => {
-                        const img = e.currentTarget;
-                        if (img.dataset.fallbackApplied === '1') return;
-                        const fallback = getFallbackUrl(post.medias[0].sourceUrl);
-                        if (fallback) {
-                          img.dataset.fallbackApplied = '1';
-                          img.src = fallback;
-                        }
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="profile-tab-grid-3">
+              {scrappedPosts.map((post) => (
+                <ProfilePostGridThumb key={post.id} post={post} />
+              ))}
+            </div>
+            {!scrapsLast && scrappedPosts.length > 0 && (
+              <button
+                type="button"
+                className="profile-tab-load-more"
+                onClick={() => void loadMoreScraps()}
+                disabled={scrapsLoadingMore}
+              >
+                {scrapsLoadingMore ? '불러오는 중…' : '저장됨 더 보기'}
+              </button>
+            )}
+          </>
         )}
         {activeTab === 'tech' && (
-          <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '12px' }}>
-            <h3 style={{ marginBottom: '8px', fontSize: '1rem', fontWeight: 'bold' }}>기술 스택 숙련도</h3>
-            <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#8e8e8e' }}>
-              각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
-            </p>
-            {profile.topTechScores && profile.topTechScores.length > 0 ? (
-              <TechRadarChart scores={profile.topTechScores} maxScore={100} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <p style={{ color: '#8e8e8e' }}>아직 활동 데이터가 부족합니다.</p>
-              </div>
-            )}
+          <div className="profile-tab-grid-3 profile-tab-grid-3--single">
+            <div className="profile-tab-tech-inner">
+              <h3 className="profile-tab-section-title">기술 스택 숙련도</h3>
+              <p className="profile-tab-section-desc">
+                각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
+              </p>
+              {techAdminAllowed && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/technologies/manage')}
+                    style={{ padding: '10px 14px', background: '#fff', border: '1px solid #dbdbdb', borderRadius: 8, cursor: 'pointer', fontWeight: 800 }}
+                  >
+                    기술 관리
+                  </button>
+                </div>
+              )}
+              {profile.topTechScores && profile.topTechScores.length > 0 ? (
+                <TechRadarChart scores={profile.topTechScores} maxScore={100} />
+              ) : (
+                <div className="profile-tab-empty">
+                  <p style={{ margin: 0 }}>아직 활동 데이터가 부족합니다.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
         {activeTab === 'archive' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '28px' }}>
+          <div className="profile-tab-grid-3">
             {archivedStories.map((story) => (
-              <div key={story.storyId} style={{ position: 'relative', aspectRatio: '9/16', backgroundColor: '#efefef', overflow: 'hidden' }}>
+              <div
+                key={story.storyId}
+                className="profile-tab-thumb"
+                style={{ aspectRatio: '9/16', cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/story/archive/${story.storyId}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigate(`/story/archive/${story.storyId}`);
+                  }
+                }}
+              >
                 {story.mediaType.toLowerCase().includes('mp4') || story.mediaType.toLowerCase().includes('webm') || story.mediaType.toLowerCase().includes('mov') ? (
                   <video
                     src={getFullUrl(story.mediaUrl)}
@@ -832,9 +1099,43 @@ const ProfilePage: React.FC = () => {
                     }}
                   />
                 )}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    color: '#fff',
+                    gap: '20px',
+                    zIndex: 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Heart size={20} fill="white" /> {story.totalLikeCount}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Users size={20} /> {(story.viewers ?? []).length}
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => handleHardDeleteStory(story.storyId)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleHardDeleteStory(story);
+                  }}
                   style={{
                     position: 'absolute',
                     top: '8px',
@@ -848,7 +1149,8 @@ const ProfilePage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    zIndex: 2,
                   }}
                   title="스토리 삭제"
                 >
@@ -857,8 +1159,8 @@ const ProfilePage: React.FC = () => {
               </div>
             ))}
             {archivedStories.length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#8e8e8e', padding: '40px 0' }}>
-                만료된 스토리가 없습니다.
+              <div className="profile-tab-empty">
+                <p style={{ margin: 0 }}>만료된 스토리가 없습니다.</p>
               </div>
             )}
           </div>

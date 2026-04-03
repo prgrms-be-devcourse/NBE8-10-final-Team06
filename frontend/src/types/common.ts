@@ -38,3 +38,9 @@ export interface Slice<T> {
   last: boolean;
   empty: boolean;
 }
+
+/** Spring Data Page (예: 스크랩 목록) */
+export interface Page<T> extends Slice<T> {
+  totalPages: number;
+  totalElements: number;
+}

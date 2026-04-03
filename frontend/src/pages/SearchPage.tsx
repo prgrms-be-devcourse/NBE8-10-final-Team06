@@ -10,6 +10,7 @@ import { searchUtil } from '../util/search';
 import { useAuthStore } from '../store/useAuthStore';
 import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
 import ProfileAvatar from '../components/common/ProfileAvatar';
+import UserRecommendationsSection from '../components/user/UserRecommendationsSection';
 
 // --- 서브 컴포넌트: 검색 결과 아이템 ---
 const SearchResultItem: React.FC<{ 
@@ -249,6 +250,9 @@ const SearchPage: React.FC = () => {
       </div>
 
       <div className="content-area">
+        <div style={{ marginBottom: 16 }}>
+          <UserRecommendationsSection title="추천" />
+        </div>
         {keyword.trim() ? (
           <>
             <div className="results-list">

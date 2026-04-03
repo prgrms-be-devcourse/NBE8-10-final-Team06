@@ -96,7 +96,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
     }
     const rid = Number(roomId);
 
-    const TYPING_STOP_UI_DEBOUNCE_MS = 220;
     const typingStopUiDebounceRef = { current: null as number | null };
     const cancelTypingStopDebounce = () => {
       if (typingStopUiDebounceRef.current != null) {
@@ -182,15 +181,8 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
         ) {
           return;
         }
-        cancelTypingStopDebounce();
-        const uidForStop = typingUid;
-        typingStopUiDebounceRef.current = window.setTimeout(() => {
-          typingStopUiDebounceRef.current = null;
-          if (lastShownTypingUserIdRef.current === uidForStop) {
-            lastShownTypingUserIdRef.current = null;
-            setRemoteTyping(null);
-          }
-        }, TYPING_STOP_UI_DEBOUNCE_MS);
+        /** 지연 해제 시 그 사이 도착한 `start` 가 디바운스를 취소해 입력 종료 후에도 말풍선이 다시 켜질 수 있음 → 즉시 해제 */
+        clearRemoteTypingNow();
         return;
       }
 

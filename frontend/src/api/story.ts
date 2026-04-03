@@ -8,6 +8,7 @@ import {
   StoryCreateResponse
 } from '../types/story';
 import { RsData } from '../types/common';
+import { appendOptionalFormField } from '../util/formDataParts';
 
 export const storyApi = {
   // 스토리 피드(홈 바) 조회
@@ -51,8 +52,9 @@ export const storyApi = {
     formData.append('mediaType', data.mediaType);
     
     if (data.tagUserIds && data.tagUserIds.length > 0) {
-      data.tagUserIds.forEach(id => formData.append('tagUserIds', id.toString()));
+      data.tagUserIds.forEach((id) => formData.append('tagUserIds', id.toString()));
     }
+    appendOptionalFormField(formData, 'thumbnailUrl', data.thumbnailUrl);
 
     const res = await client.post<RsData<StoryCreateResponse>>('/story', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
