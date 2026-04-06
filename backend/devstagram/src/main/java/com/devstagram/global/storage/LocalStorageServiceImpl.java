@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-@Profile("test")
+@Profile("!prod")
 public class LocalStorageServiceImpl implements StorageService {
 
     // application.yml 파일에 적어둔 저장 경로를 빼옴
