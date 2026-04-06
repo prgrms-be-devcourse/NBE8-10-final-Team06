@@ -69,6 +69,10 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/actuator/health")
                         .permitAll()
+                        .requestMatchers("/actuator/prometheus")
+                        .permitAll()
+                        .requestMatchers("/actuator/metrics/**")
+                        .permitAll()
 
                         // 3. 내 정보 조회는 반드시 인증(authenticated) 필요!
                         // /api/auth/** 보다 위에 있어야 먼저 적용됩니다.

@@ -120,7 +120,7 @@ public class PostService {
     @Transactional(readOnly = true)
     public PostDetailRes getPostDetail(Long memberId, Long postId, int pageNumber) {
         Post post = postRepository
-                .findPostWithDetails(postId)
+                .findPost(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
         Pageable pageable = PageRequest.of(
@@ -181,11 +181,11 @@ public class PostService {
             for (int i = 0; i < files.size(); i++) {
                 MultipartFile file = files.get(i);
 
-                String savedFileName = storageService.store(file);
+                String fileUrl = storageService.store(file);
 
                 PostMedia postMedia = PostMedia.builder()
                         .post(post)
-                        .sourceUrl(savedFileName)
+                        .sourceUrl(fileUrl)
                         .mediaType(extractMediaType(file))
                         .sequence((short) (i + 1))
                         .build();
@@ -295,32 +295,26 @@ public class PostService {
             throw new ServiceException("403-U-2", "삭제 권한이 없습니다.");
         }
 
-        // 1. [최적화] User 엔티티 통째가 아니라 ID 리스트만 뽑아서 비동기로 넘깁니다.
+        // [최적화] User 엔티티 통째가 아니라 ID 리스트만 뽑아서 비동기로 넘깁니다.
         List<Long> targetUserIds = feedService.findTargetUsersForPost(post).stream()
                 .map(User::getId)
                 .toList();
 
-        // 2. 기술 점수 회수 (영속성 컨텍스트 활용)
+        // 기술 점수 회수 (영속성 컨텍스트 활용)
         if (!post.getTechTags().isEmpty()) {
             post.getTechTags()
                     .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "POST"));
             post.getTechTags().clear();
         }
 
-        commentRepository.deleteParentsByPostId(postId);
-        commentRepository.deleteRepliesByPostId(postId);
-
-        // 3. 파일 및 DB 상태 변경
-        List<String> fileNames =
-                post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
         post.softDelete();
+
         userRepository.decreasePostCount(userId);
 
-        // 4. Redis 정리 위임 (ID 리스트만 전달)
-        feedService.removePostFromFeeds(postId, targetUserIds, userId);
+        postRepository.saveAndFlush(post);
 
-        // 5. 물리 파일 삭제
-        fileNames.forEach(storageService::delete);
+        // Redis 정리 위임 (ID 리스트만 전달)
+        feedService.removePostFromFeeds(postId, targetUserIds, userId);
     }
 
     @Transactional
