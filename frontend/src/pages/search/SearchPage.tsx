@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import MainLayout from '../components/layout/MainLayout';
-import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
-import { toggleFollowRelation } from '../services/followToggle';
-import { dmApi } from '../api/dm';
-import { UserSearchResponse, FollowResponse } from '../types/user';
+import MainLayout from '../../components/layout/MainLayout';
+import { userApi, FOLLOW_CHANGED_EVENT } from '../../api/user';
+import { toggleFollowRelation } from '../../services/followToggle';
+import { dmApi } from '../../api/dm';
+import { UserSearchResponse, FollowResponse } from '../../types/user';
 import { Search, X, History, Clock } from 'lucide-react';
-import { searchUtil } from '../util/search';
-import { useAuthStore } from '../store/useAuthStore';
-import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
-import ProfileAvatar from '../components/common/ProfileAvatar';
-import UserRecommendationsSection from '../components/user/UserRecommendationsSection';
+import { searchUtil } from '../../util/search';
+import { useAuthStore } from '../../store/useAuthStore';
+import { mergeFollowingHint, useFollowLocalStore } from '../../store/useFollowLocalStore';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import UserRecommendationsSection from '../../components/user/UserRecommendationsSection';
 
 // --- 서브 컴포넌트: 검색 결과 아이템 ---
 const SearchResultItem: React.FC<{ 

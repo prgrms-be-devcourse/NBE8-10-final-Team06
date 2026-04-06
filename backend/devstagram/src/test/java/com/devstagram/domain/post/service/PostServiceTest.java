@@ -225,8 +225,6 @@ class PostServiceTest {
 
         // then
         assertThat(mockPost.isDeleted()).isTrue();
-        verify(commentRepository).deleteRepliesByPostId(postId);
-        verify(commentRepository).deleteParentsByPostId(postId);
         verify(postRepository).findById(postId);
     }
 
@@ -265,7 +263,7 @@ class PostServiceTest {
 
         Slice<Comment> commentEntitySlice = new SliceImpl<>(List.of(realComment), PageRequest.of(pageNumber, 10), true);
 
-        given(postRepository.findPostWithDetails(postId)).willReturn(Optional.of(post));
+        given(postRepository.findPost(postId)).willReturn(Optional.of(post));
         given(commentRepository.findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class)))
                 .willReturn(commentEntitySlice);
 
@@ -279,7 +277,7 @@ class PostServiceTest {
         assertThat(result.comments().getContent().get(0).content()).isEqualTo("첫 번째 댓글");
 
         // 4. Verify
-        verify(postRepository).findPostWithDetails(postId); // findById -> findPostWithDetails
+        verify(postRepository).findPost(postId); // findById -> findPostWithDetails
         verify(commentRepository).findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class));
     }
 

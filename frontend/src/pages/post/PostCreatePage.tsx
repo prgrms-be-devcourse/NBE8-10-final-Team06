@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, X } from 'lucide-react';
-import { postApi } from '../api/post';
-import { technologyApi } from '../api/technology';
-import { TechTagRes } from '../types/post';
-import BottomNav from '../components/layout/BottomNav';
-import { getApiErrorMessage } from '../util/apiError';
-import { isRsDataSuccess } from '../util/rsData';
+import { postApi } from '../../api/post';
+import { technologyApi } from '../../api/technology';
+import { TechTagRes } from '../../types/post';
+import BottomNav from '../../components/layout/BottomNav';
+import { getApiErrorMessage } from '../../util/apiError';
+import { isRsDataSuccess } from '../../util/rsData';
 
 const PostCreatePage: React.FC = () => {
   const [title, setTitle] = useState('');
@@ -15,7 +15,7 @@ const PostCreatePage: React.FC = () => {
   const [previews, setPreviews] = useState<string[]>([]);
   const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
-  const [techIdInput, setTechIdInput] = useState('');
+  const [techSearchQuery, setTechSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -38,6 +38,17 @@ const PostCreatePage: React.FC = () => {
       prev.includes(techId) ? prev.filter(id => id !== techId) : [...prev, techId]
     );
   };
+
+  const displayedTechs = useMemo(() => {
+    const raw = techSearchQuery.trim();
+    if (!raw) return allTechs;
+    const q = raw.toLowerCase();
+    return allTechs.filter((tech) => {
+      if (tech.name.toLowerCase().includes(q)) return true;
+      if (/^\d+$/.test(raw) && String(tech.id).includes(raw)) return true;
+      return false;
+    });
+  }, [allTechs, techSearchQuery]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -71,16 +82,6 @@ const PostCreatePage: React.FC = () => {
     URL.revokeObjectURL(newPreviews[index]);
     newPreviews.splice(index, 1);
     setPreviews(newPreviews);
-  };
-
-  const applyManualTechIds = () => {
-    const parsed = techIdInput
-      .split(',')
-      .map((v) => Number(v.trim()))
-      .filter((v) => Number.isInteger(v) && v > 0);
-
-    const unique = Array.from(new Set(parsed));
-    setSelectedTechIds(unique);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,62 +169,77 @@ const PostCreatePage: React.FC = () => {
 
           <div style={{ marginBottom: '30px' }}>
             <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>기술 태그</label>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-              <input
-                type="text"
-                value={techIdInput}
-                onChange={(e) => setTechIdInput(e.target.value)}
-                placeholder="기술 ID 입력 (예: 1,2,3)"
-                style={{ flex: 1, padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px' }}
-              />
-              <button
-                type="button"
-                onClick={applyManualTechIds}
-                style={{ padding: '10px 12px', border: '1px solid #dbdbdb', borderRadius: '4px', background: '#fff', cursor: 'pointer' }}
-              >
-                적용
-              </button>
-            </div>
+            <input
+              type="search"
+              value={techSearchQuery}
+              onChange={(e) => setTechSearchQuery(e.target.value)}
+              placeholder="태그 이름 검색 (예: React, Java)"
+              autoComplete="off"
+              style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px', boxSizing: 'border-box', marginBottom: '10px' }}
+            />
+            <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: '#8e8e8e' }}>
+              검색어가 없으면 전체 태그가 표시됩니다. 입력 시 이름으로 필터되며, 숫자만 입력하면 ID로도 찾을 수 있습니다.
+            </p>
 
             {selectedTechIds.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                {selectedTechIds.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setSelectedTechIds((prev) => prev.filter((v) => v !== id))}
-                    style={{ padding: '4px 10px', border: '1px solid #dbdbdb', borderRadius: '14px', background: '#f7f7f7', cursor: 'pointer', fontSize: '0.8rem' }}
-                  >
-                    #{id} ×
-                  </button>
-                ))}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                {selectedTechIds.map((id) => {
+                  const tech = allTechs.find((t) => t.id === id);
+                  const label = tech ? tech.name : `태그 #${id}`;
+                  const color = tech?.color ?? '#dbdbdb';
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSelectedTechIds((prev) => prev.filter((v) => v !== id))}
+                      style={{
+                        padding: '4px 10px',
+                        border: `1px solid ${color}`,
+                        borderRadius: '14px',
+                        background: tech ? `${color}18` : '#f7f7f7',
+                        color: tech ? color : '#262626',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      #{label} ×
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {allTechs.map(tech => {
-                const isSelected = selectedTechIds.includes(tech.id);
-                return (
-                  <button
-                    key={tech.id}
-                    type="button"
-                    onClick={() => toggleTech(tech.id)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      border: `1px solid ${tech.color}`,
-                      backgroundColor: isSelected ? tech.color : '#fff',
-                      color: isSelected ? '#fff' : tech.color,
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    #{tech.name}
-                  </button>
-                );
-              })}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '8px' }}>
+              {displayedTechs.length === 0 ? (
+                <span style={{ fontSize: '0.85rem', color: '#8e8e8e' }}>
+                  {techSearchQuery.trim() ? '검색 결과가 없습니다.' : '등록된 기술 태그가 없습니다.'}
+                </span>
+              ) : (
+                displayedTechs.map((tech) => {
+                  const isSelected = selectedTechIds.includes(tech.id);
+                  return (
+                    <button
+                      key={tech.id}
+                      type="button"
+                      onClick={() => toggleTech(tech.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        border: `1px solid ${tech.color}`,
+                        backgroundColor: isSelected ? tech.color : '#fff',
+                        color: isSelected ? '#fff' : tech.color,
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      #{tech.name}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 

@@ -10,13 +10,13 @@ import StoryArchive from './pages/story/StoryArchive';
 import ArchivedStoryViewer from './pages/story/ArchivedStoryViewer';
 import DmListPage from './pages/dm/DmListPage';
 import DmChatPage from './pages/dm/DmChatPage';
-import HomePage from './pages/HomePage';
-import PostDetailPage from './pages/PostDetailPage';
-import PostCreatePage from './pages/PostCreatePage';
-import PostEditPage from './pages/PostEditPage';
-import ProfilePage from './pages/ProfilePage';
-import ProfileEditPage from './pages/ProfileEditPage';
-import SearchPage from './pages/SearchPage';
+import HomePage from './pages/home/HomePage';
+import PostDetailPage from './pages/post/PostDetailPage';
+import PostCreatePage from './pages/post/PostCreatePage';
+import PostEditPage from './pages/post/PostEditPage';
+import ProfilePage from './pages/profile/ProfilePage';
+import ProfileEditPage from './pages/profile/ProfileEditPage';
+import SearchPage from './pages/search/SearchPage';
 import TechManagePage from './pages/technology/TechManagePage';
 import TechCategoryManagePage from './pages/technology/TechCategoryManagePage';
 import { useAuthStore } from './store/useAuthStore';
@@ -39,7 +39,7 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authApi.me();
+        const res = await authApi.me({ sessionProbe: true });
         if (cancelled) return;
         if (isRsDataSuccess(res) && res.data) {
           const { id, nickname } = res.data;

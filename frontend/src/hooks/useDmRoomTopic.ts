@@ -10,6 +10,7 @@
  *
  * 송신은 페이지에서 `/app/dm/{roomId}/message` + DmSendMessageRequest (type, content, thumbnail).
  * WS 가 메시지를 놓치는 환경에서는 DmChatPage 의 REST 폴링·전송 직후 sync 로 보완한다.
+ * 새 메시지 시 하단 스크롤은 페이지 `messages` 기준 `useLayoutEffect` 에서 처리한다.
  */
 
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
@@ -26,6 +27,7 @@ import {
   mergePendingStompBatchIntoUiMessages,
   mergeRealtimeDmMessageIntoList,
 } from '../util/dmMessagesMerge';
+import { DM_UNKNOWN_PEER_NICKNAME, formatDmPeerNickname } from '../util/dmPeerDisplayName';
 import {
   buildDmStompMessageBody,
   dmStompAppMessage,
@@ -47,7 +49,6 @@ export type UseDmRoomTopicParams = {
   typingEchoSelfUserIdRef: MutableRefObject<number | null>;
   roomIdRef: DmRoomIdRef;
   typingPollDebounceRef: MutableRefObject<number | null>;
-  scrollRef: MutableRefObject<HTMLDivElement | null>;
   messagesRefreshGenRef: MutableRefObject<number>;
   sendReadEventRef: MutableRefObject<(messageId: number) => void>;
   mergeFreshSliceIntoMessages: (rid: number, slice: DmMessageSliceResponse) => void;
@@ -69,7 +70,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
     typingEchoSelfUserIdRef,
     roomIdRef,
     typingPollDebounceRef,
-    scrollRef,
     messagesRefreshGenRef,
     sendReadEventRef,
     mergeFreshSliceIntoMessages,
@@ -139,10 +139,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           },
         });
       }, 700);
-
-      setTimeout(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }, 0);
     }, 450);
 
     const applyTopicTyping = (t: { userId: number; status: 'start' | 'stop' }) => {
@@ -186,12 +182,16 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
         return;
       }
 
-      const typingBubbleLabel = (nick: string) =>
-        roomSnap?.isGroup ? `${nick.trim() || '상대방'}님이 입력 중...` : '입력 중...';
-      const nick =
+      const typingBubbleLabel = (displayNick: string) => {
+        if (!roomSnap?.isGroup) return '입력 중...';
+        if (displayNick === DM_UNKNOWN_PEER_NICKNAME) return '입력 중...';
+        return `${displayNick}님이 입력 중...`;
+      };
+      const rawNick =
         parts.find((p) => Number(p.userId) === typingUid)?.nickname?.trim() ||
         opponentTypingNicknameRef.current?.trim() ||
-        '상대방';
+        null;
+      const nick = formatDmPeerNickname(rawNick);
 
       const showRemoteTyping = () => {
         cancelTypingStopDebounce();
@@ -227,8 +227,6 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           if (sid != null && lastShownTypingUserIdRef.current === sid) {
             clearRemoteTypingNow();
           }
-          const el = scrollRef.current;
-          if (el) el.scrollTop = el.scrollHeight;
         }
       }
 

@@ -36,13 +36,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :postId")
     void decrementLikeCount(@Param("postId") Long postId);
 
-    // 상세 조회: 페치 조인
-    @Query("select distinct p from Post p " + "join fetch p.user "
-            + "left join fetch p.mediaList "
-            + "left join fetch p.techTags pt "
-            + "left join fetch pt.technology "
-            + "where p.id = :id and p.isDeleted = false")
-    Optional<Post> findPostWithDetails(@Param("id") Long id);
+    // 상세조회
+    @Query("select p from Post p " + "join fetch p.user " + "where p.id = :id and p.isDeleted = false")
+    Optional<Post> findPost(@Param("id") Long id);
 
     // 특정 ID 리스트 조회: 삭제되지 않은 것만
     List<Post> findAllByIdInAndIsDeletedFalse(List<Long> ids);

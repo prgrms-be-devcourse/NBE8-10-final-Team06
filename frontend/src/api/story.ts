@@ -23,18 +23,25 @@ export const storyApi = {
     return res.data;
   },
 
-  // 스토리 단건 조회 및 시청 기록 전송
-  recordView: async (storyId: number): Promise<RsData<StoryDetailResponse>> => {
-    const res = await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`);
+  /**
+   * 스토리 단건 시청 기록 — 백엔드 필수 쿼리 `targetUserId`(스토리 작성자 user id).
+   * 하드삭제된 스토리 등 분기 시 서버가 targetUserId로 탈퇴/삭제 응답을 구분함.
+   */
+  recordView: async (storyId: number, targetUserId: number): Promise<RsData<StoryDetailResponse>> => {
+    const res = await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`, null, {
+      params: { targetUserId },
+    });
     return res.data;
   },
 
-  /** 시청 기록 전송(베스트 에포트). 서버/네트워크 오류 시에도 예외를 던지지 않음 — 피어 재생 흐름용. */
-  recordViewSafe: async (storyId: number): Promise<void> => {
+  /** 시청 기록 전송(베스트 에포트). 실패해도 예외 없음 — 뷰어 재생 흐름용. */
+  recordViewSafe: async (storyId: number, targetUserId: number): Promise<void> => {
     try {
-      await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`);
+      await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`, null, {
+        params: { targetUserId },
+      });
     } catch {
-      /* 백엔드 5xx 등으로 실패해도 뷰어는 계속 동작 */
+      /* 백엔드 5xx 등 */
     }
   },
 
@@ -74,7 +81,9 @@ export const storyApi = {
     return res.data;
   },
 
-  // 스토리 하드 삭제 (DELETE /api/story/{storyId}/hard-delete)
+  /**
+   * 스토리 영구 삭제 — 본인만 가능. 미디어가 http(s) 외부 URL이면 스토리지만 제거하고 파일 삭제는 건너뜀(백엔드).
+   */
   hardDelete: async (storyId: number): Promise<RsData<void>> => {
     const res = await client.delete<RsData<void>>(`/story/${storyId}/hard-delete`);
     return res.data;

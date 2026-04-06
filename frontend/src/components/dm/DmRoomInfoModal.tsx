@@ -4,6 +4,7 @@ import { X, Users } from 'lucide-react';
 import type { DmRoomSummaryResponse, DmRoomParticipantSummary } from '../../types/dm';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { useAuthStore } from '../../store/useAuthStore';
+import { formatDmPeerNickname, isWithdrawnPlaceholderNickname } from '../../util/dmPeerDisplayName';
 
 export type DmRoomInfoModalProps = {
   open: boolean;
@@ -23,7 +24,7 @@ function sortParticipants(list: DmRoomParticipantSummary[], myUserId: number | n
   return [...list].sort((a, b) => {
     if (myUserId != null && a.userId === myUserId && b.userId !== myUserId) return 1;
     if (myUserId != null && b.userId === myUserId && a.userId !== myUserId) return -1;
-    return a.nickname.localeCompare(b.nickname, 'ko');
+    return formatDmPeerNickname(a.nickname).localeCompare(formatDmPeerNickname(b.nickname), 'ko');
   });
 }
 
@@ -39,17 +40,25 @@ const DmRoomInfoModal: React.FC<DmRoomInfoModalProps> = ({ open, onClose, room }
     : [];
 
   const goProfile = (nickname: string) => {
+    const nick = nickname.trim();
+    if (!nick) return;
     onClose();
-    navigate(`/profile/${encodeURIComponent(nickname)}`);
+    navigate(`/profile/${encodeURIComponent(nick)}`);
   };
 
   const participantRow = (p: DmRoomParticipantSummary) => {
     const isMe = myUserId != null && p.userId === myUserId;
+    const displayNick = formatDmPeerNickname(p.nickname);
+    const canOpenProfile =
+      !isMe && Boolean(p.nickname?.trim()) && !isWithdrawnPlaceholderNickname(p.nickname);
     return (
       <button
         key={p.userId}
         type="button"
-        onClick={() => !isMe && goProfile(p.nickname)}
+        onClick={() => {
+          if (!canOpenProfile || !p.nickname?.trim()) return;
+          goProfile(p.nickname);
+        }}
         style={{
           width: '100%',
           display: 'flex',
@@ -59,13 +68,13 @@ const DmRoomInfoModal: React.FC<DmRoomInfoModalProps> = ({ open, onClose, room }
           border: 'none',
           borderBottom: '1px solid #fafafa',
           background: '#fff',
-          cursor: isMe ? 'default' : 'pointer',
+          cursor: isMe || !canOpenProfile ? 'default' : 'pointer',
           textAlign: 'left',
         }}
       >
-        <ProfileAvatar authorUserId={p.userId} profileImageUrl={p.profileImageUrl} nickname={p.nickname} sizePx={44} />
+        <ProfileAvatar authorUserId={p.userId} profileImageUrl={p.profileImageUrl} nickname={displayNick} sizePx={44} />
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#262626' }}>{p.nickname}</span>
+          <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#262626' }}>{displayNick}</span>
           {isMe && <span style={{ fontSize: '0.75rem', color: '#8e8e8e' }}>나</span>}
         </div>
       </button>

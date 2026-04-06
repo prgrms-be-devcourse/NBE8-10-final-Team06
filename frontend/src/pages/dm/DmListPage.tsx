@@ -9,16 +9,18 @@ import BottomNav from '../../components/layout/BottomNav';
 import { UserSearchResponse } from '../../types/user';
 import type { DmRoomSummaryResponse } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 
 function roomListTitle(room: DmRoomSummaryResponse, myUserId: number | null): string {
   if (room.isGroup) return room.roomName || '그룹 채팅';
   // GET /dm/rooms 요약은 본인을 participants 에서 제외하므로 1:1 에서 단일 요소가 곧 상대
   if (room.participants.length === 1) {
-    return room.participants[0]?.nickname ?? room.roomName ?? '채팅';
+    const p = room.participants[0];
+    return p ? formatDmPeerNickname(p.nickname) : room.roomName ?? '채팅';
   }
   const my = myUserId != null ? Number(myUserId) : NaN;
   const other = room.participants.find((p) => Number(p.userId) !== my);
-  return other?.nickname ?? room.roomName ?? '채팅';
+  return other ? formatDmPeerNickname(other.nickname) : room.roomName ?? '채팅';
 }
 
 function resolveParticipantDisplayLabel(
@@ -251,7 +253,7 @@ const DmListPage: React.FC = () => {
                           fillContainer
                           authorUserId={peer.userId}
                           profileImageUrl={peer.profileImageUrl}
-                          nickname={peer.nickname}
+                          nickname={formatDmPeerNickname(peer.nickname)}
                         />
                       ) : (
                         <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{room.roomName ? room.roomName[0].toUpperCase() : '?'}</span>

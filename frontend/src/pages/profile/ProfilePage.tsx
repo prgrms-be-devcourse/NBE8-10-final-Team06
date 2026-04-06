@@ -1,31 +1,31 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { isAxiosError } from 'axios';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
-import { useFollowSyncStore } from '../store/useFollowSyncStore';
-import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
-import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
-import { performClientLogout } from '../services/performClientLogout';
-import { applyAuthoritativeFollowStatus } from '../services/profileFollowState';
-import { loadFollowListsAndCounts } from '../services/profileFollowStats';
-import { toggleFollowRelation } from '../services/followToggle';
-import { postApi } from '../api/post';
-import { storyApi } from '../api/story';
-import { dmApi } from '../api/dm';
-import { isTechAdminSession } from '../util/techAdmin';
-import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
-import { PostFeedProfileRes, PostFeedResponse } from '../types/post';
-import { StoryDetailResponse } from '../types/story';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useFollowSyncStore } from '../../store/useFollowSyncStore';
+import { mergeFollowingHint, useFollowLocalStore } from '../../store/useFollowLocalStore';
+import { userApi, FOLLOW_CHANGED_EVENT } from '../../api/user';
+import { performClientLogout } from '../../services/performClientLogout';
+import { applyAuthoritativeFollowStatus } from '../../services/profileFollowState';
+import { loadFollowListsAndCounts } from '../../services/profileFollowStats';
+import { toggleFollowRelation } from '../../services/followToggle';
+import { postApi } from '../../api/post';
+import { storyApi } from '../../api/story';
+import { dmApi } from '../../api/dm';
+import { isTechAdminSession } from '../../util/techAdmin';
+import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../../types/user';
+import { PostFeedProfileRes, PostFeedResponse } from '../../types/post';
+import { StoryDetailResponse } from '../../types/story';
 import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2, Users } from 'lucide-react';
-import UserListModal from '../components/profile/UserListModal';
-import MainLayout from '../components/layout/MainLayout';
-import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
-import { getApiErrorMessage } from '../util/apiError';
-import ProfileAvatar from '../components/common/ProfileAvatar';
-import TechRadarChart from '../components/profile/TechRadarChart';
-import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
-import { getProfilePostCountLabel } from '../util/profilePostCount';
-import { isRemoteStoryMediaUrl } from '../util/storyMediaUrl';
+import UserListModal from '../../components/profile/UserListModal';
+import MainLayout from '../../components/layout/MainLayout';
+import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
+import { getApiErrorMessage } from '../../util/apiError';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import TechDonutChart from '../../components/profile/TechDonutChart';
+import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
+import { getProfilePostCountLabel } from '../../util/profilePostCount';
+import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -711,12 +711,6 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleHardDeleteStory = async (story: StoryDetailResponse) => {
-    if (isRemoteStoryMediaUrl(story.mediaUrl)) {
-      alert(
-        '이 스토리는 외부 이미지·동영상 주소(https://…)로 저장되어 있습니다. 서버가 로컬 파일만 삭제하도록 되어 있어 완전 삭제 시 오류가 납니다. DB·스토리지까지 지우려면 백엔드에서 외부 URL인 경우 파일 삭제 단계를 건너뛰도록 수정이 필요합니다.'
-      );
-      return;
-    }
     if (!window.confirm('이 만료 스토리를 완전히 삭제하시겠습니까?')) return;
     try {
       const res = await storyApi.hardDelete(story.storyId);
@@ -772,7 +766,8 @@ const ProfilePage: React.FC = () => {
 
   const openProfileStories = () => {
     if (!profileStoryRing.hasActiveStories) return;
-    navigate(`/story/${profile.userId}`);
+    const storyFrom = `${location.pathname}${location.search}`;
+    navigate(`/story/${profile.userId}`, { state: { [STORY_FROM_STATE_KEY]: storyFrom } });
   };
 
   return (
@@ -1028,7 +1023,7 @@ const ProfilePage: React.FC = () => {
             <div className="profile-tab-tech-inner">
               <h3 className="profile-tab-section-title">기술 스택 숙련도</h3>
               <p className="profile-tab-section-desc">
-                각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
+                원형 그래프는 보유 기술 점수 합계 대비 각 기술의 비중(%)을 나타냅니다. 왼쪽 요약에서 비중·점수를 함께 확인할 수 있습니다.
               </p>
               {techAdminAllowed && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
@@ -1041,8 +1036,15 @@ const ProfilePage: React.FC = () => {
                   </button>
                 </div>
               )}
-              {profile.topTechScores && profile.topTechScores.length > 0 ? (
-                <TechRadarChart scores={profile.topTechScores} maxScore={100} />
+              {(profile.allTechScores && profile.allTechScores.length > 0) ||
+              (profile.topTechScores && profile.topTechScores.length > 0) ? (
+                <TechDonutChart
+                  scores={
+                    profile.allTechScores && profile.allTechScores.length > 0
+                      ? profile.allTechScores
+                      : profile.topTechScores
+                  }
+                />
               ) : (
                 <div className="profile-tab-empty">
                   <p style={{ margin: 0 }}>아직 활동 데이터가 부족합니다.</p>

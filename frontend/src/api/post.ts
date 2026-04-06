@@ -1,3 +1,4 @@
+import axios from 'axios';
 import client from './client';
 import { RsData, Slice, Page } from '../types/common';
 import { appendJsonRequestPart, appendFileParts } from '../util/formDataParts';
@@ -8,6 +9,8 @@ import {
   PostUpdateRequest,
   PostLikerResponse
 } from '../types/post';
+
+export type DeletePostResult = 'deleted' | 'alreadyDeleted';
 
 export const postApi = {
   create: (req: PostCreateRequest, files: File[] = []) => {
@@ -41,6 +44,31 @@ export const postApi = {
 
   delete: (postId: number) =>
     client.delete<RsData<void>>(`/posts/${postId}`).then(res => res.data),
+
+  /**
+   * 백엔드 soft-delete 정책 대응:
+   * - 200-S-*  : 정상 삭제
+   * - 404-P-2 : 이미 삭제된 게시글(멱등 삭제로 간주)
+   */
+  deleteSafe: async (postId: number): Promise<DeletePostResult> => {
+    try {
+      const res = await client.delete<RsData<void>>(`/posts/${postId}`);
+      if (res.data.resultCode?.includes('-S-') || res.data.resultCode?.startsWith('200')) {
+        return 'deleted';
+      }
+      throw new Error(res.data.msg || '삭제 실패');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        const data = err.response?.data as { resultCode?: unknown } | undefined;
+        const code = typeof data?.resultCode === 'string' ? data.resultCode : '';
+        if (status === 404 && code === '404-P-2') {
+          return 'alreadyDeleted';
+        }
+      }
+      throw err;
+    }
+  },
 
   toggleLike: (postId: number) =>
     client.post<RsData<void>>(`/posts/${postId}/like`).then(res => res.data),
