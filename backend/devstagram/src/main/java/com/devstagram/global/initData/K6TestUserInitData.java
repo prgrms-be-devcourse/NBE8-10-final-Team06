@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.devstagram.domain.user.dto.SignupRequest;
@@ -58,8 +57,7 @@ public class K6TestUserInitData implements ApplicationRunner {
                     LocalDate.of(1995, 1, (i % 28) + 1),
                     i % 2 == 0 ? Gender.MALE : Gender.FEMALE,
                     "https://github.com/" + nickname,
-                    Resume.JUNIOR
-            ));
+                    Resume.JUNIOR));
 
             createdCount++;
         }
