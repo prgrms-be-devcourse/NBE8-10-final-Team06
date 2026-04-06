@@ -120,7 +120,7 @@ public class PostService {
     @Transactional(readOnly = true)
     public PostDetailRes getPostDetail(Long memberId, Long postId, int pageNumber) {
         Post post = postRepository
-                .findPostWithDetails(postId)
+                .findPost(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "해당 게시글이 존재하지 않습니다."));
 
         Pageable pageable = PageRequest.of(
@@ -181,11 +181,11 @@ public class PostService {
             for (int i = 0; i < files.size(); i++) {
                 MultipartFile file = files.get(i);
 
-                String savedFileName = storageService.store(file);
+                String fileUrl = storageService.store(file);
 
                 PostMedia postMedia = PostMedia.builder()
                         .post(post)
-                        .sourceUrl(savedFileName)
+                        .sourceUrl(fileUrl)
                         .mediaType(extractMediaType(file))
                         .sequence((short) (i + 1))
                         .build();

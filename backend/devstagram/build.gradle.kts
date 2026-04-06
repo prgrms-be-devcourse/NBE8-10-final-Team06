@@ -90,6 +90,8 @@ dependencies {
 	annotationProcessor("org.projectlombok:lombok")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
+    
+    implementation("io.awspring.cloud:spring-cloud-aws-starter-s3:3.1.0")
 
 	// runtimeOnly("com.mysql:mysql-connector-j")
 

@@ -21,3 +21,6 @@ spring:
 
   file:
     upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}
+
+storage:
+  location: ./uploads
