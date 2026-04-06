@@ -62,8 +62,13 @@ public class UserService {
             isFollowing = followService.isFollowing(currentUserId, targetUser.getId());
         }
 
-        // 3. 유저의 기술 벡터를 기반으로 상위 5개 기술 추출
-        List<TechScoreDto> topTechScores = getTopTechScoresFromVector(targetUser);
+        // 3. 모든 기술 스택(비중 포함)을 한 번에 가져옴
+        List<TechScoreDto> allTechScores = getAllTechScoresFromVector(targetUser);
+
+        // 프로필 상단 요약(Highlight) 정보를 위해 상위 5개 추출 (나중에 쓸 수도 있을 것 같아서 만들었음)
+        List<TechScoreDto> topTechScores = allTechScores.stream()
+                .limit(5)
+                .toList();
 
         // 4. 프로필에 보여줄 게시글 목록 조회 (최신순 정렬 적용)
         Slice<Post> postEntities =
@@ -79,6 +84,7 @@ public class UserService {
                 targetUser.getFollowingCount(),
                 isFollowing,
                 topTechScores,
+                allTechScores,
                 posts);
     }
 
@@ -156,7 +162,7 @@ public class UserService {
         eventPublisher.publishEvent(new UserWithdrawnEvent(userId));
     }
 
-    private List<TechScoreDto> getTopTechScoresFromVector(User user) {
+    private List<TechScoreDto> getAllTechScoresFromVector(User user) {
         // 1. 유저 엔티티에 저장된 기술 점수 벡터를 가져온다.
         float[] techVector = user.getTechVector();
 
@@ -165,60 +171,35 @@ public class UserService {
             return Collections.emptyList();
         }
 
-        // 2. 점수가 0보다 큰 기술만 따로 모아둘 리스트
-        List<TechScoreInfo> scoredTechnologies = new ArrayList<>();
+        // 2. 점수가 0보다 큰 기술만 따로 모아둘 리스트, '전체 점수 합계'를 먼저 계산
+        List<TechScoreInfo> scoredInfos = new ArrayList<>();
+        double totalScoreSum = 0;
 
-        // 3. 벡터를 처음부터 끝까지 순회하면서
-        //    점수가 있는 기술만 (기술ID, 점수) 형태로 저장
-        for (int index = 0; index < techVector.length; index++) {
-            float score = techVector[index];
-
-            // 점수가 0보다 큰 경우만 관심 기술로 본다
+        for (int i = 0; i < techVector.length; i++) {
+            float score = techVector[i];
             if (score > 0) {
-                // 벡터 index는 0부터 시작하므로 실제 기술 ID는 +1
-                long technologyId = index + 1L;
-
-                scoredTechnologies.add(new TechScoreInfo(technologyId, score));
+                scoredInfos.add(new TechScoreInfo((long) i + 1, score));
+                totalScoreSum += score;
             }
         }
 
-        // 관심 기술이 하나도 없으면 빈 리스트 반환
-        if (scoredTechnologies.isEmpty()) {
-            return Collections.emptyList();
-        }
+        if (scoredInfos.isEmpty()) return Collections.emptyList();
 
-        // 4. 점수 높은 순으로 정렬한 뒤 상위 5개만 추출
-        List<TechScoreInfo> top5Technologies = scoredTechnologies.stream()
-                .sorted((first, second) -> Float.compare(second.score(), first.score()))
-                .limit(5)
-                .toList();
+        // 3. 기술 엔티티들을 한 번에 조회 (N+1 방지)
+        List<Long> ids = scoredInfos.stream().map(TechScoreInfo::techId).toList();
+        List<Technology> technologies = technologyRepository.findAllByIdsWithCategory(ids);
+        Map<Long, Technology> techMap = technologies.stream()
+                .collect(Collectors.toMap(Technology::getId, t -> t));
 
-        // 5. 상위 5개 기술의 ID만 추출
-        List<Long> technologyIds =
-                top5Technologies.stream().map(TechScoreInfo::techId).toList();
-
-        // 6. 기술 ID들로 Technology 엔티티를 한 번에 조회
-        //    현재는 기술 이름만 사용하지만, repository 메서드가 category도 함께 fetch하도록 되어 있다
-        List<Technology> technologies = technologyRepository.findAllByIdsWithCategory(technologyIds);
-
-        // 7. 조회한 Technology를 "기술ID -> Technology" 형태의 Map으로 변환
-        //    나중에 빠르게 찾아 쓰기 위해서
-        Map<Long, Technology> technologyById =
-                technologies.stream().collect(Collectors.toMap(Technology::getId, technology -> technology));
-
-        // 8. 상위 5개 정보(top5Technologies)를 DTO로 변환
-        return top5Technologies.stream()
-                .map(techScoreInfo -> {
-                    // 기술 ID로 실제 Technology 엔티티 찾기
-                    Technology technology = technologyById.get(techScoreInfo.techId());
-
-                    // 혹시 조회 결과가 없으면 null 반환 후 아래 filter에서 제거
-                    if (technology == null) {
-                        return null;
-                    }
-
-                    // 벡터 점수는 float이므로 DTO의 int에 맞게 반올림해서 변환
-                    return TechScoreDto.of(technology, Math.round(techScoreInfo.score()));
+        // 4. 점수 높은 순으로 정렬 후 TechScoreDto로 변환 (비중 계산 포함)
+        final double finalTotalSum = totalScoreSum;
+        return scoredInfos.stream()
+                .sorted((a, b) -> Float.compare(b.score(), a.score()))
+                .map(info -> {
+                    Technology t = techMap.get(info.techId());
+                    if (t == null) return null;
+                    // 준비하신 of 메서드 호출!
+                    return TechScoreDto.of(t, Math.round(info.score()), finalTotalSum);
                 })
                 .filter(Objects::nonNull)
                 .toList();

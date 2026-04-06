@@ -26,6 +26,7 @@ public record UserProfileResponse(
         long followingCount,
         boolean isFollowing,
         List<TechScoreDto> topTechScores,
+        List<TechScoreDto> allTechScores,
         Slice<PostFeedProfileRes> posts) {
     public static UserProfileResponse of(
             User user,
@@ -34,6 +35,7 @@ public record UserProfileResponse(
             long followingCount,
             boolean isFollowing,
             List<TechScoreDto> topTechScores,
+            List<TechScoreDto> allTechScores,
             Slice<PostFeedProfileRes> posts) {
         // 실무적 포인트: Optional을 활용해 UserInfo가 null이어도 터지지 않게 보호
         UserInfo info = user.getUserInfo();
@@ -53,6 +55,7 @@ public record UserProfileResponse(
                 followingCount,
                 isFollowing,
                 topTechScores,
+                allTechScores,
                 posts);
     }
 }
