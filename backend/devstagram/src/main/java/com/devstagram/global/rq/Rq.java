@@ -48,8 +48,12 @@ public class Rq {
     }
 
     public void setCookie(String name, String value, int maxAge) {
+        setCookie(name, value, maxAge, true);
+    }
+
+    public void setCookie(String name, String value, int maxAge, boolean httpOnly) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
-                .httpOnly(true)
+                .httpOnly(httpOnly)
                 .secure(secure)
                 .path("/")
                 .maxAge(maxAge)

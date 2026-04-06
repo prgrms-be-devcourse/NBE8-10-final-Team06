@@ -7,7 +7,8 @@ function clearSessionAndRedirectToLogin(reason: string) {
   console.error(`인증이 필요합니다 (${reason}). 세션을 종료하고 로그인 페이지로 이동합니다.`);
   const { setLogout } = useAuthStore.getState();
   setLogout();
-  if (!window.location.pathname.includes('/login')) {
+  const path = window.location.pathname;
+  if (!path.includes('/login') && !path.includes('/signup')) {
     window.location.href = '/login?reason=' + encodeURIComponent(reason);
   }
 }
