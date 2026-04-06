@@ -200,17 +200,18 @@ public class StoryService {
         if (story.getStoryMedia() != null && story.getStoryMedia().getSourceUrl() != null) {
             String url = story.getStoryMedia().getSourceUrl();
 
-            // 외부 인터넷 주소(http...)는 물리적 삭제(s3 삭제) 과정을 건너뜁니다.
-            if (!url.startsWith("http")) {
+            // 로컬 파일(파일명만 있는 경우)이거나 S3 업로드 파일(amazonaws.com URL)인 경우에만 삭제
+            boolean isLocalFile = !url.startsWith("http");
+            boolean isS3File = url.contains("amazonaws.com");
+
+            if (isLocalFile || isS3File) {
                 try {
                     storageService.delete(url);
                 } catch (Exception e) {
-                    // 파일이 서버에 실제로 없을 경우에도 로그만 남기고 다음 단계(DB 삭제)로 진행
                     log.warn("물리 파일 삭제 실패(무시하고 DB 삭제 진행): {}", url);
                 }
             }
         }
-        // 이 코드는 if문 밖에 있으므로, 외부 파일이든 내부 파일이든 DB에서는 확실히 지워집니다!
         storyRepository.delete(story);
     }
 

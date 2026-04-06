@@ -40,6 +40,8 @@ cloud:
       auto: false
 
 custom:
+  cors:
+    allowed-origins: https://devstagram.site
   cookie:
     secure: true
     same-site: None
