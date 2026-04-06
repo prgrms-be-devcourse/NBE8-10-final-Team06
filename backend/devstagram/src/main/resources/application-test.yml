@@ -25,3 +25,4 @@ custom:
   jwt:
     secret-key: "test_secret_key_for_devstagram_project_at_least_32_chars"
     access-token-expire-seconds: 3600
+    refresh-token-expire-seconds: 86400

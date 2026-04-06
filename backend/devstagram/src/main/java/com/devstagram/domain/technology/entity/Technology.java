@@ -34,6 +34,7 @@ public class Technology extends BaseEntity {
     @Column(name = "color")
     private String color;
 
+    @Builder.Default
     @OneToMany(mappedBy = "technology", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<PostTechnology> postTechnologies = new ArrayList<>();
 
