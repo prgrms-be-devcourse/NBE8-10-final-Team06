@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { isAxiosError } from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Trash2, Edit, Forward } from 'lucide-react';
 import { postApi } from '../../api/post';
@@ -127,6 +128,10 @@ const PostDetailPage: React.FC = () => {
       }
       alert(res.msg || '삭제 실패');
     } catch (err: unknown) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        navigate('/', { replace: true });
+        return;
+      }
       alert(getApiErrorMessage(err, '삭제 실패'));
     } finally {
       setIsDeletingPost(false);

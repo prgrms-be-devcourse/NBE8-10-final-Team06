@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2, Bookmark, Forward, ExternalLink } from 'lucide-react';
 import { PostFeedResponse } from '../../types/post';
@@ -8,13 +9,16 @@ import { getAlternateAssetUrl, isAssetMarkedMissing, markAssetMissing, resolveAs
 import ProfileAvatar from '../common/ProfileAvatar';
 import DmShareModal from '../dm/DmShareModal';
 import { buildPostSharePayload } from '../../util/dmDeepLinks';
+import { getApiErrorMessage } from '../../util/apiError';
 
 interface PostCardProps {
   post: PostFeedResponse;
+  /** 삭제 직후 피드 state에서 해당 글을 먼저 제거(스토리지 파일 삭제와 재요청 사이 이미지 404 완화) */
+  onPostRemoved?: (postId: number) => void;
   onRefresh?: () => void;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => {
+const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, onRefresh }) => {
   // initialPost가 변경될 때 상태 동기화 (피드 리로드 대응)
   const [post, setPost] = useState(initialPost);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -24,6 +28,14 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   const [showDmShare, setShowDmShare] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setPost(initialPost);
@@ -76,15 +88,25 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
       setIsDeleting(true);
       const res = await postApi.delete(post.id);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        if (onRefresh) onRefresh();
+        onPostRemoved?.(post.id);
+        onRefresh?.();
         setShowMenu(false);
         return;
       }
       alert(res.msg || '삭제 실패');
     } catch (err) {
-      alert('삭제 실패');
+      // 이미 삭제된 글(중복 요청·401 재시도 후 등)이면 서버가 404를 줄 수 있음 → 목록만 맞춤
+      if (isAxiosError(err) && err.response?.status === 404) {
+        onPostRemoved?.(post.id);
+        onRefresh?.();
+        setShowMenu(false);
+        return;
+      }
+      alert(getApiErrorMessage(err, '삭제 실패'));
     } finally {
-      setIsDeleting(false);
+      if (isMountedRef.current) {
+        setIsDeleting(false);
+      }
     }
   };
 
