@@ -307,8 +307,8 @@ public class PostService {
             post.getTechTags().clear();
         }
 
-        commentRepository.deleteParentsByPostId(postId);
         commentRepository.deleteRepliesByPostId(postId);
+        commentRepository.deleteParentsByPostId(postId);
 
         // 3. 파일 및 DB 상태 변경
         List<String> fileNames =
