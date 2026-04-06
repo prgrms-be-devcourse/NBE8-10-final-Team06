@@ -10,6 +10,16 @@ import { resolveAssetUrl } from '../../util/assetUrl';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
 
+type ExistingMediaItem = {
+  sourceUrl: string;
+  previewUrl: string;
+};
+
+type NewFileItem = {
+  file: File;
+  previewUrl: string;
+};
+
 const PostEditPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
@@ -18,8 +28,9 @@ const PostEditPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [existingMedias, setExistingMedias] = useState<ExistingMediaItem[]>([]);
+  const [newFileItems, setNewFileItems] = useState<NewFileItem[]>([]);
+  const [initialMediaCount, setInitialMediaCount] = useState(0);
   const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
   const [techSearchQuery, setTechSearchQuery] = useState('');
@@ -47,6 +58,12 @@ const PostEditPage: React.FC = () => {
   }, [allTechs, techSearchQuery]);
 
   useEffect(() => {
+    return () => {
+      newFileItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, [newFileItems]);
+
+  useEffect(() => {
     const fetchPost = async () => {
       if (!postId) return;
       try {
@@ -68,7 +85,12 @@ const PostEditPage: React.FC = () => {
         if (isRsDataSuccess(postRes)) {
           setTitle(postRes.data.title);
           setContent(postRes.data.content);
-          setPreviews(postRes.data.medias.map((m) => resolveAssetUrl(m.sourceUrl)));
+          const medias = postRes.data.medias.map((m) => ({
+            sourceUrl: m.sourceUrl,
+            previewUrl: resolveAssetUrl(m.sourceUrl),
+          }));
+          setExistingMedias(medias);
+          setInitialMediaCount(medias.length);
 
           const stacks = Array.isArray(postRes.data.techStacks) ? postRes.data.techStacks : [];
           setPostTechStacks(stacks);
@@ -90,9 +112,37 @@ const PostEditPage: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setNewFiles(prev => [...prev, ...files]);
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setPreviews(prev => [...prev, ...newPreviews]);
+    const nextItems = files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }));
+    setNewFileItems((prev) => [...prev, ...nextItems]);
+    e.target.value = '';
+  };
+
+  const removeExistingMedia = (index: number) => {
+    setExistingMedias((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewFile = (index: number) => {
+    setNewFileItems((prev) => {
+      const target = prev[index];
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const toFileName = (sourceUrl: string, index: number) => {
+    const withoutQuery = sourceUrl.split('?')[0];
+    const raw = withoutQuery.split('/').pop() || `existing-${index + 1}`;
+    return raw.trim() || `existing-${index + 1}`;
+  };
+
+  const fetchAsFile = async (media: ExistingMediaItem, index: number): Promise<File> => {
+    const response = await fetch(media.previewUrl);
+    if (!response.ok) {
+      throw new Error(`기존 이미지 다운로드 실패: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const fileName = toFileName(media.sourceUrl, index);
+    return new File([blob], fileName, { type: blob.type || 'image/jpeg' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,7 +163,21 @@ const PostEditPage: React.FC = () => {
         content: nextContent,
         techIds: selectedTechIds,
       };
-      const res = await postApi.update(Number(postId), req, newFiles);
+      const mediaChanged = newFileItems.length > 0 || existingMedias.length !== initialMediaCount;
+      let filesForUpload: File[] | undefined;
+
+      if (mediaChanged) {
+        const keptExistingFiles = await Promise.all(
+          existingMedias.map((media, index) => fetchAsFile(media, index))
+        );
+        filesForUpload = [...keptExistingFiles, ...newFileItems.map((item) => item.file)];
+        if (filesForUpload.length === 0) {
+          alert('현재는 이미지가 1개 이상 있어야 합니다. 최소 1개 이미지를 남기거나 새로 추가해주세요.');
+          return;
+        }
+      }
+
+      const res = await postApi.update(Number(postId), req, filesForUpload);
       if (isRsDataSuccess(res)) {
         alert('게시글이 수정되었습니다.');
         navigate(`/post/${postId}`, { replace: true });
@@ -139,11 +203,32 @@ const PostEditPage: React.FC = () => {
       <main style={{ maxWidth: '600px', margin: '20px auto', padding: '0 15px' }}>
         <form onSubmit={handleSubmit} style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '8px', padding: '20px' }}>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>사진 (수정 시 새로 업로드)</label>
+            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>사진</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {previews.map((src, index) => (
+              {existingMedias.map((media, index) => (
                 <div key={index} style={{ width: '80px', height: '80px', position: 'relative' }}>
-                  <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} alt="preview" />
+                  <img src={media.previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} alt="existing-preview" />
+                  <button
+                    type="button"
+                    onClick={() => removeExistingMedia(index)}
+                    style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#111', color: '#fff', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1 }}
+                    aria-label="기존 이미지 삭제"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {newFileItems.map((item, index) => (
+                <div key={`new-${index}`} style={{ width: '80px', height: '80px', position: 'relative' }}>
+                  <img src={item.previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} alt="new-preview" />
+                  <button
+                    type="button"
+                    onClick={() => removeNewFile(index)}
+                    style={{ position: 'absolute', top: '-6px', right: '-6px', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: '#111', color: '#fff', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1 }}
+                    aria-label="새 이미지 삭제"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
               <label style={{ width: '80px', height: '80px', border: '2px dashed #dbdbdb', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
