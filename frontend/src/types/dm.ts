@@ -14,7 +14,8 @@ export interface DmMessageResponse {
 
 export interface DmRoomParticipantSummary {
   userId: number;
-  nickname: string;
+  /** 탈퇴 등으로 null 일 수 있음 — UI 는 `formatDmPeerNickname` 등으로 표시 */
+  nickname: string | null;
   profileImageUrl: string | null;
 }
 

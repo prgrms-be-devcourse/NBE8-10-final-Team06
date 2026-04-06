@@ -26,6 +26,7 @@ import {
   mergePendingStompBatchIntoUiMessages,
   mergeRealtimeDmMessageIntoList,
 } from '../util/dmMessagesMerge';
+import { DM_UNKNOWN_PEER_NICKNAME, formatDmPeerNickname } from '../util/dmPeerDisplayName';
 import {
   buildDmStompMessageBody,
   dmStompAppMessage,
@@ -186,12 +187,16 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
         return;
       }
 
-      const typingBubbleLabel = (nick: string) =>
-        roomSnap?.isGroup ? `${nick.trim() || '상대방'}님이 입력 중...` : '입력 중...';
-      const nick =
+      const typingBubbleLabel = (displayNick: string) => {
+        if (!roomSnap?.isGroup) return '입력 중...';
+        if (displayNick === DM_UNKNOWN_PEER_NICKNAME) return '입력 중...';
+        return `${displayNick}님이 입력 중...`;
+      };
+      const rawNick =
         parts.find((p) => Number(p.userId) === typingUid)?.nickname?.trim() ||
         opponentTypingNicknameRef.current?.trim() ||
-        '상대방';
+        null;
+      const nick = formatDmPeerNickname(rawNick);
 
       const showRemoteTyping = () => {
         cancelTypingStopDebounce();

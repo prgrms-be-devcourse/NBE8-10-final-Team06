@@ -50,6 +50,7 @@ import {
   DM_CLIENT_TYPING_START_REFRESH_MS,
   DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS,
 } from '../../util/dmTypingClient';
+import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 
 /**
  * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
@@ -144,8 +145,8 @@ const DmChatPage: React.FC = () => {
     if (!currentRoom) return '채팅방';
     if (currentRoom.isGroup) return currentRoom.roomName || '그룹 채팅';
     // 1:1: roomName 은 DB에 상대 닉으로 고정돼 있지 않을 수 있어(본인 닉으로 보이는 경우) 쓰지 않음
-    const nick = headerPeer?.nickname?.trim();
-    return nick && nick.length > 0 ? nick : '채팅';
+    if (headerPeer) return formatDmPeerNickname(headerPeer.nickname);
+    return '채팅';
   }, [currentRoom, headerPeer]);
 
   /**
@@ -202,7 +203,10 @@ const DmChatPage: React.FC = () => {
   );
 
   const typingOpponentNickname = useMemo((): string | null => {
-    if (!currentRoom || currentRoom.isGroup) return headerPeer?.nickname?.trim() ?? null;
+    if (!currentRoom || currentRoom.isGroup) {
+      const n = headerPeer?.nickname?.trim();
+      return n && n.length > 0 ? n : null;
+    }
     if (headerPeer?.nickname?.trim()) return headerPeer.nickname.trim();
     const selfGuess = selfIdForTypingEcho;
     const parts = currentRoom.participants;
@@ -747,19 +751,30 @@ const DmChatPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button onClick={() => navigate('/dm')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#efefef', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: '#efefef',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               {headerPeer ? (
                 <ProfileAvatar
                   fillContainer
                   authorUserId={headerPeer.userId}
                   profileImageUrl={headerPeer.profileImageUrl}
-                  nickname={headerPeer.nickname}
+                  nickname={formatDmPeerNickname(headerPeer.nickname)}
                 />
               ) : (
                 <ImageIcon size={20} color="#8e8e8e" />
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <strong style={{ fontSize: '0.95rem' }}>{headerTitle}</strong>
             </div>
           </div>
@@ -803,9 +818,13 @@ const DmChatPage: React.FC = () => {
           messages.map((msg, idx) => {
             const isMe = computeDmMessageIsMe(msg, bubbleSelfUserId, dmBubbleCtx);
             const peer = resolvePeerProfileForMessage(isMe, msg.senderId);
-            const groupSenderNick =
-              !isMe && currentRoom?.isGroup
-                ? participantByUserId.get(Number(msg.senderId))?.nickname?.trim() ?? null
+            const peerSenderLabel =
+              !isMe
+                ? currentRoom?.isGroup
+                  ? formatDmPeerNickname(participantByUserId.get(Number(msg.senderId))?.nickname)
+                  : formatDmPeerNickname(
+                      peer?.nickname ?? participantByUserId.get(Number(msg.senderId))?.nickname,
+                    )
                 : null;
             return (
               <DmChatMessageRow
@@ -813,12 +832,12 @@ const DmChatPage: React.FC = () => {
                 msg={msg}
                 isMe={isMe}
                 showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
-                senderLabel={groupSenderNick}
+                senderLabel={peerSenderLabel}
                 peerProfile={
                   peer
                     ? {
                         userId: peer.userId,
-                        nickname: peer.nickname,
+                        nickname: formatDmPeerNickname(peer.nickname),
                         profileImageUrl: peer.profileImageUrl,
                       }
                     : null
@@ -837,7 +856,7 @@ const DmChatPage: React.FC = () => {
               remoteTypingPeerProfile
                 ? {
                     userId: remoteTypingPeerProfile.userId,
-                    nickname: remoteTypingPeerProfile.nickname,
+                    nickname: formatDmPeerNickname(remoteTypingPeerProfile.nickname),
                     profileImageUrl: remoteTypingPeerProfile.profileImageUrl,
                   }
                 : null

@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Trash2, Edit, Forward } from 'lucide-react';
-import { postApi } from '../api/post';
-import { commentApi } from '../api/comment';
-import { PostDetailResponse } from '../types/post';
-import { CommentInfoResponse } from '../types/comment';
-import CommentItem from '../components/comment/CommentItem';
-import UserListModal from '../components/profile/UserListModal';
-import MainLayout from '../components/layout/MainLayout';
-import { getAlternateAssetUrl, isAssetMarkedMissing, markAssetMissing, resolveAssetUrl } from '../util/assetUrl';
-import ProfileAvatar from '../components/common/ProfileAvatar';
-import { getApiErrorMessage } from '../util/apiError';
-import DmShareModal from '../components/dm/DmShareModal';
-import { buildPostSharePayload } from '../util/dmDeepLinks';
-import { isRsDataSuccess } from '../util/rsData';
+import { postApi } from '../../api/post';
+import { commentApi } from '../../api/comment';
+import { PostDetailResponse } from '../../types/post';
+import { CommentInfoResponse } from '../../types/comment';
+import CommentItem from '../../components/comment/CommentItem';
+import UserListModal from '../../components/profile/UserListModal';
+import MainLayout from '../../components/layout/MainLayout';
+import { getAlternateAssetUrl, isAssetMarkedMissing, markAssetMissing, resolveAssetUrl } from '../../util/assetUrl';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import { getApiErrorMessage } from '../../util/apiError';
+import DmShareModal from '../../components/dm/DmShareModal';
+import { buildPostSharePayload } from '../../util/dmDeepLinks';
+import { isRsDataSuccess } from '../../util/rsData';
 
 const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -277,6 +277,26 @@ const PostDetailPage: React.FC = () => {
               <div style={{ marginBottom: '20px' }}>
                 <strong>{post.nickname}</strong> <span style={{ fontWeight: 'bold' }}>{post.title}</span>
                 <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                {post.techStacks && post.techStacks.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
+                    {post.techStacks.map((tech) => (
+                      <span
+                        key={tech.id}
+                        style={{
+                          fontSize: '0.75rem',
+                          color: tech.color,
+                          backgroundColor: `${tech.color}15`,
+                          padding: '3px 10px',
+                          borderRadius: '10px',
+                          border: `1px solid ${tech.color}40`,
+                          fontWeight: 600,
+                        }}
+                      >
+                        #{tech.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               {comments.map((comment) => (
                 <CommentItem key={comment.id} postId={post.id} comment={comment} onDelete={fetchDetail} onReplyAdded={fetchDetail} />

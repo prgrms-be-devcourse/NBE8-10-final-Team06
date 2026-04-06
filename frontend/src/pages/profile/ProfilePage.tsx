@@ -1,31 +1,30 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { isAxiosError } from 'axios';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
-import { useFollowSyncStore } from '../store/useFollowSyncStore';
-import { mergeFollowingHint, useFollowLocalStore } from '../store/useFollowLocalStore';
-import { userApi, FOLLOW_CHANGED_EVENT } from '../api/user';
-import { performClientLogout } from '../services/performClientLogout';
-import { applyAuthoritativeFollowStatus } from '../services/profileFollowState';
-import { loadFollowListsAndCounts } from '../services/profileFollowStats';
-import { toggleFollowRelation } from '../services/followToggle';
-import { postApi } from '../api/post';
-import { storyApi } from '../api/story';
-import { dmApi } from '../api/dm';
-import { isTechAdminSession } from '../util/techAdmin';
-import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../types/user';
-import { PostFeedProfileRes, PostFeedResponse } from '../types/post';
-import { StoryDetailResponse } from '../types/story';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useFollowSyncStore } from '../../store/useFollowSyncStore';
+import { mergeFollowingHint, useFollowLocalStore } from '../../store/useFollowLocalStore';
+import { userApi, FOLLOW_CHANGED_EVENT } from '../../api/user';
+import { performClientLogout } from '../../services/performClientLogout';
+import { applyAuthoritativeFollowStatus } from '../../services/profileFollowState';
+import { loadFollowListsAndCounts } from '../../services/profileFollowStats';
+import { toggleFollowRelation } from '../../services/followToggle';
+import { postApi } from '../../api/post';
+import { storyApi } from '../../api/story';
+import { dmApi } from '../../api/dm';
+import { isTechAdminSession } from '../../util/techAdmin';
+import { UserProfileResponse, Resume, FollowUserResponse, FollowResponse } from '../../types/user';
+import { PostFeedProfileRes, PostFeedResponse } from '../../types/post';
+import { StoryDetailResponse } from '../../types/story';
 import { Grid, Heart, Bookmark, BarChart2, AlertCircle, MessageCircle, LogOut, Clock3, Trash2, Users } from 'lucide-react';
-import UserListModal from '../components/profile/UserListModal';
-import MainLayout from '../components/layout/MainLayout';
-import { getAlternateAssetUrl, resolveAssetUrl } from '../util/assetUrl';
-import { getApiErrorMessage } from '../util/apiError';
-import ProfileAvatar from '../components/common/ProfileAvatar';
-import TechRadarChart from '../components/profile/TechRadarChart';
-import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
-import { getProfilePostCountLabel } from '../util/profilePostCount';
-import { isRemoteStoryMediaUrl } from '../util/storyMediaUrl';
+import UserListModal from '../../components/profile/UserListModal';
+import MainLayout from '../../components/layout/MainLayout';
+import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
+import { getApiErrorMessage } from '../../util/apiError';
+import ProfileAvatar from '../../components/common/ProfileAvatar';
+import TechRadarChart from '../../components/profile/TechRadarChart';
+import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
+import { getProfilePostCountLabel } from '../../util/profilePostCount';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -711,12 +710,6 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleHardDeleteStory = async (story: StoryDetailResponse) => {
-    if (isRemoteStoryMediaUrl(story.mediaUrl)) {
-      alert(
-        '이 스토리는 외부 이미지·동영상 주소(https://…)로 저장되어 있습니다. 서버가 로컬 파일만 삭제하도록 되어 있어 완전 삭제 시 오류가 납니다. DB·스토리지까지 지우려면 백엔드에서 외부 URL인 경우 파일 삭제 단계를 건너뛰도록 수정이 필요합니다.'
-      );
-      return;
-    }
     if (!window.confirm('이 만료 스토리를 완전히 삭제하시겠습니까?')) return;
     try {
       const res = await storyApi.hardDelete(story.storyId);

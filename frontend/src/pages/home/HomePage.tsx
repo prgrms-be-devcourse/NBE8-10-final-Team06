@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { postApi } from '../api/post';
-import { PostFeedResponse } from '../types/post';
-import StoryBar from '../components/story/StoryBar';
-import PostCard from '../components/post/PostCard';
-import { useAuthStore } from '../store/useAuthStore';
-import MainLayout from '../components/layout/MainLayout';
-import { getApiErrorMessage } from '../util/apiError';
-import UserRecommendationsSection from '../components/user/UserRecommendationsSection';
+import { postApi } from '../../api/post';
+import { PostFeedResponse } from '../../types/post';
+import StoryBar from '../../components/story/StoryBar';
+import PostCard from '../../components/post/PostCard';
+import { useAuthStore } from '../../store/useAuthStore';
+import MainLayout from '../../components/layout/MainLayout';
+import { getApiErrorMessage } from '../../util/apiError';
+import UserRecommendationsSection from '../../components/user/UserRecommendationsSection';
 
 const HomePage: React.FC = () => {
   const [posts, setPosts] = useState<PostFeedResponse[]>([]);
