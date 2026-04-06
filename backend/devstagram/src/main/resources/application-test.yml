@@ -5,13 +5,6 @@ spring:
     password: root
     driver-class-name: org.postgresql.Driver
 
-  autoconfigure:
-    exclude:
-      - io.awspring.cloud.autoconfigure.s3.S3AutoConfiguration
-      - io.awspring.cloud.autoconfigure.core.AwsAutoConfiguration
-      - io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration
-      - io.awspring.cloud.autoconfigure.core.RegionProviderAutoConfiguration
-
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -27,6 +20,16 @@ spring:
     redis:
       host: localhost
       port: 6379
+
+  cloud:
+    aws:
+      credentials:
+        access-key: test
+        secret-key: test
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: test-bucket
 
 custom:
   jwt:
