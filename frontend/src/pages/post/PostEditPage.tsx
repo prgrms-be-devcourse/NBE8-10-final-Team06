@@ -71,6 +71,16 @@ const extractCodeBlockLangs = (raw: string): string[] => {
   return Array.from(langs);
 };
 
+type ExistingMediaItem = {
+  sourceUrl: string;
+  previewUrl: string;
+};
+
+type NewFileItem = {
+  file: File;
+  previewUrl: string;
+};
+
 const PostEditPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
@@ -148,6 +158,12 @@ const PostEditPage: React.FC = () => {
       return next;
     });
   }, [content, allTechs]);
+
+  useEffect(() => {
+    return () => {
+      newFileItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, [newFileItems]);
 
   useEffect(() => {
     const fetchPost = async () => {
