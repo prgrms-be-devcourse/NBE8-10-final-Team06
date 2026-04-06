@@ -46,7 +46,7 @@ public class AuthController {
         int accessTokenMaxAge = (int) jwtProvider.getAccessTokenExpireSeconds();
         int refreshTokenMaxAge = (int) jwtProvider.getRefreshTokenExpireSeconds();
 
-        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge);
+        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge, false);
         rq.setCookie("refreshToken", result.refreshToken(), refreshTokenMaxAge);
 
         return RsData.success("로그인 성공", result.response());
@@ -61,7 +61,7 @@ public class AuthController {
         int accessTokenMaxAge = (int) jwtProvider.getAccessTokenExpireSeconds();
         int refreshTokenMaxAge = (int) jwtProvider.getRefreshTokenExpireSeconds();
 
-        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge);
+        rq.setCookie("accessToken", result.accessToken(), accessTokenMaxAge, false);
         rq.setCookie("refreshToken", result.refreshToken(), refreshTokenMaxAge);
 
         return RsData.success("토큰 재발급 성공", result.response());
