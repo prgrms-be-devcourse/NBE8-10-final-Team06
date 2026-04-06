@@ -225,8 +225,6 @@ class PostServiceTest {
 
         // then
         assertThat(mockPost.isDeleted()).isTrue();
-        verify(commentRepository).deleteRepliesByPostId(postId);
-        verify(commentRepository).deleteParentsByPostId(postId);
         verify(postRepository).findById(postId);
     }
 

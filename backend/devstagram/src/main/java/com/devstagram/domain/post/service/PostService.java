@@ -295,32 +295,26 @@ public class PostService {
             throw new ServiceException("403-U-2", "삭제 권한이 없습니다.");
         }
 
-        // 1. [최적화] User 엔티티 통째가 아니라 ID 리스트만 뽑아서 비동기로 넘깁니다.
+        // [최적화] User 엔티티 통째가 아니라 ID 리스트만 뽑아서 비동기로 넘깁니다.
         List<Long> targetUserIds = feedService.findTargetUsersForPost(post).stream()
                 .map(User::getId)
                 .toList();
 
-        // 2. 기술 점수 회수 (영속성 컨텍스트 활용)
+        // 기술 점수 회수 (영속성 컨텍스트 활용)
         if (!post.getTechTags().isEmpty()) {
             post.getTechTags()
                     .forEach(pt -> techScoreService.decreaseScore(post.getUser(), pt.getTechnology(), "POST"));
             post.getTechTags().clear();
         }
 
-        commentRepository.deleteRepliesByPostId(postId);
-        commentRepository.deleteParentsByPostId(postId);
-
-        // 3. 파일 및 DB 상태 변경
-        List<String> fileNames =
-                post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
         post.softDelete();
+
         userRepository.decreasePostCount(userId);
 
-        // 4. Redis 정리 위임 (ID 리스트만 전달)
-        feedService.removePostFromFeeds(postId, targetUserIds, userId);
+        postRepository.saveAndFlush(post);
 
-        // 5. 물리 파일 삭제
-        fileNames.forEach(storageService::delete);
+        // Redis 정리 위임 (ID 리스트만 전달)
+        feedService.removePostFromFeeds(postId, targetUserIds, userId);
     }
 
     @Transactional
