@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -116,13 +117,12 @@ public class DmService {
     /**
      * 1:1 DM 방 생성/재사용 + 내 room list 반환을 한 번에 처리합니다.
      *
-     * 기존 구현은:
-     * - getOrCreate1v1RoomId()에서 내 room list를 조회
-     * - 이후 getRoomsWithLastMessage()에서 다시 내 room list를 조회
-     * 하는 중복이 있었습니다.
-     *
-     * 이 메서드는 room list 조회 결과를 재사용해 중복 쿼리를 줄입니다.
+     * 우선순위:
+     * 1. 두 유저 모두 현재 참여 중인 방이 있으면 재사용
+     * 2. 내가 나갔지만 상대방이 남아있는 방이 있으면 재참여
+     * 3. 방 자체가 없으면 신규 생성
      */
+    @Transactional
     public DmCreate1v1WithRoomListResponse create1v1RoomAndReturnRooms(Long currentUserId, Long otherUserId) {
         if (currentUserId == null || otherUserId == null) {
             throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
@@ -131,17 +131,23 @@ public class DmService {
             throw new ServiceException("400-F-1", "자기 자신과의 1:1 DM 은 생성할 수 없습니다.");
         }
 
-        List<DmRoomUser> myRoomUsers = dmRoomUserRepository.findByUser_Id(currentUserId);
-
-        Long existingRoomId =
-                dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId).orElse(null);
-
+        // 1. 두 유저 모두 현재 참여 중
+        Long existingRoomId = dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId).orElse(null);
         if (existingRoomId != null) {
+            List<DmRoomUser> myRoomUsers = dmRoomUserRepository.findByUser_Id(currentUserId);
             List<DmRoomSummaryResponse> rooms = buildRoomsSummary(currentUserId, myRoomUsers);
             return new DmCreate1v1WithRoomListResponse(existingRoomId, rooms);
         }
 
-        // 방이 없으면 생성 후, 정확한 list를 위해 다시 room list를 조회합니다(생성 경로에서는 어쩔 수 없음).
+        // 2. 내가 나갔고 상대방이 남아있는 방 → 재참여
+        Long rejoinRoomId = dmRoomUserRepository.find1v1RoomWhereUserLeft(currentUserId, otherUserId).orElse(null);
+        if (rejoinRoomId != null) {
+            rejoin1v1Room(currentUserId, rejoinRoomId);
+            List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
+            return new DmCreate1v1WithRoomListResponse(rejoinRoomId, rooms);
+        }
+
+        // 3. 방 자체가 없으면 신규 생성
         Long createdRoomId = create1v1Room(currentUserId, otherUserId);
         List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
         return new DmCreate1v1WithRoomListResponse(createdRoomId, rooms);
@@ -406,14 +412,13 @@ public class DmService {
 
     /**
      * 1:1 DM 방 생성/재사용
-     * - 이미 존재하는 1:1 방이면 재사용
-     * - 없으면 신규 방 생성 후 두 유저를 participants 로 등록
      *
-     * 방 재사용 기준:
-     * - 같은 방에 currentUserId 와 otherUserId 가 모두 참여
-     * - room.isGroup == false
-     * - 참여자 수가 2명인 경우만 1:1로 간주
+     * 우선순위:
+     * 1. 두 유저 모두 현재 참여 중인 방이 있으면 재사용
+     * 2. 내가 나갔지만 상대방이 남아있는 방이 있으면 재참여
+     * 3. 방 자체가 없으면 신규 생성
      */
+    @Transactional
     public Long getOrCreate1v1RoomId(Long currentUserId, Long otherUserId) {
         if (currentUserId == null || otherUserId == null) {
             throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
@@ -422,9 +427,31 @@ public class DmService {
             throw new ServiceException("400-F-1", "자기 자신과의 1:1 DM 은 생성할 수 없습니다.");
         }
 
-        return dmRoomUserRepository
-                .find1v1RoomId(currentUserId, otherUserId)
-                .orElseGet(() -> create1v1Room(currentUserId, otherUserId));
+        // 1. 두 유저 모두 현재 참여 중
+        Optional<Long> existingRoomId = dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId);
+        if (existingRoomId.isPresent()) {
+            return existingRoomId.get();
+        }
+
+        // 2. 내가 나갔고 상대방이 남아있는 방 → 재참여
+        Optional<Long> rejoinRoomId = dmRoomUserRepository.find1v1RoomWhereUserLeft(currentUserId, otherUserId);
+        if (rejoinRoomId.isPresent()) {
+            rejoin1v1Room(currentUserId, rejoinRoomId.get());
+            return rejoinRoomId.get();
+        }
+
+        // 3. 방 자체가 없으면 신규 생성
+        return create1v1Room(currentUserId, otherUserId);
+    }
+
+    /** 나갔던 1:1 방에 다시 참여자로 등록 */
+    private void rejoin1v1Room(Long userId, Long roomId) {
+        DmRoom room = dmRoomRepository.findById(roomId)
+                .orElseThrow(() -> new ServiceException("404-F-1", "채팅방이 존재하지 않습니다."));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
+        DmRoomUser newRoomUser = DmRoomUser.create(room, user, new Date());
+        dmRoomUserRepository.save(newRoomUser);
     }
 
     private Long create1v1Room(Long currentUserId, Long otherUserId) {
@@ -448,7 +475,7 @@ public class DmService {
         return savedRoom.getId();
     }
 
-    // 1:1 채팅방 나가기 - 한명이라도 나가면 채팅방 삭제
+    // 1:1 채팅방 나가기 - 내 참여 정보만 삭제, 상대방은 방·메시지 유지
     @Transactional
     public void leave1v1Room(Long userId, Long roomId) {
         DmRoomUser roomUser = getValidRoomUser(userId, roomId);
@@ -458,10 +485,17 @@ public class DmService {
             throw new ServiceException("400-F-2", "1:1 채팅방이 아닙니다.");
         }
 
-        // 1:1 방은 퇴장시 예외 없이 삭제
-        dmRepository.deleteByDmRoom_Id(roomId);
-        dmRoomUserRepository.deleteByDmRoom_Id(roomId); // 해당 방의 모든 유저 관계 삭제
-        dmRoomRepository.delete(room);
+        long currentUsers = dmRoomUserRepository.countByDmRoom_Id(roomId);
+
+        // 내 참여 정보만 삭제 (방과 메시지는 상대방을 위해 유지)
+        dmRoomUserRepository.delete(roomUser);
+        dmRoomUserRepository.flush();
+
+        // 내가 마지막 참여자였으면 방과 메시지도 삭제
+        if (currentUsers == 1) {
+            dmRepository.deleteByDmRoom_Id(roomId);
+            dmRoomRepository.delete(room);
+        }
     }
 
     // 그룹 채팅방 퇴장 : 퇴장 메시지 보내고 나감

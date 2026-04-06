@@ -80,6 +80,7 @@ public class DmWebSocketController {
     @MessageMapping("/dm/{roomId}/message")
     public void message(Message<?> message, @DestinationVariable Long roomId, @Payload DmSendMessageRequest request) {
         Long userId = requireUserIdFromStompOrSecurity(message);
+        if (userId == null) return; // 미인증 세션: 저장하지 않고 조용히 무시
 
         DmMessageResponse saved = dmService.sendMessage(userId, roomId, request);
         WebSocketEventPayload<DmMessageResponse> payload = new WebSocketEventPayload<>("message", saved);
@@ -127,6 +128,8 @@ public class DmWebSocketController {
     @MessageMapping("/dm/{roomId}/read")
     public void read(Message<?> message, @DestinationVariable Long roomId, @Payload ReadEventDto readEventDto) {
         Long userId = requireUserIdFromStompOrSecurity(message);
+        if (userId == null) return; // 미인증 세션 무시
+
         Long messageId = dmService.markRead(userId, roomId, readEventDto.messageId());
 
         ReadWsPayload payload = new ReadWsPayload("read", messageId);
@@ -200,13 +203,20 @@ public class DmWebSocketController {
      * message/read 등 반드시 로그인 사용자여야 하는 핸들러용.
      * 1순위: STOMP {@code Message} 의 {@link StompHeaderAccessor#getUser()}({@code SecurityUser} principal)
      * 2순위: {@link SecurityUtil#getCurrentUserId()} (동일 스레드에 SecurityContext 가 있을 때만 성공)
+     *
+     * 인증 정보가 전혀 없으면 null 을 반환한다(예외를 던지지 않음).
+     * 호출부에서 null 체크 후 조용히 무시해야 한다.
      */
     private Long requireUserIdFromStompOrSecurity(Message<?> message) {
         Long stomp = userIdFromStompMessage(message);
         if (stomp != null) {
             return stomp;
         }
-        return SecurityUtil.getCurrentUserId();
+        try {
+            return SecurityUtil.getCurrentUserId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
