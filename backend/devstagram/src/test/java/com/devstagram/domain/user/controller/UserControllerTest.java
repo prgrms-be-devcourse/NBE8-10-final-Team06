@@ -99,8 +99,8 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("프로필 조회 시 기술 벡터 기반 상위 기술 점수를 반환한다")
-    void getProfileTopTechScoresFromVector() throws Exception {
+    @DisplayName("프로필 조회 시 기술 벡터 기반 전체 기술 점수와 비중(Percentage)을 반환한다")
+    void getProfileAllTechScoresWithPercentage() throws Exception {
         // given
         TechCategory backendCategory = techCategoryRepository.save(
                 TechCategory.builder().name("Backend").color("#6C757D").build());
@@ -123,26 +123,30 @@ class UserControllerTest {
                 .category(backendCategory)
                 .build());
 
-        // 저장된 실제 기술 ID를 사용해 벡터 점수를 누적한다.
+        // 점수 합계: 65 + 40 + 20 = 125
         otherUser.updateTechScore(javaTechnology.getId().intValue(), 65);
         otherUser.updateTechScore(springBootTechnology.getId().intValue(), 40);
         otherUser.updateTechScore(dockerTechnology.getId().intValue(), 20);
-
         userRepository.save(otherUser);
 
         // when & then
         mvc.perform(get("/api/users/" + otherUser.getNickname() + "/profile").cookie(authCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-S-1"))
-                .andExpect(jsonPath("$.msg").value("프로필 조회 성공"))
-                .andExpect(jsonPath("$.data.nickname").value("otherNickname"))
-                .andExpect(jsonPath("$.data.topTechScores").isArray())
-                .andExpect(jsonPath("$.data.topTechScores[0].techName").value("Java"))
-                .andExpect(jsonPath("$.data.topTechScores[0].score").value(65))
-                .andExpect(jsonPath("$.data.topTechScores[1].techName").value("Spring Boot"))
-                .andExpect(jsonPath("$.data.topTechScores[1].score").value(40))
-                .andExpect(jsonPath("$.data.topTechScores[2].techName").value("Docker"))
-                .andExpect(jsonPath("$.data.topTechScores[2].score").value(20))
+                // 1. 전체 리스트 존재 확인
+                .andExpect(jsonPath("$.data.allTechScores").isArray())
+
+                // 2. 특정 기술의 비중(Percentage) 검증
+                // Java 비중: (65 / 125) * 100 = 52.0
+                .andExpect(jsonPath("$.data.allTechScores[0].techName").value("Java"))
+                .andExpect(jsonPath("$.data.allTechScores[0].percentage").value(52.0))
+
+                // Spring Boot 비중: (40 / 125) * 100 = 32.0
+                .andExpect(jsonPath("$.data.allTechScores[1].techName").value("Spring Boot"))
+                .andExpect(jsonPath("$.data.allTechScores[1].percentage").value(32.0))
+
+                // Docker 비중: (20 / 125) * 100 = 16.0
+                .andExpect(jsonPath("$.data.allTechScores[2].techName").value("Docker"))
+                .andExpect(jsonPath("$.data.allTechScores[2].percentage").value(16.0))
                 .andDo(print());
     }
 

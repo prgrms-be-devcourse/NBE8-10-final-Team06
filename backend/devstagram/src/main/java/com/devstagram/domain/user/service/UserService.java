@@ -66,9 +66,7 @@ public class UserService {
         List<TechScoreDto> allTechScores = getAllTechScoresFromVector(targetUser);
 
         // 프로필 상단 요약(Highlight) 정보를 위해 상위 5개 추출 (나중에 쓸 수도 있을 것 같아서 만들었음)
-        List<TechScoreDto> topTechScores = allTechScores.stream()
-                .limit(5)
-                .toList();
+        List<TechScoreDto> topTechScores = allTechScores.stream().limit(5).toList();
 
         // 4. 프로필에 보여줄 게시글 목록 조회 (최신순 정렬 적용)
         Slice<Post> postEntities =
@@ -188,8 +186,7 @@ public class UserService {
         // 3. 기술 엔티티들을 한 번에 조회 (N+1 방지)
         List<Long> ids = scoredInfos.stream().map(TechScoreInfo::techId).toList();
         List<Technology> technologies = technologyRepository.findAllByIdsWithCategory(ids);
-        Map<Long, Technology> techMap = technologies.stream()
-                .collect(Collectors.toMap(Technology::getId, t -> t));
+        Map<Long, Technology> techMap = technologies.stream().collect(Collectors.toMap(Technology::getId, t -> t));
 
         // 4. 점수 높은 순으로 정렬 후 TechScoreDto로 변환 (비중 계산 포함)
         final double finalTotalSum = totalScoreSum;

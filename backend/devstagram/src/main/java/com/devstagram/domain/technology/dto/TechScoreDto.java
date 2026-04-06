@@ -1,7 +1,6 @@
 package com.devstagram.domain.technology.dto;
 
 import com.devstagram.domain.technology.entity.Technology;
-import com.devstagram.domain.technology.entity.UserTechScore;
 
 public record TechScoreDto(String techName, int score, double percentage) {
     public static TechScoreDto of(Technology technology, int score, double totalScore) {
