@@ -60,6 +60,8 @@ export enum Resume {
 export interface TechScoreDto {
   techName: string;
   score: number;
+  /** 전체 점수 대비 비중(%) — 서버에서 소수 첫째 자리까지 반올림 */
+  percentage?: number;
 }
 
 /**
@@ -80,6 +82,8 @@ export interface UserProfileResponse {
   isFollower: boolean; // 추가
   techStacks: TechTagRes[]; // 추가
   topTechScores: TechScoreDto[];
+  /** 전체 기술 점수 목록(비중 percentage 포함) — 프로필 기술 탭 도넛 등에 사용 */
+  allTechScores?: TechScoreDto[];
   posts: Slice<PostFeedProfileRes>;
 }
 

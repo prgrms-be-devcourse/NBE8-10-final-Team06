@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { postApi } from '../api/post';
-import { PostFeedResponse } from '../types/post';
-import StoryBar from '../components/story/StoryBar';
-import PostCard from '../components/post/PostCard';
-import { useAuthStore } from '../store/useAuthStore';
-import MainLayout from '../components/layout/MainLayout';
-import { getApiErrorMessage } from '../util/apiError';
-import UserRecommendationsSection from '../components/user/UserRecommendationsSection';
+import { postApi } from '../../api/post';
+import { PostFeedResponse } from '../../types/post';
+import StoryBar from '../../components/story/StoryBar';
+import PostCard from '../../components/post/PostCard';
+import { useAuthStore } from '../../store/useAuthStore';
+import MainLayout from '../../components/layout/MainLayout';
+import { getApiErrorMessage } from '../../util/apiError';
+import UserRecommendationsSection from '../../components/user/UserRecommendationsSection';
 
 const HomePage: React.FC = () => {
   const [posts, setPosts] = useState<PostFeedResponse[]>([]);
@@ -15,24 +15,28 @@ const HomePage: React.FC = () => {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [isLast, setIsLast] = useState(false);
+  const [removedPostIds, setRemovedPostIds] = useState<number[]>([]);
   
   const { isLoggedIn } = useAuthStore();
   const isInitialMount = useRef(true);
 
-  const fetchFeed = useCallback(async (pageNumber: number) => {
+  /** force: 삭제 직후 등 isLoading 가드 없이 첫 페이지를 다시 받을 때 사용 */
+  const fetchFeed = useCallback(async (pageNumber: number, options?: { force?: boolean }) => {
     // error 는 여기서 막지 않음 — React 배치로 setError(false) 직후 재시도가 막히는 문제 방지
-    if (!isLoggedIn || isLoading) return;
+    if (!isLoggedIn) return;
+    if (!options?.force && isLoading) return;
 
     try {
       setIsLoading(true);
       if (pageNumber === 0) setFeedError(null);
       const res = await postApi.getFeed(pageNumber);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const filteredContent = (res.data.content || []).filter((post) => !removedPostIds.includes(post.id));
         if (pageNumber === 0) {
-          setPosts(res.data.content || []);
+          setPosts(filteredContent);
           setPage(0);
         } else {
-          setPosts(prev => [...prev, ...(res.data.content || [])]);
+          setPosts(prev => [...prev, ...filteredContent]);
         }
         setIsLast(res.data.last);
       } else {
@@ -50,7 +54,7 @@ const HomePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, isLoading]);
+  }, [isLoggedIn, isLoading, removedPostIds]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -67,7 +71,19 @@ const HomePage: React.FC = () => {
             {isLoggedIn && <StoryBar />}
 
             <div style={{ marginTop: '20px' }}>
-              {posts.map(post => <PostCard key={post.id} post={post} />)}
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onPostRemoved={(id) => {
+                    setRemovedPostIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                    setPosts((prev) => prev.filter((p) => p.id !== id));
+                  }}
+                  onRefresh={() => {
+                    void fetchFeed(0, { force: true });
+                  }}
+                />
+              ))}
             </div>
 
             {isLoading && <p style={{ textAlign: 'center', padding: '20px' }}>데이터 로드 중...</p>}

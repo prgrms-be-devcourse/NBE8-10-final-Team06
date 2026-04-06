@@ -10,8 +10,9 @@ function tokenLooksUsable(t: string | null | undefined): t is string {
 }
 
 /**
- * localStorage 에 토큰이 없을 때 쿠키(로그인 시 setAuthCookie 로 심어진 값)를 복사합니다.
- * 백엔드는 Authorization 이 없어도 쿠키 accessToken 을 읽지만, 인터셉터는 localStorage 를 쓰므로 맞춰 둡니다.
+ * localStorage 에 토큰이 없을 때 쿠키에서 accessToken 을 복사합니다.
+ * HTTP 는 `CustomAuthenticationFilter` 가 쿠키를 읽고, STOMP 는 CONNECT/SEND 의 Bearer 헤더가 필요해
+ * `useStomp` 가 같은 문자열을 쓸 수 있도록 맞춥니다.
  */
 export function syncAuthTokensFromCookies(): void {
   if (!tokenLooksUsable(localStorage.getItem('accessToken'))) {

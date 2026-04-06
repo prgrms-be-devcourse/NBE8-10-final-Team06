@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2, Bookmark, Forward } from 'lucide-react';
+import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2, Bookmark, Forward, ExternalLink } from 'lucide-react';
 import { PostFeedResponse } from '../../types/post';
 import { postApi } from '../../api/post';
 import UserListModal from '../profile/UserListModal';
@@ -8,13 +8,16 @@ import { getAlternateAssetUrl, isAssetMarkedMissing, markAssetMissing, resolveAs
 import ProfileAvatar from '../common/ProfileAvatar';
 import DmShareModal from '../dm/DmShareModal';
 import { buildPostSharePayload } from '../../util/dmDeepLinks';
+import { getApiErrorMessage } from '../../util/apiError';
 
 interface PostCardProps {
   post: PostFeedResponse;
+  /** 삭제 직후 피드 state에서 해당 글을 먼저 제거(스토리지 파일 삭제와 재요청 사이 이미지 404 완화) */
+  onPostRemoved?: (postId: number) => void;
   onRefresh?: () => void;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => {
+const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, onRefresh }) => {
   // initialPost가 변경될 때 상태 동기화 (피드 리로드 대응)
   const [post, setPost] = useState(initialPost);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -24,11 +27,20 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
   const [showDmShare, setShowDmShare] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setPost(initialPost);
     setCurrentMediaIndex(0);
     setIsMediaUnavailable(false);
+    setShowMenu(false);
   }, [initialPost]);
 
   useEffect(() => {
@@ -73,31 +85,220 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onRefresh }) => 
     if (isDeleting || !window.confirm('삭제하시겠습니까?')) return;
     try {
       setIsDeleting(true);
-      const res = await postApi.delete(post.id);
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        if (onRefresh) onRefresh();
-        setShowMenu(false);
-        return;
-      }
-      alert(res.msg || '삭제 실패');
+      await postApi.deleteSafe(post.id);
+      onPostRemoved?.(post.id);
+      onRefresh?.();
+      setShowMenu(false);
+      return;
     } catch (err) {
-      alert('삭제 실패');
+      alert(getApiErrorMessage(err, '삭제 실패'));
     } finally {
-      setIsDeleting(false);
+      if (isMountedRef.current) {
+        setIsDeleting(false);
+      }
     }
   };
 
   const postMenu = (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <MoreHorizontal size={20} style={{ cursor: 'pointer' }} onClick={() => setShowMenu(!showMenu)} />
+      <MoreHorizontal
+        size={20}
+        style={{ cursor: 'pointer' }}
+        aria-expanded={showMenu}
+        aria-haspopup="true"
+        aria-label={post.isMine ? '내 게시글 메뉴' : '게시글 정보'}
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowMenu((v) => !v);
+        }}
+      />
       {showMenu && post.isMine && (
-        <div style={{ position: 'absolute', right: 0, top: '25px', backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '4px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 5, width: '100px' }}>
-          <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate(`/post/${post.id}/edit`)}>
+        <div
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '25px',
+            backgroundColor: '#fff',
+            border: '1px solid #dbdbdb',
+            borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            zIndex: 30,
+            width: '132px',
+            overflow: 'hidden',
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setShowMenu(false);
+              navigate(`/post/${post.id}/edit`);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: 'none',
+              background: '#fff',
+              textAlign: 'left',
+            }}
+          >
             <Edit size={14} /> 수정
-          </div>
-          <div style={{ padding: '10px', fontSize: '0.85rem', cursor: 'pointer', color: '#ed4956', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid #efefef' }} onClick={handlePostDelete}>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handlePostDelete()}
+            disabled={isDeleting}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '0.85rem',
+              cursor: isDeleting ? 'wait' : 'pointer',
+              color: '#ed4956',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: 'none',
+              borderTop: '1px solid #efefef',
+              background: '#fff',
+              textAlign: 'left',
+            }}
+          >
             <Trash2 size={14} /> 삭제
+          </button>
+        </div>
+      )}
+      {showMenu && !post.isMine && (
+        <div
+          role="dialog"
+          aria-label="게시글 정보"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '25px',
+            width: 'min(300px, calc(100vw - 32px))',
+            maxHeight: 'min(420px, 70vh)',
+            overflowY: 'auto',
+            backgroundColor: '#fff',
+            border: '1px solid #dbdbdb',
+            borderRadius: '10px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+            zIndex: 30,
+            padding: '14px 14px 12px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '12px', color: '#262626' }}>게시글 정보</div>
+          <div style={{ fontSize: '0.82rem', color: '#262626', lineHeight: 1.5 }}>
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '2px' }}>작성자</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  navigate(`/profile/${encodeURIComponent(post.nickname)}`);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  fontWeight: 600,
+                  color: '#0095f6',
+                }}
+              >
+                {post.nickname}
+              </button>
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '2px' }}>작성일</span>
+              {new Date(post.createdAt).toLocaleString('ko-KR')}
+            </div>
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              <span>
+                <span style={{ color: '#8e8e8e', fontSize: '0.72rem' }}>좋아요 </span>
+                <strong>{post.likeCount ?? 0}</strong>
+              </span>
+              <span>
+                <span style={{ color: '#8e8e8e', fontSize: '0.72rem' }}>댓글 </span>
+                <strong>{post.commentCount ?? 0}</strong>
+              </span>
+              {hasMedia && (
+                <span>
+                  <span style={{ color: '#8e8e8e', fontSize: '0.72rem' }}>미디어 </span>
+                  <strong>{post.medias?.length ?? 0}개</strong>
+                </span>
+              )}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '4px' }}>제목</span>
+              <span style={{ fontWeight: 600 }}>{post.title}</span>
+            </div>
+            {post.techStacks && post.techStacks.length > 0 && (
+              <div style={{ marginBottom: '10px' }}>
+                <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '6px' }}>기술 태그</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {post.techStacks.map((tech) => (
+                    <span
+                      key={tech.id}
+                      style={{
+                        fontSize: '0.7rem',
+                        color: tech.color,
+                        backgroundColor: `${tech.color}15`,
+                        padding: '2px 8px',
+                        borderRadius: '8px',
+                        border: `1px solid ${tech.color}40`,
+                        fontWeight: 600,
+                      }}
+                    >
+                      #{tech.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ marginBottom: '12px' }}>
+              <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '4px' }}>내용</span>
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '120px', overflowY: 'auto', fontSize: '0.8rem' }}>
+                {post.content}
+              </p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowMenu(false);
+              navigate(`/post/${post.id}`);
+            }}
+            style={{
+              width: '100%',
+              marginTop: '4px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              border: '1px solid #dbdbdb',
+              background: '#fafafa',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              color: '#262626',
+            }}
+          >
+            <ExternalLink size={16} />
+            게시글 페이지로 이동
+          </button>
         </div>
       )}
     </div>

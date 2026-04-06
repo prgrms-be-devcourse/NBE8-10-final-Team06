@@ -1,6 +1,6 @@
 // src/pages/story/StoryViewer.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, X, Users, MoreHorizontal, Trash2, Send, Share2 } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import { dmApi } from '../../api/dm';
@@ -10,13 +10,15 @@ import { useDmStore } from '../../store/useDmStore';
 import { setPendingDmBatch } from '../../services/dmPendingSend';
 import { buildStorySharePayload } from '../../util/dmDeepLinks';
 import { getApiErrorMessage } from '../../util/apiError';
-import { isRemoteStoryMediaUrl } from '../../util/storyMediaUrl';
 import { isRsDataSuccess } from '../../util/rsData';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import { normalizeStoryExitPath } from '../../util/storyNavigation';
 
 const STORY_DURATION = 5000;
+/** 이 길이를 넘으면 말줄임 후 클릭 시 전문 토글 */
+const STORY_CAPTION_COLLAPSE_MAX = 40;
 
 function applyStoryAfterLikeToggle(
   story: StoryDetailResponse,
@@ -51,6 +53,14 @@ const StoryViewer: React.FC = () => {
   const { userId: targetUserIdStr } = useParams<{ userId: string }>();
   const targetUserId = Number(targetUserIdStr);
   const navigate = useNavigate();
+  const location = useLocation();
+  const storyReturnPathRef = useRef<string | undefined>(undefined);
+  if (storyReturnPathRef.current === undefined) {
+    storyReturnPathRef.current = normalizeStoryExitPath(location.state);
+  }
+  const exitStoryViewer = useCallback(() => {
+    navigate(storyReturnPathRef.current ?? '/');
+  }, [navigate]);
   
   const [stories, setStories] = useState<StoryDetailResponse[]>([]);
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
@@ -65,6 +75,7 @@ const StoryViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'views' | 'likes'>('views');
   const [replyText, setReplyText] = useState('');
   const [showDmShare, setShowDmShare] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const likeInFlightRef = useRef(false);
 
@@ -100,21 +111,35 @@ const StoryViewer: React.FC = () => {
         if (res.resultCode.startsWith('200') && res.data.length > 0) {
           setStories(res.data);
           const firstStoryId = res.data[0]?.storyId;
-          if (firstStoryId) await storyApi.recordViewSafe(firstStoryId);
+          if (firstStoryId) await storyApi.recordViewSafe(firstStoryId, targetUserId);
         } else {
-          navigate('/');
+          exitStoryViewer();
         }
       } catch (error) {
-        navigate('/');
+        exitStoryViewer();
       } finally {
         setIsLoading(false);
       }
     };
     initData();
-  }, [targetUserId, navigate]);
+  }, [targetUserId, navigate, exitStoryViewer]);
+
+  const currentStoryIdForCaption = stories[currentIndex]?.storyId;
+  useEffect(() => {
+    setCaptionExpanded(false);
+  }, [currentIndex, currentStoryIdForCaption]);
 
   useEffect(() => {
-    if (stories.length === 0 || isLoading || showStats || isPaused || showMenu || replyText.length > 0 || showDmShare) {
+    if (
+      stories.length === 0 ||
+      isLoading ||
+      showStats ||
+      isPaused ||
+      showMenu ||
+      replyText.length > 0 ||
+      showDmShare ||
+      captionExpanded
+    ) {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
       return;
@@ -133,13 +158,13 @@ const StoryViewer: React.FC = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
     };
-  }, [currentIndex, stories, isLoading, showStats, isPaused, showMenu, replyText, showDmShare]);
+  }, [currentIndex, stories, isLoading, showStats, isPaused, showMenu, replyText, showDmShare, captionExpanded]);
 
   const handleNext = () => {
     if (currentIndex < stories.length - 1) {
       setCurrentIndex(prev => prev + 1);
       setProgress(0);
-      void storyApi.recordViewSafe(stories[currentIndex + 1].storyId);
+      void storyApi.recordViewSafe(stories[currentIndex + 1].storyId, targetUserId);
     } else {
       const feedUserIds = feed.map(u => u.userId);
       let sequence = [...feedUserIds];
@@ -148,7 +173,7 @@ const StoryViewer: React.FC = () => {
       if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
         navigate(`/story/${sequence[currentIdx + 1]}`);
       } else {
-        navigate('/');
+        exitStoryViewer();
       }
     }
   };
@@ -190,7 +215,7 @@ const StoryViewer: React.FC = () => {
   };
 
   const removeStoryFromList = (updated: StoryDetailResponse[]) => {
-    if (updated.length === 0) navigate('/');
+    if (updated.length === 0) exitStoryViewer();
     else {
       setStories(updated);
       setCurrentIndex((prev) => Math.min(prev, updated.length - 1));
@@ -213,17 +238,13 @@ const StoryViewer: React.FC = () => {
 
   const handleHardDelete = async () => {
     if (!currentStory) return;
-    if (isRemoteStoryMediaUrl(currentStory.mediaUrl)) {
-      alert(
-        '외부 주소(https://…) 미디어는 서버 로컬 파일 삭제 단계에서 오류가 날 수 있습니다. 완전 삭제를 쓰려면 백엔드에서 외부 URL일 때 파일 삭제를 건너뛰도록 수정해야 합니다.'
-      );
-      return;
-    }
     if (!window.confirm('영구 삭제하시겠습니까?')) return;
     try {
       const res = await storyApi.hardDelete(currentStory.storyId);
-      if (res.resultCode.startsWith('200')) {
+      if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
         removeStoryFromList(stories.filter((_, idx) => idx !== currentIndex));
+      } else {
+        alert(res.msg || '삭제에 실패했습니다.');
       }
     } catch (err) {
       alert('오류 발생');
@@ -283,8 +304,27 @@ const StoryViewer: React.FC = () => {
     navigate(`/profile/${encodeURIComponent(nick)}`);
   };
 
+  const storyCaption = currentStory.content?.trim() ?? '';
+  const captionNeedsTruncate = storyCaption.length > STORY_CAPTION_COLLAPSE_MAX;
+
+  const captionBlockStyle: React.CSSProperties = {
+    flexShrink: 0,
+    width: '100%',
+    maxWidth: 450,
+    margin: '12px 0 0',
+    padding: '0 16px',
+    boxSizing: 'border-box',
+    color: '#fff',
+    fontSize: '0.95rem',
+    lineHeight: 1.45,
+    textAlign: 'left',
+    wordBreak: 'break-word',
+    maxHeight: 'min(28vh, 220px)',
+    overflowY: 'auto',
+  };
+
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#1a1a1a', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#1a1a1a', zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       {/* 프로그레스 바 */}
       <div style={{ position: 'absolute', top: '15px', width: '95%', maxWidth: '400px', display: 'flex', gap: '4px', zIndex: 2100 }}>
         {stories.map((_, idx) => (
@@ -341,58 +381,195 @@ const StoryViewer: React.FC = () => {
           </div>
           <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{authorLabel}</span>
         </div>
-        {isOwner && <button onClick={() => { setShowMenu(!showMenu); setShowStats(false); }} style={{ marginLeft: 'auto', marginRight: '10px', background: 'none', border: 'none', color: '#fff' }}><MoreHorizontal size={24} /></button>}
-        <button onClick={() => navigate('/')} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}><X size={28} /></button>
+        {isOwner && (
+          <div style={{ position: 'relative', marginLeft: 'auto', marginRight: '10px' }}>
+            <button
+              type="button"
+              aria-expanded={showMenu}
+              aria-haspopup="true"
+              aria-label="스토리 메뉴"
+              onClick={() => {
+                setShowMenu((v) => !v);
+                setShowStats(false);
+              }}
+              style={{ background: 'none', border: 'none', color: '#fff', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <MoreHorizontal size={24} />
+            </button>
+            {showMenu && (
+              <div
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '6px',
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  zIndex: 3100,
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                  width: '180px',
+                }}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleSoftDelete()}
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '15px 20px',
+                    border: 'none',
+                    background: 'none',
+                    color: '#262626',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid #efefef',
+                    textAlign: 'left',
+                    font: 'inherit',
+                  }}
+                >
+                  보관하기
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleHardDelete()}
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '15px 20px',
+                    border: 'none',
+                    background: 'none',
+                    color: '#ed4956',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    font: 'inherit',
+                  }}
+                >
+                  <Trash2 size={18} /> 영구 삭제
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <button type="button" onClick={() => exitStoryViewer()} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}>
+          <X size={28} />
+        </button>
       </div>
 
-      {/* 메뉴창 */}
-      {showMenu && isOwner && (
-        <div style={{ position: 'absolute', top: '70px', right: '20px', backgroundColor: '#fff', borderRadius: '12px', zIndex: 3100, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', width: '180px' }}>
-          <button onClick={handleSoftDelete} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '10px', padding: '15px 20px', border: 'none', background: 'none', color: '#262626', cursor: 'pointer', borderBottom: '1px solid #efefef' }}>보관하기</button>
-          <button onClick={handleHardDelete} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '10px', padding: '15px 20px', border: 'none', background: 'none', color: '#ed4956', fontWeight: 'bold', cursor: 'pointer' }}><Trash2 size={18} /> 영구 삭제</button>
-        </div>
-      )}
-
-      {/* 미디어 영역 */}
-      <div 
-        onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}
-        style={{ width: '100%', maxWidth: '450px', height: '85vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#000' }}
+      {/* 미디어 + 문구(본문은 미디어 아래) */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingTop: 72,
+          paddingBottom: 88,
+          boxSizing: 'border-box',
+        }}
       >
-        {isImage(currentStory.mediaType) ? (
-          <img
-            src={getFullUrl(currentStory.mediaUrl)}
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onError={(e) => {
-              const img = e.currentTarget;
-              if (img.dataset.fallbackApplied === '1') return;
-              const fallback = getFallbackUrl(currentStory.mediaUrl);
-              if (fallback) {
-                img.dataset.fallbackApplied = '1';
-                img.src = fallback;
-              }
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 450,
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'stretch',
+          }}
+        >
+          <div
+            onMouseDown={() => setIsPaused(true)}
+            onMouseUp={() => setIsPaused(false)}
+            onTouchStart={() => setIsPaused(true)}
+            onTouchEnd={() => setIsPaused(false)}
+            style={{
+              width: '100%',
+              flex: 1,
+              minHeight: 0,
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              overflow: 'hidden',
+              backgroundColor: '#000',
             }}
-          />
-        ) : (
-          <video
-            src={getFullUrl(currentStory.mediaUrl)}
-            autoPlay
-            muted
-            playsInline
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onError={(e) => {
-              const video = e.currentTarget;
-              if (video.dataset.fallbackApplied === '1') return;
-              const fallback = getFallbackUrl(currentStory.mediaUrl);
-              if (fallback) {
-                video.dataset.fallbackApplied = '1';
-                video.src = fallback;
-                video.load();
-              }
-            }}
-          />
-        )}
-        <div onClick={handlePrev} style={{ position: 'absolute', left: 0, top: 0, width: '30%', height: '100%' }} />
-        <div onClick={handleNext} style={{ position: 'absolute', right: 0, top: 0, width: '70%', height: '100%' }} />
+          >
+            {isImage(currentStory.mediaType) ? (
+              <img
+                src={getFullUrl(currentStory.mediaUrl)}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(currentStory.mediaUrl);
+                  if (fallback) {
+                    img.dataset.fallbackApplied = '1';
+                    img.src = fallback;
+                  }
+                }}
+              />
+            ) : (
+              <video
+                src={getFullUrl(currentStory.mediaUrl)}
+                autoPlay
+                muted
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onError={(e) => {
+                  const video = e.currentTarget;
+                  if (video.dataset.fallbackApplied === '1') return;
+                  const fallback = getFallbackUrl(currentStory.mediaUrl);
+                  if (fallback) {
+                    video.dataset.fallbackApplied = '1';
+                    video.src = fallback;
+                    video.load();
+                  }
+                }}
+              />
+            )}
+            <div onClick={handlePrev} style={{ position: 'absolute', left: 0, top: 0, width: '30%', height: '100%' }} />
+            <div onClick={handleNext} style={{ position: 'absolute', right: 0, top: 0, width: '70%', height: '100%' }} />
+          </div>
+          {storyCaption.length > 0 ? (
+            captionNeedsTruncate ? (
+              <button
+                type="button"
+                onClick={() => setCaptionExpanded((v) => !v)}
+                aria-expanded={captionExpanded}
+                aria-label={captionExpanded ? '문구 접기' : '문구 전체 보기'}
+                style={{
+                  ...captionBlockStyle,
+                  display: 'block',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {captionExpanded
+                  ? storyCaption
+                  : `${storyCaption.slice(0, STORY_CAPTION_COLLAPSE_MAX)}...`}
+              </button>
+            ) : (
+              <p style={captionBlockStyle}>{storyCaption}</p>
+            )
+          ) : null}
+        </div>
       </div>
 
       {/* 하단 인터랙션 (답장하기 기능 추가) */}

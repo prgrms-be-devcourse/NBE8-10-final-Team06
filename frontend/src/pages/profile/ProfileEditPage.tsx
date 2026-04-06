@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
-import { userApi } from '../api/user';
-import { technologyApi } from '../api/technology';
-import { Gender, Resume, ProfileUpdateRequest } from '../types/user';
-import { TechTagRes } from '../types/post';
-import BottomNav from '../components/layout/BottomNav';
+import { useAuthStore } from '../../store/useAuthStore';
+import { userApi } from '../../api/user';
+import { authApi } from '../../api/auth';
+import { technologyApi } from '../../api/technology';
+import { Gender, Resume, ProfileUpdateRequest } from '../../types/user';
+import { TechTagRes } from '../../types/post';
+import BottomNav from '../../components/layout/BottomNav';
 import { ChevronLeft, Camera } from 'lucide-react';
-import { applyImageFallback, resolveProfileImageUrl } from '../util/assetUrl';
-import { getApiErrorMessage } from '../util/apiError';
-import { isRsDataSuccess } from '../util/rsData';
-import { syncMyProfileImageFromUserApi } from '../services/syncMyProfileImage';
-import { performClientWithdraw } from '../services/performClientWithdraw';
-import { useProfileImageCacheStore } from '../store/useProfileImageCacheStore';
+import { applyImageFallback, resolveProfileImageUrl } from '../../util/assetUrl';
+import { getApiErrorMessage } from '../../util/apiError';
+import { isRsDataSuccess } from '../../util/rsData';
+import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
+import { performClientWithdraw } from '../../services/performClientWithdraw';
+import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -42,7 +43,8 @@ const ProfileEditPage: React.FC = () => {
   const [preview, setPreview] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [withdrawConfirmText, setWithdrawConfirmText] = useState('');
+  const [withdrawPassword, setWithdrawPassword] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
 
   useEffect(() => {
@@ -58,6 +60,15 @@ const ProfileEditPage: React.FC = () => {
           }
         } catch {
           setAllTechs([]);
+        }
+
+        try {
+          const meRes = await authApi.me();
+          if (isRsDataSuccess(meRes) && meRes.data?.email) {
+            setAccountEmail(meRes.data.email.trim());
+          }
+        } catch {
+          setAccountEmail('');
         }
 
         const res = await userApi.getProfile(myNickname);
@@ -300,7 +311,7 @@ const ProfileEditPage: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              setWithdrawConfirmText('');
+              setWithdrawPassword('');
               setShowWithdrawModal(true);
             }}
             style={{
@@ -334,7 +345,12 @@ const ProfileEditPage: React.FC = () => {
             zIndex: 3000,
             padding: '20px',
           }}
-          onClick={(e) => e.target === e.currentTarget && !withdrawing && setShowWithdrawModal(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !withdrawing) {
+              setShowWithdrawModal(false);
+              setWithdrawPassword('');
+            }
+          }}
         >
           <div
             style={{
@@ -353,15 +369,20 @@ const ProfileEditPage: React.FC = () => {
               정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </p>
             <p style={{ fontSize: '0.8rem', color: '#8e8e8e', marginBottom: '8px' }}>
-              계속하려면 아래에 <strong>탈퇴</strong>를 입력하세요.
+              계속하려면 <strong>로그인 비밀번호</strong>를 입력해 본인 확인을 완료하세요.
             </p>
+            {!accountEmail && (
+              <p style={{ fontSize: '0.8rem', color: '#ed4956', marginBottom: '8px' }}>
+                계정 이메일을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.
+              </p>
+            )}
             <input
-              type="text"
-              value={withdrawConfirmText}
-              onChange={(e) => setWithdrawConfirmText(e.target.value)}
-              placeholder="탈퇴"
-              disabled={withdrawing}
-              autoComplete="off"
+              type="password"
+              value={withdrawPassword}
+              onChange={(e) => setWithdrawPassword(e.target.value)}
+              placeholder="비밀번호"
+              disabled={withdrawing || !accountEmail}
+              autoComplete="current-password"
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
@@ -376,7 +397,10 @@ const ProfileEditPage: React.FC = () => {
               <button
                 type="button"
                 disabled={withdrawing}
-                onClick={() => setShowWithdrawModal(false)}
+                onClick={() => {
+                  setShowWithdrawModal(false);
+                  setWithdrawPassword('');
+                }}
                 style={{
                   padding: '8px 16px',
                   border: '1px solid #dbdbdb',
@@ -390,14 +414,23 @@ const ProfileEditPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                disabled={withdrawing || withdrawConfirmText.trim() !== '탈퇴'}
+                disabled={withdrawing || !accountEmail || withdrawPassword.length === 0}
                 onClick={async () => {
+                  if (!accountEmail) return;
+                  const pwd = withdrawPassword;
+                  if (!pwd) return;
                   setWithdrawing(true);
                   try {
+                    const loginRes = await authApi.login({ email: accountEmail, password: pwd });
+                    if (!isRsDataSuccess(loginRes)) {
+                      alert(loginRes.msg || '비밀번호가 올바르지 않습니다.');
+                      return;
+                    }
                     await performClientWithdraw(navigate);
+                  } catch (err: unknown) {
+                    alert(getApiErrorMessage(err, '비밀번호 확인에 실패했습니다.'));
                   } finally {
                     setWithdrawing(false);
-                    setShowWithdrawModal(false);
                   }
                 }}
                 style={{
@@ -407,8 +440,8 @@ const ProfileEditPage: React.FC = () => {
                   background: '#ed4956',
                   color: '#fff',
                   fontWeight: 600,
-                  cursor: withdrawing || withdrawConfirmText.trim() !== '탈퇴' ? 'not-allowed' : 'pointer',
-                  opacity: withdrawConfirmText.trim() !== '탈퇴' ? 0.5 : 1,
+                  cursor: withdrawing || !accountEmail || withdrawPassword.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: !accountEmail || withdrawPassword.length === 0 ? 0.5 : 1,
                 }}
               >
                 {withdrawing ? '처리 중...' : '탈퇴하기'}

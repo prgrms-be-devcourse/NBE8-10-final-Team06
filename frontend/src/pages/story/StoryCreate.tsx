@@ -46,6 +46,17 @@ const StoryCreate: React.FC = () => {
     }
   };
 
+  const clearSelectedMedia = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    setFile(null);
+    setPreviewUrl(null);
+    setThumbnailUrl('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const isVideoMedia = file?.type.startsWith('video') === true;
 
   const toggleTagUser = (user: StoryFeedResponse) => {
@@ -164,9 +175,37 @@ const StoryCreate: React.FC = () => {
             }}
           >
             {previewUrl ? (
-              file?.type.startsWith('video') 
-                ? <video src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} autoPlay muted loop />
-                : <img src={previewUrl} alt="미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <>
+                {file?.type.startsWith('video') ? (
+                  <video src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} autoPlay muted loop />
+                ) : (
+                  <img src={previewUrl} alt="미리보기" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                <button
+                  type="button"
+                  aria-label="선택한 미디어 제거"
+                  onClick={clearSelectedMedia}
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    border: 'none',
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    zIndex: 2,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  <X size={22} strokeWidth={2.5} />
+                </button>
+              </>
             ) : (
               <div style={{ textAlign: 'center' }}>
                 <ImageIcon size={48} color="#dbdbdb" style={{ marginBottom: '10px' }} />

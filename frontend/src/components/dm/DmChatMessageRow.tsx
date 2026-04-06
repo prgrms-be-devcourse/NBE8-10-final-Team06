@@ -1,11 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import type { DmMessageResponse } from '../../types/dm';
 import { resolveDmAttachment } from '../../util/dmAttachment';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
+import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
 const checkIsExpired = (content: string, type: string) => {
   if (type !== 'STORY') return false;
@@ -125,6 +126,8 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   peerProfile,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const storyNavState = { state: { [STORY_FROM_STATE_KEY]: `${location.pathname}${location.search}` } };
   const attachmentData = resolveDmAttachment(msg);
   const isValid =
     msg.valid &&
@@ -142,28 +145,28 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
     const storyId = Number(attachmentData.id);
     if (!Number.isFinite(storyId)) return;
     const authorFallback = msg.content.match(/(?:^|[?&])u=(\d+)/);
-    const fallbackUserId = authorFallback ? Number(authorFallback[1]) : NaN;
+    const authorUserId = authorFallback ? Number(authorFallback[1]) : NaN;
+    if (!Number.isFinite(authorUserId) || authorUserId <= 0) {
+      alert('스토리 링크에 작성자 정보가 없어 열 수 없습니다.');
+      return;
+    }
     try {
-      const res = await storyApi.recordView(storyId);
+      const res = await storyApi.recordView(storyId, authorUserId);
       const ok = res.resultCode?.startsWith('200') || res.resultCode?.includes('-S-');
       if (ok && res.data?.userId != null) {
-        navigate(`/story/${res.data.userId}`);
+        navigate(`/story/${res.data.userId}`, storyNavState);
         return;
       }
     } catch {
-      /* 시청 기록 API 실패 시 공유 링크의 작성자 id로 스토리 피드 진입 */
+      /* 시청 기록 실패 시 작성자 피드로 진입 */
     }
-    if (Number.isFinite(fallbackUserId) && fallbackUserId > 0) {
-      navigate(`/story/${fallbackUserId}`);
-      return;
-    }
-    alert('스토리를 열 수 없습니다.');
+    navigate(`/story/${authorUserId}`, storyNavState);
   };
 
   const bubble = isMe ? DM_BUBBLE_MINE : DM_BUBBLE_PEER;
   const showPeerAvatar = !isMe && peerProfile != null;
   const trimmedLabel = senderLabel?.trim() ?? '';
-  const showGroupSenderName = !isMe && trimmedLabel.length > 0;
+  const showPeerSenderName = !isMe && trimmedLabel.length > 0;
 
   const bubbleBlock = !attachmentData ? (
     <div
@@ -238,7 +241,7 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
             alignItems: isMe ? 'flex-end' : 'flex-start',
           }}
         >
-          {showGroupSenderName ? (
+          {showPeerSenderName ? (
             <span
               style={{
                 fontSize: '0.72rem',
