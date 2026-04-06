@@ -24,7 +24,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Slf4j
 @Service
-@Profile("prod")
+@Profile("prod & !test")
 public class S3StorageServiceImpl implements StorageService {
 
     @Value("${cloud.aws.s3.bucket}")
