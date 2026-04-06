@@ -22,7 +22,7 @@ import MainLayout from '../../components/layout/MainLayout';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import { getApiErrorMessage } from '../../util/apiError';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
-import TechRadarChart from '../../components/profile/TechRadarChart';
+import TechDonutChart from '../../components/profile/TechDonutChart';
 import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../../util/profilePostCount';
 
@@ -1021,7 +1021,7 @@ const ProfilePage: React.FC = () => {
             <div className="profile-tab-tech-inner">
               <h3 className="profile-tab-section-title">기술 스택 숙련도</h3>
               <p className="profile-tab-section-desc">
-                각 축은 기술 항목이며, 중심에서 멀수록 점수가 높습니다. (최대 100점 기준)
+                원형 그래프는 보유 기술 점수 합계 대비 각 기술의 비중(%)을 나타냅니다. 왼쪽 요약에서 비중·점수를 함께 확인할 수 있습니다.
               </p>
               {techAdminAllowed && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
@@ -1034,8 +1034,15 @@ const ProfilePage: React.FC = () => {
                   </button>
                 </div>
               )}
-              {profile.topTechScores && profile.topTechScores.length > 0 ? (
-                <TechRadarChart scores={profile.topTechScores} maxScore={100} />
+              {(profile.allTechScores && profile.allTechScores.length > 0) ||
+              (profile.topTechScores && profile.topTechScores.length > 0) ? (
+                <TechDonutChart
+                  scores={
+                    profile.allTechScores && profile.allTechScores.length > 0
+                      ? profile.allTechScores
+                      : profile.topTechScores
+                  }
+                />
               ) : (
                 <div className="profile-tab-empty">
                   <p style={{ margin: 0 }}>아직 활동 데이터가 부족합니다.</p>
