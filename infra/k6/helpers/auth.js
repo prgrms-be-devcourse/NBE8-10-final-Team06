@@ -14,7 +14,6 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 export const TEST_USERS = [
     { email: 'k6test01@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test02@devstagram.com', password: 'Test1234Pw' },
-    { email: 'k6test03@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test04@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test05@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test06@devstagram.com', password: 'Test1234Pw' },
@@ -22,6 +21,7 @@ export const TEST_USERS = [
     { email: 'k6test08@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test09@devstagram.com', password: 'Test1234Pw' },
     { email: 'k6test10@devstagram.com', password: 'Test1234Pw' },
+    { email: 'k6test011@devstagram.com', password: 'Test1234Pw' },
 ];
 
 /**
