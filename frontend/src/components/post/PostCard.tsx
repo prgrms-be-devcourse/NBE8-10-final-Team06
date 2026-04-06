@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, MoreHorizontal, ChevronLeft, ChevronRight, Edit, Trash2, Bookmark, Forward, ExternalLink } from 'lucide-react';
 import { PostFeedResponse } from '../../types/post';
@@ -86,22 +85,12 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
     if (isDeleting || !window.confirm('삭제하시겠습니까?')) return;
     try {
       setIsDeleting(true);
-      const res = await postApi.delete(post.id);
-      if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
-        onPostRemoved?.(post.id);
-        onRefresh?.();
-        setShowMenu(false);
-        return;
-      }
-      alert(res.msg || '삭제 실패');
+      await postApi.deleteSafe(post.id);
+      onPostRemoved?.(post.id);
+      onRefresh?.();
+      setShowMenu(false);
+      return;
     } catch (err) {
-      // 이미 삭제된 글(중복 요청·401 재시도 후 등)이면 서버가 404를 줄 수 있음 → 목록만 맞춤
-      if (isAxiosError(err) && err.response?.status === 404) {
-        onPostRemoved?.(post.id);
-        onRefresh?.();
-        setShowMenu(false);
-        return;
-      }
       alert(getApiErrorMessage(err, '삭제 실패'));
     } finally {
       if (isMountedRef.current) {

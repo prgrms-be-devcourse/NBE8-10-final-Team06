@@ -15,6 +15,7 @@ const HomePage: React.FC = () => {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [isLast, setIsLast] = useState(false);
+  const [removedPostIds, setRemovedPostIds] = useState<number[]>([]);
   
   const { isLoggedIn } = useAuthStore();
   const isInitialMount = useRef(true);
@@ -30,11 +31,12 @@ const HomePage: React.FC = () => {
       if (pageNumber === 0) setFeedError(null);
       const res = await postApi.getFeed(pageNumber);
       if (res.resultCode?.includes('-S-') || res.resultCode?.startsWith('200')) {
+        const filteredContent = (res.data.content || []).filter((post) => !removedPostIds.includes(post.id));
         if (pageNumber === 0) {
-          setPosts(res.data.content || []);
+          setPosts(filteredContent);
           setPage(0);
         } else {
-          setPosts(prev => [...prev, ...(res.data.content || [])]);
+          setPosts(prev => [...prev, ...filteredContent]);
         }
         setIsLast(res.data.last);
       } else {
@@ -52,7 +54,7 @@ const HomePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, isLoading]);
+  }, [isLoggedIn, isLoading, removedPostIds]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -73,7 +75,10 @@ const HomePage: React.FC = () => {
                 <PostCard
                   key={post.id}
                   post={post}
-                  onPostRemoved={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
+                  onPostRemoved={(id) => {
+                    setRemovedPostIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                    setPosts((prev) => prev.filter((p) => p.id !== id));
+                  }}
                   onRefresh={() => {
                     void fetchFeed(0, { force: true });
                   }}
