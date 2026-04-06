@@ -195,7 +195,6 @@ public class UserService {
                 .map(info -> {
                     Technology t = techMap.get(info.techId());
                     if (t == null) return null;
-                    // 준비하신 of 메서드 호출!
                     return TechScoreDto.of(t, Math.round(info.score()), finalTotalSum);
                 })
                 .filter(Objects::nonNull)
