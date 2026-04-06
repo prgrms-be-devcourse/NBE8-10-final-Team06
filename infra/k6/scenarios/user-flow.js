@@ -21,9 +21,10 @@ export const options = {
     // iteration이 바뀌어도 쿠키를 유지해야 로그인 후 조회 흐름을 자연스럽게 볼 수 있음
     noCookiesReset: true,
     stages: [
-        { duration: '2m', target: 10 },
-        { duration: '3m', target: 20 },
-        { duration: '5m', target: 30 },
+        { duration: '2m', target: 30 },
+        { duration: '3m', target: 60 },
+        { duration: '5m', target: 100 },
+        { duration: '3m', target: 150 },
         { duration: '2m', target: 0 },
     ],
     thresholds: {

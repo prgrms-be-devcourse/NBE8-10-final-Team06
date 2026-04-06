@@ -43,6 +43,8 @@ custom:
     secret-key: ${JWT_SECRET_KEY}
     access-token-expire-seconds: ${JWT_ACCESS_TOKEN_EXPIRE_SECONDS}
     refresh-token-expire-seconds: ${JWT_REFRESH_TOKEN_EXPIRE_SECONDS}
+  init:
+    k6-users: ${INIT_K6_USERS:false}
 
 file:
   upload-dir: ${DEVSTAGRAM_STORAGE_PATH:/tmp/devstagram/uploads/}
