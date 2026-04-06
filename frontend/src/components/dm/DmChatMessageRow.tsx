@@ -1,11 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import type { DmMessageResponse } from '../../types/dm';
 import { resolveDmAttachment } from '../../util/dmAttachment';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
+import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
 const checkIsExpired = (content: string, type: string) => {
   if (type !== 'STORY') return false;
@@ -125,6 +126,8 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   peerProfile,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const storyNavState = { state: { [STORY_FROM_STATE_KEY]: `${location.pathname}${location.search}` } };
   const attachmentData = resolveDmAttachment(msg);
   const isValid =
     msg.valid &&
@@ -151,13 +154,13 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
       const res = await storyApi.recordView(storyId, authorUserId);
       const ok = res.resultCode?.startsWith('200') || res.resultCode?.includes('-S-');
       if (ok && res.data?.userId != null) {
-        navigate(`/story/${res.data.userId}`);
+        navigate(`/story/${res.data.userId}`, storyNavState);
         return;
       }
     } catch {
       /* 시청 기록 실패 시 작성자 피드로 진입 */
     }
-    navigate(`/story/${authorUserId}`);
+    navigate(`/story/${authorUserId}`, storyNavState);
   };
 
   const bubble = isMe ? DM_BUBBLE_MINE : DM_BUBBLE_PEER;

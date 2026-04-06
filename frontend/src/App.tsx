@@ -39,7 +39,7 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authApi.me();
+        const res = await authApi.me({ sessionProbe: true });
         if (cancelled) return;
         if (isRsDataSuccess(res) && res.data) {
           const { id, nickname } = res.data;

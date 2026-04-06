@@ -64,7 +64,11 @@ client.interceptors.response.use(
     const data = error.response?.data;
     const originalConfig = error.config as InternalAxiosRequestConfig | undefined;
 
-    if (status === 403 && shouldTreat403ResponseAsSessionExpired(data)) {
+    if (
+      status === 403 &&
+      shouldTreat403ResponseAsSessionExpired(data) &&
+      !originalConfig?.skip403SessionHandling
+    ) {
       clearSessionAndRedirectToLogin('403-auth');
       return Promise.reject(error);
     }

@@ -25,6 +25,7 @@ import ProfileAvatar from '../../components/common/ProfileAvatar';
 import TechDonutChart from '../../components/profile/TechDonutChart';
 import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../../util/profilePostCount';
+import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -765,7 +766,8 @@ const ProfilePage: React.FC = () => {
 
   const openProfileStories = () => {
     if (!profileStoryRing.hasActiveStories) return;
-    navigate(`/story/${profile.userId}`);
+    const storyFrom = `${location.pathname}${location.search}`;
+    navigate(`/story/${profile.userId}`, { state: { [STORY_FROM_STATE_KEY]: storyFrom } });
   };
 
   return (

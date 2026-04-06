@@ -35,9 +35,14 @@ export const authApi = {
     return response.data;
   },
 
-  /** GET /auth/me — 백엔드 MyInfoResponse(id, nickname, email)만. 프로필 이미지는 별도 사용자 API·syncMyProfileImage 등으로 조회. */
-  me: async (): Promise<RsData<AuthMeResponse>> => {
-    const response: AxiosResponse<RsData<AuthMeResponse>> = await client.get('/auth/me');
+  /**
+   * GET /auth/me — 백엔드 MyInfoResponse(id, nickname, email)만.
+   * `sessionProbe`: 앱 부트스트랩용. 비로그인 시 백엔드 403을 전역 세션 만료 처리에 넘기지 않음.
+   */
+  me: async (options?: { sessionProbe?: boolean }): Promise<RsData<AuthMeResponse>> => {
+    const response: AxiosResponse<RsData<AuthMeResponse>> = await client.get('/auth/me', {
+      ...(options?.sessionProbe ? { skip403SessionHandling: true } : {}),
+    });
     return response.data;
   },
 

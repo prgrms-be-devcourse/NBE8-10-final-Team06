@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus } from 'lucide-react'; 
 import { storyApi } from '../../api/story';
 import { authApi } from '../../api/auth';
@@ -7,11 +7,14 @@ import { StoryFeedResponse, StoryDetailResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
+import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
 const StoryBar: React.FC = () => {
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
   const [myStories, setMyStories] = useState<StoryDetailResponse[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
+  const storyFrom = `${location.pathname}${location.search}`;
   const {
     nickname,
     isLoggedIn,
@@ -81,7 +84,7 @@ const StoryBar: React.FC = () => {
 
   const handleMyStoryClick = () => {
     if (hasActiveMyStory && userId) {
-      navigate(`/story/${userId}`);
+      navigate(`/story/${userId}`, { state: { [STORY_FROM_STATE_KEY]: storyFrom } });
     } else {
       navigate('/story/create');
     }
@@ -113,7 +116,11 @@ const StoryBar: React.FC = () => {
 
       {/* 타인 스토리 섹션 */}
       {otherUsersFeed.map((item) => (
-        <div key={item.userId} className="story-bar-item" onClick={() => navigate(`/story/${item.userId}`)}>
+        <div
+          key={item.userId}
+          className="story-bar-item"
+          onClick={() => navigate(`/story/${item.userId}`, { state: { [STORY_FROM_STATE_KEY]: storyFrom } })}
+        >
           <div
             className="story-bar-ring-outer"
             style={{

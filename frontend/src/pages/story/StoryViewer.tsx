@@ -1,6 +1,6 @@
 // src/pages/story/StoryViewer.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, X, Users, MoreHorizontal, Trash2, Send, Share2 } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import { dmApi } from '../../api/dm';
@@ -14,6 +14,7 @@ import { isRsDataSuccess } from '../../util/rsData';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import { normalizeStoryExitPath } from '../../util/storyNavigation';
 
 const STORY_DURATION = 5000;
 /** 이 길이를 넘으면 말줄임 후 클릭 시 전문 토글 */
@@ -52,6 +53,14 @@ const StoryViewer: React.FC = () => {
   const { userId: targetUserIdStr } = useParams<{ userId: string }>();
   const targetUserId = Number(targetUserIdStr);
   const navigate = useNavigate();
+  const location = useLocation();
+  const storyReturnPathRef = useRef<string | undefined>(undefined);
+  if (storyReturnPathRef.current === undefined) {
+    storyReturnPathRef.current = normalizeStoryExitPath(location.state);
+  }
+  const exitStoryViewer = useCallback(() => {
+    navigate(storyReturnPathRef.current ?? '/');
+  }, [navigate]);
   
   const [stories, setStories] = useState<StoryDetailResponse[]>([]);
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
@@ -104,16 +113,16 @@ const StoryViewer: React.FC = () => {
           const firstStoryId = res.data[0]?.storyId;
           if (firstStoryId) await storyApi.recordViewSafe(firstStoryId, targetUserId);
         } else {
-          navigate('/');
+          exitStoryViewer();
         }
       } catch (error) {
-        navigate('/');
+        exitStoryViewer();
       } finally {
         setIsLoading(false);
       }
     };
     initData();
-  }, [targetUserId, navigate]);
+  }, [targetUserId, navigate, exitStoryViewer]);
 
   const currentStoryIdForCaption = stories[currentIndex]?.storyId;
   useEffect(() => {
@@ -164,7 +173,7 @@ const StoryViewer: React.FC = () => {
       if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
         navigate(`/story/${sequence[currentIdx + 1]}`);
       } else {
-        navigate('/');
+        exitStoryViewer();
       }
     }
   };
@@ -206,7 +215,7 @@ const StoryViewer: React.FC = () => {
   };
 
   const removeStoryFromList = (updated: StoryDetailResponse[]) => {
-    if (updated.length === 0) navigate('/');
+    if (updated.length === 0) exitStoryViewer();
     else {
       setStories(updated);
       setCurrentIndex((prev) => Math.min(prev, updated.length - 1));
@@ -449,7 +458,7 @@ const StoryViewer: React.FC = () => {
             )}
           </div>
         )}
-        <button type="button" onClick={() => navigate('/')} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}>
+        <button type="button" onClick={() => exitStoryViewer()} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}>
           <X size={28} />
         </button>
       </div>
