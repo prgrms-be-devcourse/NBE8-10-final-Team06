@@ -9,6 +9,7 @@ import ProfileAvatar from '../common/ProfileAvatar';
 import DmShareModal from '../dm/DmShareModal';
 import { buildPostSharePayload } from '../../util/dmDeepLinks';
 import { getApiErrorMessage } from '../../util/apiError';
+import MarkdownContent from '../common/MarkdownContent';
 
 interface PostCardProps {
   post: PostFeedResponse;
@@ -268,9 +269,9 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
             )}
             <div style={{ marginBottom: '12px' }}>
               <span style={{ color: '#8e8e8e', display: 'block', fontSize: '0.72rem', marginBottom: '4px' }}>내용</span>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '120px', overflowY: 'auto', fontSize: '0.8rem' }}>
-                {post.content}
-              </p>
+              <div style={{ maxHeight: '120px', overflowY: 'auto', fontSize: '0.8rem' }}>
+                <MarkdownContent content={post.content} />
+              </div>
             </div>
           </div>
           <button
@@ -444,7 +445,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
                   ))}
                 </div>
               )}
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{post.content}</p>
+              <MarkdownContent content={post.content} />
             </div>
             <div
               style={{ color: '#8e8e8e', fontSize: '0.85rem', marginTop: '12px', cursor: 'pointer' }}
@@ -536,7 +537,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
             </div>
           )}
 
-          <p className="post-card-feed-community-excerpt">{post.content}</p>
+          <MarkdownContent content={post.content} className="post-card-feed-community-excerpt" />
 
           <div className="post-card-feed-community-footer">
             <div className="post-card-feed-community-stat">

@@ -1,3 +1,5 @@
+@import "highlight.js/styles/github-dark.css";
+
 * {
   box-sizing: border-box;
 }
@@ -374,6 +376,66 @@ body {
 
 .post-card-feed-community-more:hover {
   text-decoration: underline;
+}
+
+.markdown-content {
+  color: inherit;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.markdown-content p {
+  margin: 0 0 0.6em;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content pre {
+  margin: 0.6em 0;
+  padding: 0;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+}
+
+.markdown-content .markdown-code-block {
+  position: relative;
+}
+
+.markdown-content .markdown-code-lang {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #f8fafc;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.markdown-content pre code.hljs {
+  display: block;
+  padding: 28px 12px 12px;
+  border-radius: 6px;
+}
+
+.markdown-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.82em;
+}
+
+.markdown-content :not(pre) > code {
+  background-color: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  padding: 0.12em 0.35em;
+}
+
+.post-card-feed-community-excerpt pre {
+  max-height: 180px;
 }
 
 /* 데스크탑: vw 스케일 대신 고정 밀도(인스타 웹에 가까운 정보 밀도) */
