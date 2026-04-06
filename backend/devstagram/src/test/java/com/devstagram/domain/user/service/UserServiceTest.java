@@ -312,4 +312,47 @@ class UserServiceTest {
                 .findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(eq(targetUser.getId()), any(Pageable.class));
         verify(technologyRepository).findAllByIdsWithCategory(anyList());
     }
+
+    @Test
+    @DisplayName("유저 프로필 조회 - 전체 기술 목록의 비중(Percentage) 계산 및 정렬 로직을 검증한다")
+    void getUserProfile_VerifyPercentageCalculation() {
+        // given
+        String nickname = "dohwa";
+        User targetUser = User.builder().nickname(nickname).build();
+        ReflectionTestUtils.setField(targetUser, "id", 1L);
+
+        // 계산하기 편하게 60점, 40점으로 설정 (합계 100점)
+        targetUser.updateTechScore(1, 60);
+        targetUser.updateTechScore(2, 40);
+
+        Technology java = Technology.builder().name("Java").build();
+        ReflectionTestUtils.setField(java, "id", 1L);
+
+        Technology spring = Technology.builder().name("Spring").build();
+        ReflectionTestUtils.setField(spring, "id", 2L);
+
+        // 모킹 설정
+        given(userRepository.findByNicknameWithInfo(nickname)).willReturn(Optional.of(targetUser));
+        given(technologyRepository.findAllByIdsWithCategory(anyList())).willReturn(List.of(java, spring));
+        given(postRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(anyLong(), any()))
+                .willReturn(new SliceImpl<>(Collections.emptyList()));
+
+        // when
+        UserProfileResponse response = userService.getUserProfile(nickname, null, PageRequest.of(0, 10));
+
+        // then
+        // 1. 전체 리스트 반환 여부 확인
+        assertThat(response.allTechScores()).hasSize(2);
+
+        // 2. 정렬 확인 (점수 높은 순)
+        assertThat(response.allTechScores().get(0).techName()).isEqualTo("Java");
+
+        // 3. 비중 계산 정확성 확인 (소수점 첫째 자리까지)
+        assertThat(response.allTechScores().get(0).percentage()).isEqualTo(60.0);
+        assertThat(response.allTechScores().get(1).percentage()).isEqualTo(40.0);
+
+        // 4. 상위 5개(topTechScores)에도 데이터가 잘 복사되었는지 확인
+        assertThat(response.topTechScores()).isNotEmpty();
+        assertThat(response.topTechScores().get(0).techName()).isEqualTo("Java");
+    }
 }
