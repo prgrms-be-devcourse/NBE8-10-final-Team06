@@ -65,17 +65,14 @@ function resolveAccessTokenForStomp(): string {
 function stompSendAuthHeaders(): Record<string, string> | undefined {
   const token = resolveAccessTokenForStomp();
   if (!token) return undefined;
-  return {
-    Authorization: `Bearer ${token}`,
-    accessToken: token,
-  };
+  return { Authorization: `Bearer ${token}` };
 }
 
 interface UseStompProps {
   endpoint: string;
   onConnect?: () => void;
   /**
-   * 값이 바뀌면 STOMP 클라이언트를 새로 만든다. CONNECT 시 JWT(Authorization·accessToken)를 다시 심기 위함.
+   * 값이 바뀌면 STOMP 클라이언트를 새로 만든다. CONNECT 시 `Authorization: Bearer` 를 다시 심기 위함.
    * 서버는 CONNECT 로 Principal 을 세션에 두고 SEND 마다 SecurityContext 를 복원하므로 DM message/read 가 동작한다.
    * 토큰이 늦게 생기면 인증 없이 붙은 연검이 남지 않도록 reconnectKey 로 재연결한다.
    */
@@ -103,8 +100,6 @@ export const useStomp = ({ endpoint, onConnect, reconnectKey = '' }: UseStompPro
     const connectHeaders: Record<string, string> = {};
     if (token) {
       connectHeaders.Authorization = `Bearer ${token}`;
-      // StompAuthChannelInterceptor: Authorization 없을 때 accessToken 네이티브 헤더 폴백
-      connectHeaders.accessToken = token;
     }
 
     setStompDiagnostics({

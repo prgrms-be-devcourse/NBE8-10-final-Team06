@@ -9,6 +9,20 @@ import ProfileAvatar from '../common/ProfileAvatar';
 import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
 import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
 
+const STORY_RING_GRADIENT =
+  'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)';
+
+function isMyFeedRow(
+  item: StoryFeedResponse,
+  uid: number | null | undefined,
+  nick: string | null | undefined
+): boolean {
+  if (item.isMe === true) return true;
+  if (uid != null && Number(item.userId) === Number(uid)) return true;
+  if (nick != null && nick.length > 0 && item.nickname === nick) return true;
+  return false;
+}
+
 const StoryBar: React.FC = () => {
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
   const [myStories, setMyStories] = useState<StoryDetailResponse[]>([]);
@@ -67,11 +81,15 @@ const StoryBar: React.FC = () => {
     };
 
     fetchData();
-  }, [isLoggedIn, userId, nickname, setSessionUserId, setSessionNickname]);
+    /** 홈 ↔ 스토리 뷰어 이동 시 피드의 isUnread(본인 링 색) 갱신 */
+  }, [isLoggedIn, userId, nickname, setSessionUserId, setSessionNickname, location.pathname]);
 
   const hasActiveMyStory = myStories.length > 0;
-  // 다른 사용자들의 피드 (내 닉네임 중복 제거)
-  const otherUsersFeed = feed.filter(item => item.nickname !== nickname);
+  const myFeedRow = feed.find((item) => isMyFeedRow(item, userId, nickname));
+  /** 활성 스토리가 있는데 피드 행이 아직 없으면(로딩) 안 읽은 것으로 간주 → 그라데이션 */
+  const myStoryRingUnread = hasActiveMyStory && (myFeedRow ? myFeedRow.isUnread : true);
+
+  const otherUsersFeed = feed.filter((item) => !isMyFeedRow(item, userId, nickname));
   /** 피드 본인 행 → 없으면 세션(로그인/me/내 프로필)에 맞춘 URL — 피드에 내 행이 없어도 포스트와 같은 사진 */
   const myProfileImageUrl =
     sessionProfileImageUrl ??
@@ -97,7 +115,7 @@ const StoryBar: React.FC = () => {
         <div
           className="story-bar-ring-outer"
           style={{
-            background: '#dbdbdb',
+            background: hasActiveMyStory ? (myStoryRingUnread ? STORY_RING_GRADIENT : '#dbdbdb') : '#dbdbdb',
           }}
         >
           <div className="story-bar-ring-inner">

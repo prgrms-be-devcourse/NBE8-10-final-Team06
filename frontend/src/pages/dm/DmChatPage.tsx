@@ -1,7 +1,7 @@
 // src/pages/dm/DmChatPage.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { dmApi } from '../../api/dm';
 import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -51,6 +51,7 @@ import {
   DM_CLIENT_TYPING_STOP_AFTER_IDLE_MS,
 } from '../../util/dmTypingClient';
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
+import { scrollDmChatPaneToBottom } from '../../util/dmScroll';
 
 /**
  * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
@@ -58,6 +59,8 @@ import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
  */
 const DM_POLL_INTERVAL_IN_ROOM_MS = 2_500;
 const DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS = 2_000;
+/** 맨 아래에서 이만큼 이상 떨어지면 “아래로” 버튼 표시 */
+const DM_SCROLL_JUMP_BUTTON_THRESHOLD_PX = 120;
 
 /** /auth/me(MyInfoResponse) data.id 와 일부 환경의 userId 별칭 */
 function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | null {
@@ -259,6 +262,7 @@ const DmChatPage: React.FC = () => {
   const [hasNext, setHasNext] = useState(false);
   const [lastReadIdByOpponent, setLastReadIdByOpponent] = useState<number>(0);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   // 채팅방 진입 전에도 JWT id 를 가능한 빨리 채워 말풍선 좌우 오판을 줄임(roomId effect 와 중복 호출되어도 무방)
   useEffect(() => {
@@ -272,6 +276,30 @@ const DmChatPage: React.FC = () => {
   }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** 맨 아래 메시지가 바뀔 때만 스크롤(위쪽 과거 로드 시 마지막 id 동일 → 스크롤 유지) */
+  const dmScrollLastTailKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    dmScrollLastTailKeyRef.current = null;
+    setShowJumpToBottom(false);
+  }, [roomId]);
+
+  const updateJumpButtonVisibility = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowJumpToBottom(distFromBottom > DM_SCROLL_JUMP_BUTTON_THRESHOLD_PX);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    const key = `${last.id}\0${last.createdAt ?? ''}`;
+    if (dmScrollLastTailKeyRef.current === key) return;
+    dmScrollLastTailKeyRef.current = key;
+    scrollDmChatPaneToBottom(scrollRef.current);
+    requestAnimationFrame(() => updateJumpButtonVisibility());
+  }, [messages, updateJumpButtonVisibility]);
+
   const topObserverRef = useRef<HTMLDivElement>(null);
   /**
    * 상대 원격 타이핑이 켜지면 항상 맨 아래로(타이핑 행이 스크롤 밖에 남는 재현 방지).
@@ -284,12 +312,16 @@ const DmChatPage: React.FC = () => {
     /** 상대 타이핑 행은 목록 맨 아래에 붙으므로, 하단 근처 조건 없이 내려야 뷰에 들어옴(이전 100px 조건으로는 안 보이는 재현 가능). */
     if (showPeerTypingFromRemote) {
       el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => updateJumpButtonVisibility());
       return;
     }
     const nearBottomPx = 100;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (dist <= nearBottomPx) el.scrollTop = el.scrollHeight;
-  }, [showPeerTypingFromRemote, isMeTyping]);
+    if (dist <= nearBottomPx) {
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => updateJumpButtonVisibility());
+    }
+  }, [showPeerTypingFromRemote, isMeTyping, updateJumpButtonVisibility]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 서버로 `start` 를 보낸 세션 — 전송·방 이동 시 `stop` 필요 여부 판별 */
   const typingSessionActiveRef = useRef(false);
@@ -619,7 +651,6 @@ const DmChatPage: React.FC = () => {
     typingEchoSelfUserIdRef,
     roomIdRef,
     typingPollDebounceRef,
-    scrollRef,
     messagesRefreshGenRef,
     sendReadEventRef,
     mergeFreshSliceIntoMessages,
@@ -704,8 +735,6 @@ const DmChatPage: React.FC = () => {
       console.log('[DM typing][send_stop]', { roomId: rid, userId: actor, reason: 'message_sent' });
     }
     setIsMeTyping(false);
-    // 하단 이동
-    setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 0);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -797,17 +826,27 @@ const DmChatPage: React.FC = () => {
         </div>
       </header>
 
-      <main
-        ref={scrollRef}
+      <div
         style={{
           flex: 1,
           minHeight: 0,
-          overflowY: 'auto',
-          padding: '20px',
+          position: 'relative',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
+        <main
+          ref={scrollRef}
+          onScroll={updateJumpButtonVisibility}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
         {/* 상단 무한 스크롤 관찰 포인트 */}
         <div ref={topObserverRef} style={{ height: '10px' }} />
         {isFetchingMore && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px' }}><Loader2 className="animate-spin" size={20} color="#8e8e8e" /></div>}
@@ -869,7 +908,38 @@ const DmChatPage: React.FC = () => {
             isMe={isDmTypingBubbleMine(bubbleSelfUserId, bubbleSelfUserId, dmBubbleCtx)}
           />
         ) : null}
-      </main>
+        </main>
+
+        {showJumpToBottom ? (
+          <button
+            type="button"
+            aria-label="맨 아래로 이동"
+            onClick={() => {
+              scrollDmChatPaneToBottom(scrollRef.current);
+              requestAnimationFrame(() => updateJumpButtonVisibility());
+            }}
+            style={{
+              position: 'absolute',
+              right: 18,
+              bottom: 14,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '1px solid #dbdbdb',
+              backgroundColor: '#fff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#262626',
+              zIndex: 5,
+            }}
+          >
+            <ChevronDown size={22} strokeWidth={2.25} aria-hidden />
+          </button>
+        ) : null}
+      </div>
 
       <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>

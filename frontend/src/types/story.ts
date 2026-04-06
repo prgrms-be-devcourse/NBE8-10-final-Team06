@@ -17,6 +17,8 @@ export interface StoryFeedResponse {
   isUnread: boolean;
   totalStoryCount: number;
   lastUpdatedAt: string;
+  /** 백엔드 피드: 본인 행(스토리 바 첫 칸과 동일 사용자) */
+  isMe?: boolean;
 }
 
 export interface StoryDetailResponse {
