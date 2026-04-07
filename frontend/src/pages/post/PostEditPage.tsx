@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Camera, ChevronLeft } from 'lucide-react';
+import { Camera, ChevronLeft, X } from 'lucide-react';
 import { postApi } from '../../api/post';
 import { technologyApi } from '../../api/technology';
 import { PostUpdateRequest } from '../../types/post';
@@ -9,6 +9,67 @@ import BottomNav from '../../components/layout/BottomNav';
 import { resolveAssetUrl } from '../../util/assetUrl';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
+import MarkdownContent from '../../components/common/MarkdownContent';
+
+type ExistingMediaItem = {
+  sourceUrl: string;
+  previewUrl: string;
+};
+
+type NewFileItem = {
+  file: File;
+  previewUrl: string;
+};
+
+const LANGUAGE_TECH_ALIASES: Record<string, string[]> = {
+  java: ['java'],
+  javascript: ['javascript', 'js', 'node.js', 'nodejs'],
+  typescript: ['typescript', 'ts'],
+  python: ['python', 'py'],
+  kotlin: ['kotlin'],
+  c: ['c'],
+  cpp: ['c++', 'cpp', 'cxx'],
+  csharp: ['c#', 'csharp', 'cs', '.net', 'dotnet'],
+  go: ['go', 'golang'],
+  rust: ['rust'],
+  sql: ['sql', 'mysql', 'postgresql', 'mariadb', 'oracle', 'sqlite'],
+  bash: ['bash', 'shell', 'sh'],
+  json: ['json'],
+  html: ['html'],
+  css: ['css'],
+};
+
+const CODE_LANGUAGES = [
+  { value: 'plaintext', label: 'Plain Text' },
+  { value: 'java', label: 'Java' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'kotlin', label: 'Kotlin' },
+  { value: 'c', label: 'C' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'csharp', label: 'C#' },
+  { value: 'go', label: 'Go' },
+  { value: 'rust', label: 'Rust' },
+  { value: 'sql', label: 'SQL' },
+  { value: 'bash', label: 'Bash' },
+  { value: 'json', label: 'JSON' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+];
+
+const normalize = (value: string) => value.toLowerCase().replace(/[\s._-]/g, '');
+
+const extractCodeBlockLangs = (raw: string): string[] => {
+  const langs = new Set<string>();
+  const regex = /```([a-zA-Z0-9#+-]+)/g;
+  let match: RegExpExecArray | null = regex.exec(raw);
+  while (match) {
+    langs.add(match[1].toLowerCase());
+    match = regex.exec(raw);
+  }
+  return Array.from(langs);
+};
 
 type ExistingMediaItem = {
   sourceUrl: string;
@@ -34,6 +95,9 @@ const PostEditPage: React.FC = () => {
   const [allTechs, setAllTechs] = useState<TechTagRes[]>([]);
   const [selectedTechIds, setSelectedTechIds] = useState<number[]>([]);
   const [techSearchQuery, setTechSearchQuery] = useState('');
+  const [activeContentTab, setActiveContentTab] = useState<'write' | 'preview'>('write');
+  const [showCodeLangModal, setShowCodeLangModal] = useState(false);
+  const [codeLangQuery, setCodeLangQuery] = useState('');
   /** 게시글에 붙어 있던 태그 메타(마스터 목록에 없을 때 이름 표시용) */
   const [postTechStacks, setPostTechStacks] = useState<TechTagRes[]>([]);
 
@@ -56,6 +120,44 @@ const PostEditPage: React.FC = () => {
       return false;
     });
   }, [allTechs, techSearchQuery]);
+
+  const displayedCodeLanguages = useMemo(() => {
+    const q = codeLangQuery.trim().toLowerCase();
+    if (!q) return CODE_LANGUAGES;
+    return CODE_LANGUAGES.filter((lang) => {
+      return lang.label.toLowerCase().includes(q) || lang.value.toLowerCase().includes(q);
+    });
+  }, [codeLangQuery]);
+
+  useEffect(() => {
+    return () => {
+      newFileItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, [newFileItems]);
+
+  useEffect(() => {
+    if (!content || allTechs.length === 0) return;
+
+    const usedLangs = extractCodeBlockLangs(content);
+    if (usedLangs.length === 0) return;
+
+    const matchedTechIds = usedLangs
+      .flatMap((lang) => LANGUAGE_TECH_ALIASES[lang] ?? [lang])
+      .map((alias) => normalize(alias))
+      .flatMap((alias) =>
+        allTechs
+          .filter((tech) => normalize(tech.name) === alias)
+          .map((tech) => tech.id)
+      );
+
+    if (matchedTechIds.length === 0) return;
+
+    setSelectedTechIds((prev) => {
+      const next = Array.from(new Set([...prev, ...matchedTechIds]));
+      if (next.length === prev.length) return prev;
+      return next;
+    });
+  }, [content, allTechs]);
 
   useEffect(() => {
     return () => {
@@ -143,6 +245,14 @@ const PostEditPage: React.FC = () => {
     const blob = await response.blob();
     const fileName = toFileName(media.sourceUrl, index);
     return new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+  };
+
+  const insertCodeBlockTemplate = (lang: string) => {
+    const template = `\n\`\`\`${lang}\n// code here\n\`\`\`\n`;
+    setContent((prev) => `${prev}${template}`);
+    setShowCodeLangModal(false);
+    setCodeLangQuery('');
+    setActiveContentTab('write');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,7 +355,51 @@ const PostEditPage: React.FC = () => {
 
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>내용</label>
-            <textarea value={content} onChange={e => setContent(e.target.value)} rows={6} style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px', boxSizing: 'border-box', resize: 'none' }} required />
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', border: '1px solid #dbdbdb', borderRadius: '8px', overflow: 'hidden' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveContentTab('write')}
+                  style={{ border: 'none', borderRight: '1px solid #dbdbdb', background: activeContentTab === 'write' ? '#111827' : '#fff', color: activeContentTab === 'write' ? '#fff' : '#374151', padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  작성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveContentTab('preview')}
+                  style={{ border: 'none', background: activeContentTab === 'preview' ? '#111827' : '#fff', color: activeContentTab === 'preview' ? '#fff' : '#374151', padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  미리보기
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCodeLangQuery('');
+                  setShowCodeLangModal(true);
+                }}
+                style={{ border: '1px solid #dbdbdb', borderRadius: '16px', background: '#fff', padding: '5px 11px', cursor: 'pointer', fontSize: '0.78rem' }}
+              >
+                코드블록 추가
+              </button>
+            </div>
+            {activeContentTab === 'write' ? (
+              <textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                rows={18}
+                style={{ width: '100%', minHeight: '420px', padding: '10px', border: '1px solid #dbdbdb', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical' }}
+                required
+              />
+            ) : (
+              <div style={{ minHeight: '156px', border: '1px solid #efefef', borderRadius: '8px', padding: '10px', background: '#fcfcfc' }}>
+                {!content.trim() ? (
+                  <div style={{ fontSize: '0.85rem', color: '#8e8e8e' }}>내용을 입력하면 미리보기가 표시됩니다.</div>
+                ) : (
+                  <MarkdownContent content={content} />
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: '20px' }}>
@@ -328,6 +482,58 @@ const PostEditPage: React.FC = () => {
             {submitting ? '수정 중...' : '수정 완료'}
           </button>
         </form>
+        {showCodeLangModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="코드 블록 언어 선택"
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+            onClick={() => {
+              setShowCodeLangModal(false);
+              setCodeLangQuery('');
+            }}
+          >
+            <div
+              style={{ width: 'min(520px, 100%)', maxHeight: '70vh', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid #efefef' }}>
+                <strong style={{ fontSize: '0.95rem' }}>코드 블록 언어 선택</strong>
+                <button type="button" onClick={() => { setShowCodeLangModal(false); setCodeLangQuery(''); }} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #efefef' }}>
+                <input
+                  type="search"
+                  value={codeLangQuery}
+                  onChange={(e) => setCodeLangQuery(e.target.value)}
+                  placeholder="언어 검색 (예: java, javascript, python)"
+                  autoFocus
+                  style={{ width: '100%', padding: '9px 10px', border: '1px solid #dbdbdb', borderRadius: '8px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ overflowY: 'auto', padding: '10px 14px 14px' }}>
+                {displayedCodeLanguages.length === 0 ? (
+                  <div style={{ color: '#8e8e8e', fontSize: '0.85rem', padding: '6px 2px' }}>검색 결과가 없습니다.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                    {displayedCodeLanguages.map((lang) => (
+                      <button
+                        key={lang.value}
+                        type="button"
+                        onClick={() => insertCodeBlockTemplate(lang.value)}
+                        style={{ border: '1px solid #dbdbdb', borderRadius: '8px', background: '#fff', padding: '8px 10px', textAlign: 'left', cursor: 'pointer', fontSize: '0.82rem' }}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
       <BottomNav />
     </div>
