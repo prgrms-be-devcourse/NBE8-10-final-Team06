@@ -14,6 +14,7 @@ import { getApiErrorMessage } from '../../util/apiError';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { buildPostSharePayload } from '../../util/dmDeepLinks';
 import { isRsDataSuccess } from '../../util/rsData';
+import MarkdownContent from '../../components/common/MarkdownContent';
 
 const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -273,7 +274,9 @@ const PostDetailPage: React.FC = () => {
             <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
               <div style={{ marginBottom: '20px' }}>
                 <strong>{post.nickname}</strong> <span style={{ fontWeight: 'bold' }}>{post.title}</span>
-                <p style={{ marginTop: '5px', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{post.content}</p>
+                <div style={{ marginTop: '5px', fontSize: '0.9rem' }}>
+                  <MarkdownContent content={post.content} />
+                </div>
                 {post.techStacks && post.techStacks.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
                     {post.techStacks.map((tech) => (
@@ -408,7 +411,9 @@ const PostDetailPage: React.FC = () => {
                 ))}
               </div>
             )}
-            <div style={{ fontSize: '1rem', lineHeight: 1.75, color: '#334155', whiteSpace: 'pre-wrap' }}>{post.content}</div>
+            <div style={{ fontSize: '1rem', lineHeight: 1.75, color: '#334155' }}>
+              <MarkdownContent content={post.content} />
+            </div>
             <div className="post-card-feed-community-footer" style={{ marginTop: 22 }}>
               <div className="post-card-feed-community-stat">
                 <Heart
