@@ -134,7 +134,12 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           onNormalized: (normalized) => {
             if (gen !== messagesRefreshGenRef.current) return;
             if (normalized.length > 0) {
-              sendReadEventRef.current(normalized[0].id);
+              const latest = normalized[0];
+              const senderId = toDmPositiveUserId(latest.senderId);
+              // 공유 직후(내가 보낸 최신 메시지)에는 read 이벤트를 보내지 않아 즉시 읽힘 오판을 막는다.
+              if (senderId != null && senderId !== actorId) {
+                sendReadEventRef.current(latest.id);
+              }
             }
           },
         });

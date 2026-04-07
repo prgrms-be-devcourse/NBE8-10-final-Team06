@@ -629,10 +629,10 @@ const ProfilePage: React.FC = () => {
   }, [isMe, activeTab, fetchScrapsInitial]);
 
   useEffect(() => {
-    if (isMe && activeTab === 'archive' && archivedStories.length === 0) {
-      fetchArchivedStories();
+    if (isMe && activeTab === 'archive') {
+      void fetchArchivedStories();
     }
-  }, [isMe, activeTab, archivedStories.length, fetchArchivedStories]);
+  }, [isMe, activeTab, fetchArchivedStories]);
 
   const handleFollowToggle = async () => {
     if (!profile || isMe || isFollowProcessing || followToggleLockRef.current) return;

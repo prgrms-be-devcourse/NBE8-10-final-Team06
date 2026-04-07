@@ -39,6 +39,7 @@ const rsOk = (code: string | undefined) =>
 type SharePreview = { href: string; isVideo: boolean };
 
 const shareThumbCache = new Map<string, SharePreview>();
+const sharePostTitleCache = new Map<string, string>();
 
 const DmShareAttachmentCard = ({
   msg,
@@ -69,9 +70,11 @@ const DmShareAttachmentCard = ({
 
   /** 활성 스토리 목록에 없음 → 서버에서 만료·삭제된 공유( DM valid 는 아직 true 인 경우 포함) */
   const [storyRemovedFromFeed, setStoryRemovedFromFeed] = useState(false);
+  const [postTitle, setPostTitle] = useState<string | null>(null);
 
   useEffect(() => {
     setStoryRemovedFromFeed(false);
+    setPostTitle(null);
 
     if (attachmentType === 'post') {
       const t = msg.thumbnail?.trim();
@@ -85,6 +88,10 @@ const DmShareAttachmentCard = ({
 
       const cacheKey = `post-${attachmentId}`;
       const cached = shareThumbCache.get(cacheKey);
+      const cachedTitle = sharePostTitleCache.get(cacheKey);
+      if (cachedTitle) {
+        setPostTitle(cachedTitle);
+      }
       if (cached) {
         setPreview(cached);
         return;
@@ -94,7 +101,13 @@ const DmShareAttachmentCard = ({
       void (async () => {
         try {
           const res = await postApi.getDetail(Number(attachmentId));
-          if (cancelled || !rsOk(res.resultCode) || !res.data.medias?.length) return;
+          if (cancelled || !rsOk(res.resultCode) || !res.data) return;
+          const title = typeof res.data.title === 'string' ? res.data.title.trim() : '';
+          if (title) {
+            sharePostTitleCache.set(cacheKey, title);
+            setPostTitle(title);
+          }
+          if (!res.data.medias?.length) return;
           const pick = pickPostPreviewMedia(res.data.medias);
           if (!pick) return;
           const href = resolveAssetUrl(pick.sourceUrl);
@@ -172,6 +185,11 @@ const DmShareAttachmentCard = ({
   const showThumb = !!preview?.href && !storyExpiredTextOnly;
   /** 미디어 없는 게시물: 상단 미디어 영역 없이 본문 행과 동일 배경만 */
   const postTextOnlyUnified = attachmentType === 'post' && !showThumb;
+  const postCaption = isExpired
+    ? '볼 수 없는 콘텐츠입니다'
+    : attachmentType === 'post'
+      ? postTitle || '게시물 보기'
+      : '스토리 보기';
 
   if (storyExpiredTextOnly) {
     return (
@@ -282,7 +300,7 @@ const DmShareAttachmentCard = ({
               zIndex: 1,
             }}
           >
-            {isExpired ? '볼 수 없는 콘텐츠입니다' : '게시물 보기'}
+            {postCaption}
           </div>
           {isExpired ? (
             <div
@@ -403,7 +421,7 @@ const DmShareAttachmentCard = ({
           </div>
           <div style={{ padding: '12px', borderTop: '1px solid #efefef', backgroundColor: frameBg }}>
             <div style={{ fontSize: '0.85rem', color: isExpired ? '#8e8e8e' : '#262626', fontWeight: '600' }}>
-              {isExpired ? '볼 수 없는 콘텐츠입니다' : attachmentType === 'post' ? '게시물 보기' : '스토리 보기'}
+              {postCaption}
             </div>
           </div>
         </>
