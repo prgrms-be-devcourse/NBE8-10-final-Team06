@@ -378,6 +378,61 @@ body {
   text-decoration: underline;
 }
 
+/* 포스트 작성·수정: 폼 밖 리모콘형 마크다운 툴바 */
+.post-editor-main-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.post-markdown-remote-shell {
+  flex-shrink: 0;
+  padding: 12px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow:
+    0 6px 24px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+  position: sticky;
+  top: 72px;
+  z-index: 4;
+  overflow: visible;
+}
+
+.post-markdown-heading-menu button:hover {
+  background: #f1f5f9 !important;
+}
+
+.post-markdown-format-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: 8px;
+  justify-content: center;
+}
+
+.post-markdown-format-toolbar button:hover {
+  background: #f1f5f9 !important;
+}
+
+.post-markdown-format-toolbar button:active {
+  background: #e2e8f0 !important;
+}
+
+@media (max-width: 720px) {
+  .post-editor-main-row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .post-markdown-remote-shell {
+    position: static;
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
 .markdown-content {
   color: inherit;
   line-height: 1.6;
@@ -392,16 +447,24 @@ body {
   margin-bottom: 0;
 }
 
-.markdown-content pre {
-  margin: 0.6em 0;
-  padding: 0;
-  border-radius: 6px;
-  overflow-x: auto;
-  font-size: 0.82rem;
-}
-
+/* fenced 코드: 래퍼로 본문과 확실히 구분 */
 .markdown-content .markdown-code-block {
   position: relative;
+  margin: 0.65em 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000000;
+  border: 1px solid #27272a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.markdown-content .markdown-code-block pre {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  background: #000000 !important;
 }
 
 .markdown-content .markdown-code-lang {
@@ -417,10 +480,13 @@ body {
   pointer-events: none;
 }
 
-.markdown-content pre code.hljs {
+.markdown-content .markdown-code-block pre code,
+.markdown-content .markdown-code-block pre code.hljs {
   display: block;
   padding: 28px 12px 12px;
-  border-radius: 6px;
+  border-radius: 0;
+  background-color: #000000 !important;
+  color: #e5e7eb;
 }
 
 .markdown-content code {
@@ -432,6 +498,104 @@ body {
   background-color: rgba(148, 163, 184, 0.2);
   border-radius: 4px;
   padding: 0.12em 0.35em;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 0.75em 0 0.4em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.markdown-content h1 {
+  font-size: 1.35rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.2rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.08rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.4em 0 0.6em;
+  padding-left: 1.35em;
+}
+
+.markdown-content li {
+  margin: 0.2em 0;
+}
+
+.markdown-content ul.contains-task-list,
+.markdown-content ol.contains-task-list {
+  list-style: none;
+  padding-left: 0.5em;
+}
+
+.markdown-content input[type='checkbox'] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+  pointer-events: none;
+  accent-color: #4f46e5;
+}
+
+.markdown-content blockquote {
+  margin: 0.5em 0;
+  padding: 0.35em 0 0.35em 0.85em;
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+}
+
+.markdown-content hr {
+  margin: 0.85em 0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+  margin: 0.6em 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.35em 0.5em;
+  text-align: left;
+}
+
+.markdown-content th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-content a:hover {
+  color: #1d4ed8;
+}
+
+.markdown-content .markdown-link-fallback {
+  color: inherit;
+  text-decoration: none;
+}
+
+.markdown-content .markdown-img-omitted {
+  font-size: 0.88em;
+  color: #94a3b8;
 }
 
 .post-card-feed-community-excerpt pre {
