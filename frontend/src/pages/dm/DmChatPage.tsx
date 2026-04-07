@@ -222,6 +222,8 @@ const DmChatPage: React.FC = () => {
 
   const [messages, setMessages] = useState<DmMessageResponse[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   /** STOMP typing 이벤트 — 말풍선 좌우는 렌더 시 `senderId`(userId) 로 `computeDmMessageIsMe` 와 동일 규칙 적용 */
   const [remoteTyping, setRemoteTyping] = useState<{ userId: number; text: string } | null>(null);
   const [isMeTyping, setIsMeTyping] = useState(false);
@@ -746,6 +748,65 @@ const DmChatPage: React.FC = () => {
     setIsMeTyping(false);
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const actor = effectiveSelfIdRef.current;
+    if (!isResolvedDmUserId(actor)) {
+      alert('로그인 사용자 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    const rid = Number(roomId);
+    const previewUrl = URL.createObjectURL(file);
+    const tempId = optimisticMsgIdRef.current--;
+
+    // 낙관적 업데이트: blob URL로 즉시 미리보기 표시
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        type: 'IMAGE' as MessageType,
+        content: previewUrl,
+        thumbnail: null,
+        valid: true,
+        createdAt: new Date().toISOString(),
+        senderId: actor,
+      },
+    ]);
+
+    setIsUploadingImage(true);
+    try {
+      const res = await dmApi.sendImage(rid, file);
+      URL.revokeObjectURL(previewUrl);
+
+      if (isRsSuccess(res.resultCode) && res.data) {
+        // 서버 응답의 실제 메시지(실제 ID + 실제 URL)로 temp 교체
+        // → WebSocket이 같은 메시지를 브로드캐스트해도 ID 중복으로 무시됨
+        const serverMsg = res.data;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? serverMsg : m))
+        );
+      } else {
+        // 응답 없으면 temp 제거 후 폴링이 실제 메시지 반영
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        window.setTimeout(() => {
+          fetchDmPollMergeIfStillInRoom(rid, roomIdRef, setMessages, {
+            beforeMerge: (r, normalized) => pruneShareBackupByServer(r, normalized),
+          });
+        }, 500);
+      }
+    } catch {
+      alert('이미지 전송에 실패했습니다.');
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      URL.revokeObjectURL(previewUrl);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextVal = e.target.value;
     setInputValue(nextVal);
@@ -952,7 +1013,22 @@ const DmChatPage: React.FC = () => {
 
       <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
-          <ImageIcon size={24} color="#262626" style={{ cursor: 'pointer' }} />
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageSelect}
+          />
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={isUploadingImage}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: isUploadingImage ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
+            aria-label="이미지 전송"
+          >
+            <ImageIcon size={24} color={isUploadingImage ? '#b2dffc' : '#262626'} />
+          </button>
           <input
             type="text"
             value={inputValue}

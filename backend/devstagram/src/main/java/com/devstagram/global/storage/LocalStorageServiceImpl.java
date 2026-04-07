@@ -32,16 +32,15 @@ public class LocalStorageServiceImpl implements StorageService {
     // 허용할 확장자 리스트
     private final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
 
-    @PostConstruct // 파일 저장될 폴더 경로 세팅
+    @PostConstruct
     public void init() {
         try {
-            // "C:/uploads" 같은 문자열을 자바가 이해할 수 있는 Path 객체로 변환
-            this.rootLocation = Paths.get(uploadPath);
+            // 상대 경로를 절대 경로로 변환하여 실행 환경에 무관하게 일관된 경로 사용
+            this.rootLocation = Paths.get(uploadPath).toAbsolutePath().normalize();
 
-            // 해당 경로에 폴더가 없으면 새로 생성, 있으면 넘어감)
             Files.createDirectories(rootLocation);
 
-            log.info("파일 저장 경로 준비 완료: {}", rootLocation.toAbsolutePath());
+            log.info("로컬 파일 저장 경로: {}", rootLocation);
         } catch (IOException e) {
             throw new ServiceException("500-S-1", "저장소 디렉토리 생성 불가");
         }

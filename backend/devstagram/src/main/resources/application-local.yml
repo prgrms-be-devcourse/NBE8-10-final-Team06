@@ -30,6 +30,9 @@ spring:
         format_sql: true
     show-sql: true
 
+storage:
+  location: ./uploads
+
 custom:
   cors:
     allowed-origins: http://localhost:3000
