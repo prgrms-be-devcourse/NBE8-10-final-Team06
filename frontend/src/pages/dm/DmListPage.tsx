@@ -11,6 +11,15 @@ import type { DmRoomSummaryResponse } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 
+function dmMessagePreview(room: DmRoomSummaryResponse): string {
+  const msg = room.lastMessage;
+  if (!msg) return '대화 내용이 없습니다.';
+  if (msg.type === 'POST') return '게시글을 공유했습니다.';
+  if (msg.type === 'STORY') return '스토리를 공유했습니다.';
+  if (msg.type === 'IMAGE') return '사진을 공유했습니다.';
+  return msg.content;
+}
+
 function roomListTitle(room: DmRoomSummaryResponse, myUserId: number | null): string {
   if (room.isGroup) return room.roomName || '그룹 채팅';
   // GET /dm/rooms 요약은 본인을 participants 에서 제외하므로 1:1 에서 단일 요소가 곧 상대
@@ -261,7 +270,7 @@ const DmListPage: React.FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#262626' }}>{roomListTitle(room, myUserId)}</div>
-                      <div style={{ fontSize: '0.85rem', color: room.unreadCount > 0 ? '#262626' : '#8e8e8e', fontWeight: room.unreadCount > 0 ? '700' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{room.lastMessage?.content || '대화 내용이 없습니다.'}</div>
+                      <div style={{ fontSize: '0.85rem', color: room.unreadCount > 0 ? '#262626' : '#8e8e8e', fontWeight: room.unreadCount > 0 ? '700' : '400', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>{dmMessagePreview(room)}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
