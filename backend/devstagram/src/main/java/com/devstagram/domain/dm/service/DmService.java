@@ -327,7 +327,9 @@ public class DmService {
         if (request.type() == MessageType.STORY) {
             boolean expired = isExpiredStory(request.content());
             valid = !expired;
-            if (expired) thumbnailUrl = null;
+            if (expired) {
+                thumbnailUrl = null;
+            }
         }
 
         // POST 삭제 여부는 서버 최종 판단 (post 존재 여부로 valid 결정)
@@ -387,40 +389,48 @@ public class DmService {
     }
 
     private boolean isExpiredStory(String content) {
-        if (content == null || content.isBlank()) return false;
+        if (content == null || content.isBlank()) {
+            return false;
+        }
         // devstagram://story?id=123&v=1712341234
         int vIdx = content.indexOf("v=");
-        if (vIdx < 0) return false;
+        if (vIdx < 0) {
+            return false;
+        }
 
         String afterV = content.substring(vIdx + 2);
         int ampIdx = afterV.indexOf('&');
         String vStr = ampIdx >= 0 ? afterV.substring(0, ampIdx) : afterV;
 
         try {
-            long v = Long.parseLong(vStr);
-            long createdMillis = v < 1_000_000_000_000L ? v * 1000L : v; // 10자리면 초로 가정
+            long timestamp = Long.parseLong(vStr);
+            long createdMillis = timestamp < 1_000_000_000_000L ? timestamp * 1000L : timestamp; // 10자리면 초로 가정
             long diff = System.currentTimeMillis() - createdMillis;
             return diff > (24L * 60L * 60L * 1000L);
-        } catch (Exception e) {
+        } catch (Exception ex) {
             return false; // 파싱 실패 시 안전하게 만료 아님
         }
     }
 
     private Long extractIdFromDevstagramUrl(String content, String key) {
-        if (content == null || content.isBlank()) return null;
+        if (content == null || content.isBlank()) {
+            return null;
+        }
 
         // 예: devstagram://post?id=123
         int keyIdx = content.indexOf(key + "=");
-        if (keyIdx < 0) return null;
+        if (keyIdx < 0) {
+            return null;
+        }
 
         String after = content.substring(keyIdx + key.length() + 1);
         int ampIdx = after.indexOf('&');
         String raw = ampIdx >= 0 ? after.substring(0, ampIdx) : after;
 
         try {
-            long v = Long.parseLong(raw);
-            return v;
-        } catch (Exception e) {
+            long parsedId = Long.parseLong(raw);
+            return parsedId;
+        } catch (Exception ex) {
             return null;
         }
     }

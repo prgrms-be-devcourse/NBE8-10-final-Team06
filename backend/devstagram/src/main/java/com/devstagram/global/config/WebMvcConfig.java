@@ -21,7 +21,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 상대 경로를 절대 경로로 변환하여 IDE/실행 환경에 무관하게 동작
         Path absolutePath = Paths.get(uploadPath).toAbsolutePath();
 
-        registry.addResourceHandler("/temp/media/**")
-                .addResourceLocations("file:" + absolutePath + "/");
+        registry.addResourceHandler("/temp/media/**").addResourceLocations("file:" + absolutePath + "/");
     }
 }

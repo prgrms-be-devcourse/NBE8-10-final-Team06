@@ -94,8 +94,7 @@ public class DmController {
      */
     @PostMapping("/rooms/{roomId}/images")
     public RsData<DmMessageResponse> sendImage(
-            @PathVariable("roomId") Long roomId,
-            @RequestParam("file") MultipartFile file) {
+            @PathVariable("roomId") Long roomId, @RequestParam("file") MultipartFile file) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
 
         String imageUrl = storageService.store(file);

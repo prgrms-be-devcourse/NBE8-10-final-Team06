@@ -80,7 +80,9 @@ public class DmWebSocketController {
     @MessageMapping("/dm/{roomId}/message")
     public void message(Message<?> message, @DestinationVariable Long roomId, @Payload DmSendMessageRequest request) {
         Long userId = requireUserIdFromStompOrSecurity(message);
-        if (userId == null) return; // 미인증 세션: 저장하지 않고 조용히 무시
+        if (userId == null) {
+            return; // 미인증 세션: 저장하지 않고 조용히 무시
+        }
 
         DmMessageResponse saved = dmService.sendMessage(userId, roomId, request);
         WebSocketEventPayload<DmMessageResponse> payload = new WebSocketEventPayload<>("message", saved);
@@ -101,7 +103,9 @@ public class DmWebSocketController {
         messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
 
         // STOMP 세션 또는 SecurityContext 어느 쪽에도 인증이 없으면(로컬 테스트 등) 지연 stop 스케줄만 생략
-        if (!isAuthenticated(message) || userId == null) return;
+        if (!isAuthenticated(message) || userId == null) {
+            return;
+        }
 
         String key = typingKey(roomId, userId);
 
@@ -128,7 +132,9 @@ public class DmWebSocketController {
     @MessageMapping("/dm/{roomId}/read")
     public void read(Message<?> message, @DestinationVariable Long roomId, @Payload ReadEventDto readEventDto) {
         Long userId = requireUserIdFromStompOrSecurity(message);
-        if (userId == null) return; // 미인증 세션 무시
+        if (userId == null) {
+            return; // 미인증 세션 무시
+        }
 
         Long messageId = dmService.markRead(userId, roomId, readEventDto.messageId());
 
@@ -231,8 +237,9 @@ public class DmWebSocketController {
         if (accessor == null) {
             return null;
         }
-        Object u = accessor.getUser();
-        if (u instanceof Authentication authentication && authentication.getPrincipal() instanceof SecurityUser su) {
+        Object principal = accessor.getUser();
+        if (principal instanceof Authentication authentication
+                && authentication.getPrincipal() instanceof SecurityUser su) {
             return su.getId();
         }
         return null;

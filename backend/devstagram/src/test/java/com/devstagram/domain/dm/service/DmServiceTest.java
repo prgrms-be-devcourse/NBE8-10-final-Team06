@@ -234,8 +234,8 @@ class DmServiceTest {
      */
     @Test
     void sendMessage_1v1_autoRejoinLeftUser() {
-        Long senderUserId = 2L;  // User B (방에 남아있는 사람)
-        Long leftUserId = 1L;    // User A (방을 나간 사람)
+        Long senderUserId = 2L; // User B (방에 남아있는 사람)
+        Long leftUserId = 1L; // User A (방을 나간 사람)
         Long roomId = 100L;
 
         DmRoom room = mock(DmRoom.class);
@@ -245,7 +245,8 @@ class DmServiceTest {
 
         when(dmRoomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(room.getIsGroup()).thenReturn(false);
-        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, senderUserId)).thenReturn(true);
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, senderUserId))
+                .thenReturn(true);
         when(userRepository.findById(senderUserId)).thenReturn(Optional.of(sender));
 
         when(savedDm.getId()).thenReturn(10L);
@@ -285,7 +286,8 @@ class DmServiceTest {
 
         when(dmRoomRepository.findById(roomId)).thenReturn(Optional.of(room));
         when(room.getIsGroup()).thenReturn(false);
-        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, senderUserId)).thenReturn(true);
+        when(dmRoomUserRepository.existsByDmRoom_IdAndUser_Id(roomId, senderUserId))
+                .thenReturn(true);
         when(userRepository.findById(senderUserId)).thenReturn(Optional.of(sender));
 
         when(savedDm.getId()).thenReturn(10L);

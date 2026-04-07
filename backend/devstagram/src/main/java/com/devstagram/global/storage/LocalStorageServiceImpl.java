@@ -30,7 +30,7 @@ public class LocalStorageServiceImpl implements StorageService {
     private Path rootLocation;
 
     // 허용할 확장자 리스트
-    private final List<String> ALLOWED_EXTENSIONS = List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
+    private final List<String> allowedExtensions = List.of(".jpg", ".jpeg", ".gif", ".png", ".webp", ".webm");
 
     @PostConstruct
     public void init() {
@@ -72,7 +72,7 @@ public class LocalStorageServiceImpl implements StorageService {
                     .substring(originalFilename.lastIndexOf("."))
                     .toLowerCase();
 
-            if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            if (!allowedExtensions.contains(extension)) {
                 log.warn("허용되지 않은 파일 업로드 시도: {}", originalFilename);
                 throw new ServiceException("400-S-4", "허용되지 않는 파일 형식");
             }

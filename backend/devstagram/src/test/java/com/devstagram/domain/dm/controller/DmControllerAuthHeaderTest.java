@@ -22,13 +22,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import com.devstagram.domain.dm.dto.DmRoomSummaryResponse;
 import com.devstagram.domain.dm.service.DmService;
 import com.devstagram.domain.user.entity.User;
-import com.devstagram.global.storage.StorageService;
 import com.devstagram.domain.user.service.UserSecurityService;
 import com.devstagram.global.rq.Rq;
 import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
 import com.devstagram.global.security.SecurityUser;
 import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.storage.StorageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jsonwebtoken.Claims;
