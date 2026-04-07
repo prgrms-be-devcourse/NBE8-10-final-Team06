@@ -325,7 +325,7 @@ const PostDetailPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
                 <Heart size={24} onClick={handleLike} style={{ cursor: 'pointer', color: post.isLiked ? 'red' : 'black' }} fill={post.isLiked ? 'red' : 'none'} />
                 <MessageCircle size={24} />
-                <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
+                <button type="button" title="공유하기" aria-label="공유하기" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
                   <Forward size={24} />
                 </button>
                 <Bookmark size={24} onClick={handleScrap} style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'black' }} fill={post.isScrapped ? '#ffd700' : 'none'} />
@@ -436,7 +436,7 @@ const PostDetailPage: React.FC = () => {
                 <MessageCircle size={22} style={{ color: '#64748b' }} />
                 댓글 {post.commentCount}
               </span>
-              <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
+              <button type="button" title="공유하기" aria-label="공유하기" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
                 <Forward size={22} style={{ color: '#64748b' }} />
               </button>
               <Bookmark

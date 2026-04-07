@@ -400,8 +400,8 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
               />
               <button
                 type="button"
-                title="DM으로 공유"
-                aria-label="DM으로 공유"
+                title="공유하기"
+                aria-label="공유하기"
                 onClick={() => setShowDmShare(true)}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
               >
@@ -576,8 +576,8 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
             </button>
             <button
               type="button"
-              title="DM으로 공유"
-              aria-label="DM으로 공유"
+              title="공유하기"
+              aria-label="공유하기"
               onClick={() => setShowDmShare(true)}
               style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}
             >

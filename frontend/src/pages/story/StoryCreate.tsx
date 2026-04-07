@@ -6,6 +6,7 @@ import { storyApi } from '../../api/story';
 import { StoryFeedResponse } from '../../types/story';
 import { MediaType } from '../../types/post';
 import BottomNav from '../../components/layout/BottomNav';
+import { sendTaggedUserStoryShareDms } from '../../services/sendTaggedUserStoryShareDms';
 
 const StoryCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -86,6 +87,16 @@ const StoryCreate: React.FC = () => {
       });
 
       if (res.resultCode.startsWith('200') || res.resultCode.includes('-S-')) {
+        const created = res.data;
+        const tagIds = taggedUsers.map((u) => u.userId);
+        if (tagIds.length > 0 && created?.storyId != null && created?.userId != null) {
+          await sendTaggedUserStoryShareDms({
+            taggedUserIds: tagIds,
+            storyId: created.storyId,
+            authorUserId: created.userId,
+            createdAtIso: created.createdAt ?? new Date().toISOString(),
+          });
+        }
         navigate('/');
       } else {
         alert(`생성 실패: ${res.msg}`);
@@ -272,7 +283,7 @@ const StoryCreate: React.FC = () => {
                 width: '100%'
               }}
             >
-              <UserPlus size={18} /> 사람 태그하기 ({taggedUsers.length})
+              <UserPlus size={18} /> 태그하기 ({taggedUsers.length})
             </button>
             
             {taggedUsers.length > 0 && (

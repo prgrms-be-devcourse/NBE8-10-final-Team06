@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
+import { PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
+import { postApi } from '../../api/post';
 import type { DmMessageResponse } from '../../types/dm';
+import type { PostMediaResponse } from '../../types/post';
 import { resolveDmAttachment } from '../../util/dmAttachment';
+import { resolveAssetUrl, applyImageFallback } from '../../util/assetUrl';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
 import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
@@ -18,13 +21,36 @@ const checkIsExpired = (content: string, type: string) => {
   return now - createdMillis > 24 * 60 * 60 * 1000;
 };
 
-const AttachmentCard = ({
-  type,
+const isVideoMediaType = (mt: string) => ['mp4', 'webm', 'mov'].includes(mt);
+
+/** 게시물: 순서상 첫 이미지 우선, 없으면 첫 동영상 */
+function pickPostPreviewMedia(medias: PostMediaResponse[]): { sourceUrl: string; isVideo: boolean } | null {
+  const sorted = [...medias].sort((a, b) => a.sequence - b.sequence);
+  const firstImage = sorted.find((m) => !isVideoMediaType(m.mediaType));
+  if (firstImage) return { sourceUrl: firstImage.sourceUrl, isVideo: false };
+  const firstVideo = sorted.find((m) => isVideoMediaType(m.mediaType));
+  if (firstVideo) return { sourceUrl: firstVideo.sourceUrl, isVideo: true };
+  return null;
+}
+
+const rsOk = (code: string | undefined) =>
+  !!code && (code.startsWith('200') || code.includes('-S-'));
+
+type SharePreview = { href: string; isVideo: boolean };
+
+const shareThumbCache = new Map<string, SharePreview>();
+
+const DmShareAttachmentCard = ({
+  msg,
+  attachmentType,
+  attachmentId,
   isValid,
   isMe,
   onClick,
 }: {
-  type: 'post' | 'story';
+  msg: DmMessageResponse;
+  attachmentType: 'post' | 'story';
+  attachmentId: string;
   isValid: boolean;
   isMe: boolean;
   onClick: () => void;
@@ -32,6 +58,84 @@ const AttachmentCard = ({
   const isExpired = !isValid;
   const frameBorder = isMe ? '2px solid #0095f6' : '1px solid #d8d8d8';
   const frameBg = isExpired ? '#f0f0f0' : isMe ? '#f0f8ff' : '#fafafa';
+
+  const [preview, setPreview] = useState<SharePreview | null>(() => {
+    const t = msg.thumbnail?.trim();
+    if (!t) return null;
+    const href = resolveAssetUrl(t);
+    /* 서버가 넣는 DM 썸네일은 대부분 이미지; 확장자 추론은 생략 */
+    return href ? { href, isVideo: false } : null;
+  });
+
+  useEffect(() => {
+    const t = msg.thumbnail?.trim();
+    if (t) {
+      const href = resolveAssetUrl(t);
+      if (href) setPreview({ href, isVideo: false });
+      return;
+    }
+
+    if (!isValid) {
+      setPreview(null);
+      return;
+    }
+
+    const cacheKey = `${attachmentType}-${attachmentId}`;
+    const cached = shareThumbCache.get(cacheKey);
+    if (cached) {
+      setPreview(cached);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      if (attachmentType === 'post') {
+        try {
+          const res = await postApi.getDetail(Number(attachmentId));
+          if (cancelled || !rsOk(res.resultCode) || !res.data.medias?.length) return;
+          const pick = pickPostPreviewMedia(res.data.medias);
+          if (!pick) return;
+          const href = resolveAssetUrl(pick.sourceUrl);
+          if (!href) return;
+          const next = { href, isVideo: pick.isVideo };
+          shareThumbCache.set(cacheKey, next);
+          setPreview(next);
+        } catch {
+          /* noop */
+        }
+        return;
+      }
+
+      const authorMatch = msg.content.match(/(?:^|[?&])u=(\d+)/);
+      const authorId = authorMatch ? Number(authorMatch[1]) : NaN;
+      if (!Number.isFinite(authorId)) return;
+      try {
+        const res = await storyApi.getUserStories(authorId);
+        if (cancelled || !rsOk(res.resultCode) || !res.data?.length) return;
+        const sid = Number(attachmentId);
+        const story = res.data.find((s) => s.storyId === sid);
+        if (!story?.mediaUrl) return;
+        const href = resolveAssetUrl(story.mediaUrl);
+        if (!href) return;
+        const next = { href, isVideo: isVideoMediaType(story.mediaType) };
+        shareThumbCache.set(cacheKey, next);
+        setPreview(next);
+      } catch {
+        /* noop */
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [msg.id, msg.thumbnail, msg.content, attachmentType, attachmentId, isValid]);
+
+  const showThumb = !!preview?.href && !isExpired;
+  /** 미디어 없는 게시물: 상단 미디어 영역 없이 본문 행과 동일 배경만 */
+  const postTextOnlyUnified = attachmentType === 'post' && !showThumb;
+
   return (
     <div
       onClick={isExpired ? undefined : onClick}
@@ -47,55 +151,170 @@ const AttachmentCard = ({
         position: 'relative',
       }}
     >
-      <div
-        style={{
-          height: '140px',
-          backgroundColor: '#efefef',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          filter: isExpired ? 'grayscale(1)' : 'none',
-        }}
-      >
-        {type === 'post' ? <ImageIcon size={40} color="#8e8e8e" /> : <PlayCircle size={40} color="#0095f6" />}
-        {isExpired && (
+      {postTextOnlyUnified ? (
+        <div
+          style={{
+            position: 'relative',
+            padding: '22px 12px',
+            minHeight: '96px',
+            backgroundColor: frameBg,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+          }}
+        >
           <div
             style={{
               position: 'absolute',
-              inset: 0,
-              backgroundColor: 'rgba(255,255,255,0.4)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
+              top: '10px',
+              right: '10px',
+              fontSize: '0.65rem',
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '10px',
+              fontWeight: 'bold',
+              zIndex: 1,
             }}
           >
-            <AlertCircle size={32} color="#ed4956" />
-            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ed4956' }}>만료된 콘텐츠</span>
+            게시물
           </div>
-        )}
-        <div
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            fontSize: '0.7rem',
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            color: '#fff',
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontWeight: 'bold',
-          }}
-        >
-          {type === 'post' ? '게시물' : '스토리'}
+          <div
+            style={{
+              fontSize: '0.85rem',
+              color: isExpired ? '#8e8e8e' : '#262626',
+              fontWeight: '600',
+              paddingRight: '72px',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
+            {isExpired ? '볼 수 없는 콘텐츠입니다' : '게시물 보기'}
+          </div>
+          {isExpired ? (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 2,
+                backgroundColor: 'rgba(255,255,255,0.4)',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '0 8px',
+              }}
+            >
+              <AlertCircle size={22} color="#ed4956" />
+              <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: '#ed4956', whiteSpace: 'nowrap' }}>
+                만료된 콘텐츠
+              </span>
+            </div>
+          ) : null}
         </div>
-      </div>
-      <div style={{ padding: '12px', borderTop: '1px solid #efefef' }}>
-        <div style={{ fontSize: '0.85rem', color: isExpired ? '#8e8e8e' : '#262626', fontWeight: '600' }}>
-          {isExpired ? '볼 수 없는 콘텐츠입니다' : type === 'post' ? '게시물 보기' : '스토리 보기'}
-        </div>
-      </div>
+      ) : (
+        <>
+          <div
+            style={{
+              height: '140px',
+              minHeight: '140px',
+              backgroundColor: '#0a0a0a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              filter: isExpired ? 'grayscale(1)' : 'none',
+              position: 'relative',
+            }}
+          >
+            {showThumb ? (
+              preview!.isVideo ? (
+                <video
+                  src={preview!.href}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <img
+                  src={preview!.href}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  onError={(e) => applyImageFallback(e, preview!.href)}
+                />
+              )
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#e8e8e8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {attachmentType === 'story' ? <PlayCircle size={40} color="#0095f6" /> : null}
+              </div>
+            )}
+            {showThumb && preview!.isVideo ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.25))',
+                }}
+              >
+                <PlayCircle size={44} color="#fff" strokeWidth={1.5} />
+              </div>
+            ) : null}
+            {isExpired && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(255,255,255,0.4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertCircle size={32} color="#ed4956" />
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#ed4956', whiteSpace: 'nowrap' }}>
+                  만료된 콘텐츠
+                </span>
+              </div>
+            )}
+            <div
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                fontSize: '0.65rem',
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                padding: '3px 8px',
+                borderRadius: '10px',
+                fontWeight: 'bold',
+              }}
+            >
+              {attachmentType === 'post' ? '게시물' : '스토리'}
+            </div>
+          </div>
+          <div style={{ padding: '12px', borderTop: '1px solid #efefef', backgroundColor: frameBg }}>
+            <div style={{ fontSize: '0.85rem', color: isExpired ? '#8e8e8e' : '#262626', fontWeight: '600' }}>
+              {isExpired ? '볼 수 없는 콘텐츠입니다' : attachmentType === 'post' ? '게시물 보기' : '스토리 보기'}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -181,8 +400,10 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
       {msg.content}
     </div>
   ) : (
-    <AttachmentCard
-      type={attachmentData.type as 'post' | 'story'}
+    <DmShareAttachmentCard
+      msg={msg}
+      attachmentType={attachmentData.type as 'post' | 'story'}
+      attachmentId={attachmentData.id}
       isValid={isValid}
       isMe={isMe}
       onClick={() => {
