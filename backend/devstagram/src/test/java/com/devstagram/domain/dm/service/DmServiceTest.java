@@ -138,6 +138,11 @@ class DmServiceTest {
         assertThat(res.nextCursor()).isNull();
     }
 
+    /**
+     * 참여자가 2명인 1:1 방에서 나갈 때:
+     * - 내 DmRoomUser 만 삭제
+     * - 방과 메시지는 상대방을 위해 유지
+     */
     @Test
     void leave1v1Room_success() {
         Long userId = 1L;
@@ -149,11 +154,39 @@ class DmServiceTest {
         when(dmRoomUserRepository.findByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(Optional.of(roomUser));
         when(roomUser.getDmRoom()).thenReturn(room);
         when(room.getIsGroup()).thenReturn(false);
+        when(dmRoomUserRepository.countByDmRoom_Id(roomId)).thenReturn(2L);
 
         dmService.leave1v1Room(userId, roomId);
 
+        verify(dmRoomUserRepository).delete(roomUser);
+        verify(dmRoomUserRepository).flush();
+        verify(dmRepository, never()).deleteByDmRoom_Id(roomId);
+        verify(dmRoomRepository, never()).delete(room);
+    }
+
+    /**
+     * 마지막 참여자가 1:1 방에서 나갈 때:
+     * - 내 DmRoomUser 삭제
+     * - 방과 메시지도 함께 삭제
+     */
+    @Test
+    void leave1v1Room_lastUser_success() {
+        Long userId = 1L;
+        Long roomId = 100L;
+
+        DmRoomUser roomUser = mock(DmRoomUser.class);
+        DmRoom room = mock(DmRoom.class);
+
+        when(dmRoomUserRepository.findByDmRoom_IdAndUser_Id(roomId, userId)).thenReturn(Optional.of(roomUser));
+        when(roomUser.getDmRoom()).thenReturn(room);
+        when(room.getIsGroup()).thenReturn(false);
+        when(dmRoomUserRepository.countByDmRoom_Id(roomId)).thenReturn(1L);
+
+        dmService.leave1v1Room(userId, roomId);
+
+        verify(dmRoomUserRepository).delete(roomUser);
+        verify(dmRoomUserRepository).flush();
         verify(dmRepository).deleteByDmRoom_Id(roomId);
-        verify(dmRoomUserRepository).deleteByDmRoom_Id(roomId);
         verify(dmRoomRepository).delete(room);
     }
 
