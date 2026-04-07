@@ -870,7 +870,7 @@ const DmChatPage: React.FC = () => {
                 key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
                 msg={msg}
                 isMe={isMe}
-                showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
+                isReadByPeer={msg.id > 0 && msg.id <= lastReadIdByOpponent}
                 senderLabel={peerSenderLabel}
                 peerProfile={
                   peer

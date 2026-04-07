@@ -2,6 +2,7 @@ package com.devstagram.domain.story.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -120,9 +121,11 @@ class StoryServiceTest {
         ReflectionTestUtils.setField(story, "id", 10L);
         ReflectionTestUtils.setField(story, "viewers", new ArrayList<>());
         ReflectionTestUtils.setField(story, "tags", new ArrayList<>());
+        ReflectionTestUtils.setField(story, "expiredAt", LocalDateTime.now().plusDays(1));
 
         given(userRepository.findById(targetUserId)).willReturn(Optional.of(targetUser));
-        given(storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId))
+        given(storyRepository.findActiveNonExpiredByUserIdOrderByCreatedAtAsc(
+                        eq(targetUserId), any(LocalDateTime.class)))
                 .willReturn(List.of(story));
 
         // when
@@ -156,6 +159,7 @@ class StoryServiceTest {
         ReflectionTestUtils.setField(story, "id", storyId);
         ReflectionTestUtils.setField(story, "viewers", new ArrayList<>());
         ReflectionTestUtils.setField(story, "tags", new ArrayList<>());
+        ReflectionTestUtils.setField(story, "expiredAt", LocalDateTime.now().plusDays(1));
 
         // findById 결과가 있음 (정상 상황)
         given(storyRepository.findById(storyId)).willReturn(Optional.of(story));

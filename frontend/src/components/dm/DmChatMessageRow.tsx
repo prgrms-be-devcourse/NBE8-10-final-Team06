@@ -67,30 +67,31 @@ const DmShareAttachmentCard = ({
     return href ? { href, isVideo: false } : null;
   });
 
+  /** 활성 스토리 목록에 없음 → 서버에서 만료·삭제된 공유( DM valid 는 아직 true 인 경우 포함) */
+  const [storyRemovedFromFeed, setStoryRemovedFromFeed] = useState(false);
+
   useEffect(() => {
-    const t = msg.thumbnail?.trim();
-    if (t) {
-      const href = resolveAssetUrl(t);
-      if (href) setPreview({ href, isVideo: false });
-      return;
-    }
+    setStoryRemovedFromFeed(false);
 
-    if (!isValid) {
-      setPreview(null);
-      return;
-    }
+    if (attachmentType === 'post') {
+      const t = msg.thumbnail?.trim();
+      if (t) {
+        const href = resolveAssetUrl(t);
+        setPreview(href ? { href, isVideo: false } : null);
+      } else {
+        setPreview(null);
+      }
+      if (!isValid) return;
 
-    const cacheKey = `${attachmentType}-${attachmentId}`;
-    const cached = shareThumbCache.get(cacheKey);
-    if (cached) {
-      setPreview(cached);
-      return;
-    }
+      const cacheKey = `post-${attachmentId}`;
+      const cached = shareThumbCache.get(cacheKey);
+      if (cached) {
+        setPreview(cached);
+        return;
+      }
 
-    let cancelled = false;
-
-    const run = async () => {
-      if (attachmentType === 'post') {
+      let cancelled = false;
+      void (async () => {
         try {
           const res = await postApi.getDetail(Number(attachmentId));
           if (cancelled || !rsOk(res.resultCode) || !res.data.medias?.length) return;
@@ -104,37 +105,129 @@ const DmShareAttachmentCard = ({
         } catch {
           /* noop */
         }
-        return;
-      }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
 
-      const authorMatch = msg.content.match(/(?:^|[?&])u=(\d+)/);
-      const authorId = authorMatch ? Number(authorMatch[1]) : NaN;
-      if (!Number.isFinite(authorId)) return;
+    // STORY — 작성자 피드 API 로 활성 여부 확인(만료·소프트삭제 시 목록에서 빠짐)
+    if (!isValid) {
+      setPreview(null);
+      return;
+    }
+
+    const t = msg.thumbnail?.trim();
+    if (t) {
+      const href = resolveAssetUrl(t);
+      setPreview(href ? { href, isVideo: false } : null);
+    } else {
+      setPreview(null);
+    }
+
+    const authorMatch = msg.content.match(/(?:^|[?&])u=(\d+)/);
+    const authorId = authorMatch ? Number(authorMatch[1]) : NaN;
+    if (!Number.isFinite(authorId)) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
       try {
         const res = await storyApi.getUserStories(authorId);
-        if (cancelled || !rsOk(res.resultCode) || !res.data?.length) return;
+        if (cancelled) return;
         const sid = Number(attachmentId);
-        const story = res.data.find((s) => s.storyId === sid);
-        if (!story?.mediaUrl) return;
-        const href = resolveAssetUrl(story.mediaUrl);
+        const found = res.data?.find((s) => s.storyId === sid);
+        if (!rsOk(res.resultCode)) return;
+        if (!found) {
+          setStoryRemovedFromFeed(true);
+          setPreview(null);
+          return;
+        }
+        /* 만료 시각 경과했으나 스케줄러 소프트삭제 전 — 목록에 남아 미디어 URL만 깨져 보이던 케이스 */
+        const expiredAtMs = found.expiredAt ? Date.parse(found.expiredAt) : NaN;
+        const pastExpiry = Number.isFinite(expiredAtMs) && expiredAtMs <= Date.now();
+        if (pastExpiry) {
+          setStoryRemovedFromFeed(true);
+          setPreview(null);
+          return;
+        }
+        setStoryRemovedFromFeed(false);
+        const href = resolveAssetUrl(found.mediaUrl);
         if (!href) return;
-        const next = { href, isVideo: isVideoMediaType(story.mediaType) };
-        shareThumbCache.set(cacheKey, next);
-        setPreview(next);
+        setPreview({ href, isVideo: isVideoMediaType(found.mediaType) });
       } catch {
-        /* noop */
+        /* 네트워크 실패 시 DM 썸네일(msg.thumbnail) 기반 preview 유지 */
       }
-    };
+    })();
 
-    void run();
     return () => {
       cancelled = true;
     };
   }, [msg.id, msg.thumbnail, msg.content, attachmentType, attachmentId, isValid]);
 
-  const showThumb = !!preview?.href && !isExpired;
+  /** 스토리: 링크 만료(v)·valid 거짓·피드에 없음 → 썸네일·카드 없이 문구만 */
+  const storyExpiredTextOnly = attachmentType === 'story' && (isExpired || storyRemovedFromFeed);
+
+  const showThumb = !!preview?.href && !storyExpiredTextOnly;
   /** 미디어 없는 게시물: 상단 미디어 영역 없이 본문 행과 동일 배경만 */
   const postTextOnlyUnified = attachmentType === 'post' && !showThumb;
+
+  if (storyExpiredTextOnly) {
+    return (
+      <div
+        style={{
+          width: '240px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          border: frameBorder,
+          cursor: 'default',
+          backgroundColor: frameBg,
+          marginTop: '5px',
+          opacity: 0.88,
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            padding: '20px 14px',
+            minHeight: '64px',
+            backgroundColor: frameBg,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              fontSize: '0.65rem',
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '10px',
+              fontWeight: 'bold',
+            }}
+          >
+            스토리
+          </div>
+          <div
+            style={{
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              color: '#8e8e8e',
+              paddingRight: '64px',
+            }}
+          >
+            만료된 스토리
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -323,7 +416,8 @@ export interface DmChatMessageRowProps {
   msg: DmMessageResponse;
   /** true = 본인(오른쪽·파랑), false = 상대(왼쪽·회색) — senderId vs 로그인 user id */
   isMe: boolean;
-  showReadStatus: boolean;
+  /** 상대가 이 메시지까지 읽음(WS read 기준) — true면 안 읽음 표시(1) 숨김 */
+  isReadByPeer: boolean;
   /** 그룹: 상대 메시지 위 발신자 표시명(참고 앱의 senderName 라벨과 동일 역할) */
   senderLabel?: string | null;
   /** 상대 메시지 왼쪽 프로필 — 1:1·그룹 공통 */
@@ -340,7 +434,7 @@ export interface DmChatMessageRowProps {
 export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   msg,
   isMe,
-  showReadStatus,
+  isReadByPeer,
   senderLabel,
   peerProfile,
 }) => {
@@ -483,18 +577,21 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
               flexDirection: isMe ? 'row' : 'row-reverse',
             }}
           >
-            {isMe && (
+            {isMe && !isReadByPeer ? (
               <span
                 style={{
                   fontSize: '0.7rem',
-                  color: showReadStatus ? 'transparent' : 'rgba(255,255,255,0.9)',
-                  fontWeight: 'bold',
-                  minWidth: '0.6rem',
+                  color: '#8e8e8e',
+                  fontWeight: 700,
+                  minWidth: '0.65rem',
+                  textAlign: 'center',
+                  lineHeight: 1,
                 }}
+                title="안 읽음"
               >
                 1
               </span>
-            )}
+            ) : null}
             {bubbleBlock}
           </div>
           <span
