@@ -27,6 +27,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
   const [showLikers, setShowLikers] = useState(false); // 좋아요 모달 상태
   const [showDmShare, setShowDmShare] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
   const navigate = useNavigate();
   const isMountedRef = useRef(true);
 
@@ -58,17 +59,27 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
     ['mp4', 'webm', 'mov'].includes(mediaType.toLowerCase());
 
   const handleLike = async () => {
+    if (isLiking) return;
+    const postId = post.id;
     try {
-      const res = await postApi.toggleLike(post.id);
+      setIsLiking(true);
+      const res = await postApi.toggleLike(postId);
       if (res.resultCode.includes('-S-')) {
-        const isNowLiked = !post.isLiked;
-        setPost(prev => ({
-          ...prev,
-          isLiked: isNowLiked,
-          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
-        }));
+        setPost((prev) => {
+          const isNowLiked = !prev.isLiked;
+          return {
+            ...prev,
+            isLiked: isNowLiked,
+            likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1),
+          };
+        });
       }
     } catch (err) { console.error(err); }
+    finally {
+      if (isMountedRef.current) {
+        setIsLiking(false);
+      }
+    }
   };
 
   const handleScrap = async () => {
@@ -390,7 +401,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
                 className="post-card-feed-action-icon"
                 size={24}
                 onClick={handleLike}
-                style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : 'inherit' }}
+                style={{ cursor: isLiking ? 'not-allowed' : 'pointer', color: post.isLiked ? '#ed4956' : 'inherit', opacity: isLiking ? 0.6 : 1 }}
                 fill={post.isLiked ? '#ed4956' : 'none'}
               />
               <MessageCircle
@@ -548,7 +559,7 @@ const PostCard: React.FC<PostCardProps> = ({ post: initialPost, onPostRemoved, o
                   e.stopPropagation();
                   void handleLike();
                 }}
-                style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : '#64748b' }}
+                style={{ cursor: isLiking ? 'not-allowed' : 'pointer', color: post.isLiked ? '#ed4956' : '#64748b', opacity: isLiking ? 0.6 : 1 }}
                 fill={post.isLiked ? '#ed4956' : 'none'}
               />
               <button
