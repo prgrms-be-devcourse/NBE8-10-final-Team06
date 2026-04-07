@@ -1,4 +1,15 @@
 spring:
+  cloud:
+    aws:
+      s3:
+        enabled: false
+      region:
+        static: us-east-1
+        auto: false
+      credentials:
+        instance-profile: false
+        web-identity-token-file: false
+
   datasource:
     url: jdbc:postgresql://localhost:5432/devstagram
     username: ${SPRING_DATASOURCE_USERNAME:root}

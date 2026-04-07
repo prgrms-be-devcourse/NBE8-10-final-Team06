@@ -1,4 +1,15 @@
 spring:
+  cloud:
+    aws:
+      s3:
+        enabled: false
+      region:
+        static: us-east-1
+        auto: false
+      credentials:
+        instance-profile: false
+        web-identity-token-file: false
+
   datasource:
     url: jdbc:h2:file:./data/devdb;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
