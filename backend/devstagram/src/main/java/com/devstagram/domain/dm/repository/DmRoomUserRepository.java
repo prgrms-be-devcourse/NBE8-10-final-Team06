@@ -67,8 +67,7 @@ public interface DmRoomUserRepository extends JpaRepository<DmRoomUser, Long> {
               )
             """)
     Optional<Long> find1v1RoomWhereUserLeft(
-            @Param("currentUserId") Long currentUserId,
-            @Param("otherUserId") Long otherUserId);
+            @Param("currentUserId") Long currentUserId, @Param("otherUserId") Long otherUserId);
 
     // 특정 채팅방의 모든 참여자 정보 일괄 삭제
     @Modifying(clearAutomatically = true)

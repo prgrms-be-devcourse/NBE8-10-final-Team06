@@ -132,7 +132,8 @@ public class DmService {
         }
 
         // 1. 두 유저 모두 현재 참여 중
-        Long existingRoomId = dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId).orElse(null);
+        Long existingRoomId =
+                dmRoomUserRepository.find1v1RoomId(currentUserId, otherUserId).orElse(null);
         if (existingRoomId != null) {
             List<DmRoomUser> myRoomUsers = dmRoomUserRepository.findByUser_Id(currentUserId);
             List<DmRoomSummaryResponse> rooms = buildRoomsSummary(currentUserId, myRoomUsers);
@@ -140,7 +141,9 @@ public class DmService {
         }
 
         // 2. 내가 나갔고 상대방이 남아있는 방 → 재참여
-        Long rejoinRoomId = dmRoomUserRepository.find1v1RoomWhereUserLeft(currentUserId, otherUserId).orElse(null);
+        Long rejoinRoomId = dmRoomUserRepository
+                .find1v1RoomWhereUserLeft(currentUserId, otherUserId)
+                .orElse(null);
         if (rejoinRoomId != null) {
             rejoin1v1Room(currentUserId, rejoinRoomId);
             List<DmRoomSummaryResponse> rooms = getRoomsWithLastMessage(currentUserId);
@@ -446,10 +449,10 @@ public class DmService {
 
     /** 나갔던 1:1 방에 다시 참여자로 등록 */
     private void rejoin1v1Room(Long userId, Long roomId) {
-        DmRoom room = dmRoomRepository.findById(roomId)
-                .orElseThrow(() -> new ServiceException("404-F-1", "채팅방이 존재하지 않습니다."));
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
+        DmRoom room =
+                dmRoomRepository.findById(roomId).orElseThrow(() -> new ServiceException("404-F-1", "채팅방이 존재하지 않습니다."));
+        User user =
+                userRepository.findById(userId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 사용자입니다."));
         DmRoomUser newRoomUser = DmRoomUser.create(room, user, new Date());
         dmRoomUserRepository.save(newRoomUser);
     }

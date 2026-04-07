@@ -368,6 +368,15 @@ const DmChatPage: React.FC = () => {
     return () => window.clearTimeout(id);
   }, [isLoggedIn, userId]);
 
+  // token refresh 후 STOMP 재연결 — client.ts 가 갱신 성공 시 'auth:token-refreshed' 이벤트 발행
+  useEffect(() => {
+    const onTokenRefreshed = () => {
+      setStompAuthRevision((n) => n + 1);
+    };
+    window.addEventListener('auth:token-refreshed', onTokenRefreshed);
+    return () => window.removeEventListener('auth:token-refreshed', onTokenRefreshed);
+  }, []);
+
   const stompReconnectKey = useMemo(() => {
     syncAuthTokensFromCookies();
     const t = (localStorage.getItem('accessToken') ?? '').trim();
