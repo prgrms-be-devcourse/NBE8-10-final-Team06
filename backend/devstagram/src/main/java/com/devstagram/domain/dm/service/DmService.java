@@ -293,7 +293,11 @@ public class DmService {
 
     /**
      * DM 메시지 전송 (저장 + 브로드캐스트용 응답 생성).
+     *
+     * 1:1 방에서 메시지를 전송할 때, 상대방이 이전에 방을 나간 상태라면
+     * 자동으로 재참여 처리하여 상대방의 DM 목록에 방이 다시 나타나도록 한다.
      */
+    @Transactional
     public DmMessageResponse sendMessage(Long userId, Long roomId, DmSendMessageRequest request) {
         if (userId == null) {
             throw new ServiceException("400-F-1", "유저 정보가 필요합니다.");
@@ -345,6 +349,14 @@ public class DmService {
         Dm dm = Dm.create(room, sender, request.type(), request.content(), thumbnailUrl, valid);
 
         Dm saved = dmRepository.save(dm);
+
+        // 1:1 방에서 메시지 전송 시: 나간 상대방을 자동으로 재참여시킨다
+        if (!room.getIsGroup()) {
+            List<Long> leftUserIds = dmRepository.findSenderIdsNotInRoom(roomId);
+            for (Long leftUserId : leftUserIds) {
+                rejoin1v1Room(leftUserId, roomId);
+            }
+        }
 
         return new DmMessageResponse(
                 saved.getId(),
