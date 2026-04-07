@@ -1,6 +1,7 @@
 package com.devstagram.domain.post.service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
@@ -75,8 +76,26 @@ public class PostService {
         // 뽑아낸 ID들로 게시글 인스턴스들 가져오기
         List<Post> postList = postRepository.findAllByIdInAndIsDeletedFalse(rankedIds);
 
+        // DB에서 사라진 ID = Redis에 남은 stale 항목 → lazy cleanup
+        Set<Long> fetchedIds = postList.stream().map(Post::getId).collect(Collectors.toSet());
+        List<Long> staleIds =
+                rankedIds.stream().filter(id -> !fetchedIds.contains(id)).toList();
+        if (!staleIds.isEmpty()) {
+            feedService.removeStalePostsFromFeeds(memberId, staleIds);
+        }
+
+        // Redis에 ID가 있었지만 전부 stale이었던 경우 → fallback
+        if (postList.isEmpty()) {
+            Slice<Post> posts = postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
+            return convertToFeedRes(posts, memberId, Collections.emptyMap());
+        }
+
         // Redis가 정해준 ID 순서대로 재정렬
-        postList.sort(Comparator.comparingInt(post -> rankedIds.indexOf(post.getId())));
+        Map<Long, Integer> rankIndex = new HashMap<>();
+        for (int i = 0; i < rankedIds.size(); i++) {
+            rankIndex.put(rankedIds.get(i), i);
+        }
+        postList.sort(Comparator.comparingInt(post -> rankIndex.get(post.getId())));
 
         // 5. Slice 객체 생성
         boolean hasNext = rankedIds.size() >= pageable.getPageSize();
@@ -198,8 +217,11 @@ public class PostService {
         // 사용자 공통 글로벌 피드에 등록 (좋아요)
         feedService.registerPostToGlobalFeed(post);
 
-        // 사용자 개인 피드에 등록 (기술 태그, 팔로우)
-        feedService.deliverPostToFeeds(post);
+        // 사용자 개인 피드에 등록 (기술 태그, 팔로우) — 트랜잭션 안에서 ID 추출 후 전달
+        List<Long> techIds = post.getTechTags().stream()
+                .map(pt -> pt.getTechnology().getId())
+                .toList();
+        feedService.deliverPostToFeeds(post, techIds);
 
         return post.getId();
     }

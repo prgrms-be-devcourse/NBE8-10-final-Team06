@@ -39,4 +39,12 @@ public interface UserTechScoreRepository extends JpaRepository<UserTechScore, Lo
             + "WHERE uts.technology.id IN :techIds AND uts.score >= :minScore")
     List<User> findUsersByTechIdsAndScoreGreaterThanEqual(
             @Param("techIds") List<Long> techIds, @Param("minScore") int minScore);
+
+    /**
+     * 특정 기술들에 대해 기준 점수 이상인 UserTechScore 전체 조회
+     * 용도: userId → 매칭된 techId Set 맵 빌드
+     */
+    @Query("SELECT uts FROM UserTechScore uts " + "WHERE uts.technology.id IN :techIds AND uts.score >= :minScore")
+    List<UserTechScore> findAllByTechIdsAndScoreGreaterThanEqual(
+            @Param("techIds") List<Long> techIds, @Param("minScore") int minScore);
 }
