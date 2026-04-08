@@ -22,6 +22,7 @@ import TechCategoryManagePage from './pages/technology/TechCategoryManagePage';
 import { useAuthStore } from './store/useAuthStore';
 import { authApi } from './api/auth';
 import { isRsDataSuccess } from './util/rsData';
+import { syncAuthTokensFromCookies } from './util/authStorageSync';
 import './App.css';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -44,6 +45,7 @@ function AuthBootstrap({ children }: { children: React.ReactNode }) {
         if (isRsDataSuccess(res) && res.data) {
           const { id, nickname } = res.data;
           useAuthStore.getState().setLogin(nickname, id);
+          syncAuthTokensFromCookies();
         }
       } catch {
         /* 401·refresh 실패 시 인터셉터가 로그인 이동할 수 있음 */

@@ -60,6 +60,10 @@ public class CommentService {
             if (!parentComment.getPost().getId().equals(postId)) {
                 throw new ServiceException("400-C-2", "해당 게시글의 댓글이 아닙니다.");
             }
+
+            if (parentComment.isDeleted()) {
+                throw new ServiceException("400-C-3", "삭제된 댓글에는 대댓글을 작성할 수 없습니다.");
+            }
         }
 
         Comment comment = Comment.builder()
@@ -83,7 +87,7 @@ public class CommentService {
                 CommentConstants.COMMENT_PAGE_SIZE,
                 Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
 
-        Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
+        Slice<Comment> comments = commentRepository.findCommentsWithUserByPostId(postId, pageable);
 
         Set<Long> likedCommentIds = getLikedCommentIds(memberId, comments.getContent());
 
@@ -107,12 +111,9 @@ public class CommentService {
                 .findById(commentId)
                 .orElseThrow(() -> new ServiceException("404-C-2", "존재하지 않는 댓글입니다."));
 
-        Pageable pageable = PageRequest.of(
-                pageNumber,
-                CommentConstants.REPLY_PAGE_SIZE,
-                Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
+        Pageable pageable = PageRequest.of(pageNumber, CommentConstants.REPLY_PAGE_SIZE);
 
-        Slice<Comment> replies = commentRepository.findRepliesWithUserAndImageByParentId(commentId, pageable);
+        Slice<Comment> replies = commentRepository.findRepliesWithUserByParentId(commentId, pageable);
 
         Set<Long> likedCommentIds = getLikedCommentIds(memberId, replies.getContent());
 
@@ -127,6 +128,10 @@ public class CommentService {
 
         if (!comment.getUser().getId().equals(memberId)) {
             throw new ServiceException("403-C-1", "수정 권한이 없습니다.");
+        }
+
+        if (comment.isDeleted()) {
+            throw new ServiceException("400-C-4", "삭제된 댓글은 수정할 수 없습니다.");
         }
 
         comment.modify(content);

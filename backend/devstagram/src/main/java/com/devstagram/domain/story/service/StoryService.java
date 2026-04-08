@@ -97,7 +97,8 @@ public class StoryService {
 
         userRepository.findById(targetUserId).orElseThrow(() -> new ServiceException("404-F-1", "존재하지 않는 유저."));
 
-        List<Story> stories = storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(targetUserId);
+        LocalDateTime now = LocalDateTime.now();
+        List<Story> stories = storyRepository.findActiveNonExpiredByUserIdOrderByCreatedAtAsc(targetUserId, now);
         // 특정 유저의 스토리 & 활성화된 스토리 찾아서 생성 시간순으로 정렬
 
         if (stories.isEmpty()) {
@@ -144,6 +145,11 @@ public class StoryService {
         }
 
         if (story.isDeleted()) {
+            throw new ServiceException("404-F-2", "만료된 스토리입니다.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (story.getExpiredAt() != null && !story.getExpiredAt().isAfter(now)) {
             throw new ServiceException("404-F-2", "만료된 스토리입니다.");
         }
 

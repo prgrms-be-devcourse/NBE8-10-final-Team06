@@ -343,6 +343,14 @@ export function parseBackendReadFromTopicBody(rawBody: string): number | null {
       const n = Number(mid);
       if (Number.isFinite(n) && n > 0) return n;
     }
+    const nested = el.data;
+    if (isRecord(nested)) {
+      const mid2 = nested.messageId ?? nested.message_id;
+      if (mid2 != null) {
+        const n2 = Number(mid2);
+        if (Number.isFinite(n2) && n2 > 0) return n2;
+      }
+    }
   }
   return null;
 }

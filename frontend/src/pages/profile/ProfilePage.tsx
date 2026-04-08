@@ -46,6 +46,7 @@ const PROFILE_GRID_TITLE_MAX_CHARS = 15;
 /** 프로필 그리드(게시물·저장됨): 썸네일 또는 미디어 없을 때 제목 타일 */
 const ProfilePostGridThumb: React.FC<{ post: PostFeedProfileRes }> = ({ post }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const getFullUrl = (url: string) => resolveAssetUrl(url);
   const getFallbackUrl = (url: string) => getAlternateAssetUrl(url);
   const first = post.medias?.[0];
@@ -58,7 +59,15 @@ const ProfilePostGridThumb: React.FC<{ post: PostFeedProfileRes }> = ({ post }) 
         : rawTitle;
 
   return (
-    <div className="profile-tab-thumb" style={{ aspectRatio: '1/1' }} onClick={() => navigate(`/post/${post.id}`)}>
+    <div
+      className="profile-tab-thumb"
+      style={{ aspectRatio: '1/1' }}
+      onClick={() =>
+        navigate(`/post/${post.id}`, {
+          state: { postDetailReturn: `${location.pathname}${location.search}` },
+        })
+      }
+    >
       {first ? (
         isProfileGridVideo(first.mediaType) ? (
           <video
@@ -629,10 +638,10 @@ const ProfilePage: React.FC = () => {
   }, [isMe, activeTab, fetchScrapsInitial]);
 
   useEffect(() => {
-    if (isMe && activeTab === 'archive' && archivedStories.length === 0) {
-      fetchArchivedStories();
+    if (isMe && activeTab === 'archive') {
+      void fetchArchivedStories();
     }
-  }, [isMe, activeTab, archivedStories.length, fetchArchivedStories]);
+  }, [isMe, activeTab, fetchArchivedStories]);
 
   const handleFollowToggle = async () => {
     if (!profile || isMe || isFollowProcessing || followToggleLockRef.current) return;

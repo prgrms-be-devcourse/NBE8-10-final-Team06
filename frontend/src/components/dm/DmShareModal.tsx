@@ -138,7 +138,7 @@ const DmShareModal: React.FC<DmShareModalProps> = ({ open, onClose, payloads }) 
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid #efefef' }}>
-          <strong style={{ fontSize: '1rem' }}>DM으로 공유</strong>
+          <strong style={{ fontSize: '1rem' }}>공유하기</strong>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
             <X size={22} />
           </button>

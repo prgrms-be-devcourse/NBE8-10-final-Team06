@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, X } from 'lucide-react';
 import { postApi } from '../../api/post';
@@ -8,6 +8,7 @@ import BottomNav from '../../components/layout/BottomNav';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
 import MarkdownContent from '../../components/common/MarkdownContent';
+import PostMarkdownFormatToolbar from '../../components/post/PostMarkdownFormatToolbar';
 
 const CODE_LANGUAGES = [
   { value: 'plaintext', label: 'Plain Text' },
@@ -71,6 +72,7 @@ const PostCreatePage: React.FC = () => {
   const [activeContentTab, setActiveContentTab] = useState<'write' | 'preview'>('write');
   const [showCodeLangModal, setShowCodeLangModal] = useState(false);
   const [codeLangQuery, setCodeLangQuery] = useState('');
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -211,8 +213,30 @@ const PostCreatePage: React.FC = () => {
         <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>새 게시물 만들기</h2>
       </header>
 
-      <main style={{ maxWidth: '600px', margin: '20px auto', padding: '0 15px' }}>
-        <form onSubmit={handleSubmit} style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '8px', padding: '20px' }}>
+      <main style={{ maxWidth: '920px', margin: '20px auto', padding: '0 15px' }}>
+        <div className="post-editor-main-row">
+          {activeContentTab === 'write' && (
+            <aside className="post-markdown-remote-shell" aria-label="본문 마크다운 서식">
+              <PostMarkdownFormatToolbar
+                textareaRef={contentTextareaRef}
+                value={content}
+                setValue={setContent}
+                onRequestWriteMode={() => setActiveContentTab('write')}
+              />
+            </aside>
+          )}
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              backgroundColor: '#fff',
+              border: '1px solid #dbdbdb',
+              borderRadius: '8px',
+              padding: '20px',
+              flex: '0 1 600px',
+              width: 'min(100%, 600px)',
+              minWidth: 0,
+            }}
+          >
           
           {/* 미디어 선택 */}
           <div style={{ marginBottom: '20px' }}>
@@ -285,6 +309,7 @@ const PostCreatePage: React.FC = () => {
             </div>
             {activeContentTab === 'write' ? (
               <textarea
+                ref={contentTextareaRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="문구 입력..."
@@ -397,6 +422,7 @@ const PostCreatePage: React.FC = () => {
             {isSubmitting ? '공유 중...' : '공유하기'}
           </button>
         </form>
+        </div>
         {showCodeLangModal && (
           <div
             role="dialog"

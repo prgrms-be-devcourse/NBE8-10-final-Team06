@@ -22,7 +22,7 @@ public class CommentController {
 
     private final CommentService commentService;
 
-    @GetMapping({"posts/{postId}/comments"})
+    @GetMapping("/posts/{postId}/comments")
     public RsData<Slice<CommentInfoRes>> getComments(
             @PathVariable Long postId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,

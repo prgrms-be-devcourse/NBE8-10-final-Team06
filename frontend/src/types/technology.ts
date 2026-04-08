@@ -10,10 +10,14 @@ export interface TechCreateReq {
   categoryId: number;
   name: string;
   color: string;
-  iconUrl: string;
 }
 
-export interface TechUpdateReq extends TechCreateReq {}
+export interface TechUpdateReq {
+  categoryId: number;
+  name: string;
+  color: string;
+  iconUrl: string;
+}
 
 export interface TechCategoryCreateReq {
   name: string;

@@ -49,4 +49,8 @@ public class TechCategory extends BaseEntity {
         this.name = name;
         this.color = color;
     }
+
+    public void softDelete() {
+        this.isDeleted = true;
+    }
 }

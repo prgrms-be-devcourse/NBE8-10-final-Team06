@@ -100,6 +100,30 @@ class CommentServiceTest {
     }
 
     @Test
+    @DisplayName("[대댓글 생성 실패 - 삭제된 부모 댓글]")
+    void createComment_Fail_ParentDeleted() {
+        // [given]
+        Long postId = 1L;
+        Long memberId = 1L;
+        Long parentId = 2L;
+        CommentCreateReq req = new CommentCreateReq("대댓글 내용", parentId);
+
+        User user = createMember(memberId, "테스트유저");
+        Post post = createPost(postId, "제목");
+        Comment deletedParent = createComment(parentId, "[삭제된 댓글입니다.]", post, user, null);
+        ReflectionTestUtils.setField(deletedParent, "isDeleted", true);
+
+        given(userRepository.findById(memberId)).willReturn(Optional.of(user));
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(commentRepository.findById(parentId)).willReturn(Optional.of(deletedParent));
+
+        // [when & then]
+        assertThatThrownBy(() -> commentService.createComment(postId, memberId, req))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("400");
+    }
+
+    @Test
     @DisplayName("[댓글 생성 실패]")
     void createComment_Fail_ParentNotFound() {
         // [given]
@@ -137,7 +161,7 @@ class CommentServiceTest {
         Slice<Comment> slice = new SliceImpl<>(replies, pageable, true);
 
         given(commentRepository.findById(parentId)).willReturn(Optional.of(parent));
-        given(commentRepository.findRepliesWithUserAndImageByParentId(eq(parentId), any(Pageable.class)))
+        given(commentRepository.findRepliesWithUserByParentId(eq(parentId), any(Pageable.class)))
                 .willReturn(slice);
 
         // [when]
@@ -166,6 +190,25 @@ class CommentServiceTest {
 
         // [Then]
         assertThat(comment.getContent()).isEqualTo(newContent);
+    }
+
+    @Test
+    @DisplayName("[댓글 수정 실패 - 삭제된 댓글]")
+    void updateComment_Fail_Deleted() {
+        // [Given]
+        Long commentId = 1L;
+        Long memberId = 1L;
+
+        User author = createMember(memberId, "작성자");
+        Comment deletedComment = createComment(commentId, "[삭제된 댓글입니다.]", null, author, null);
+        ReflectionTestUtils.setField(deletedComment, "isDeleted", true);
+
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(deletedComment));
+
+        // [When & Then]
+        assertThatThrownBy(() -> commentService.updateComment(commentId, memberId, "수정 시도"))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("400");
     }
 
     @Test
@@ -220,8 +263,8 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("[대댓글 삭제]")
-    void getComments_FilterDeletedChildren() {
+    @DisplayName("[댓글 목록 조회]")
+    void getCommentsByPostId_Success() {
         // [Given]
         Long postId = 1L;
         Post post = createPost(postId, "제목");
@@ -229,7 +272,7 @@ class CommentServiceTest {
         Comment parent = createComment(1L, "부모", post, user, null);
 
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class)))
+        given(commentRepository.findCommentsWithUserByPostId(eq(postId), any(Pageable.class)))
                 .willReturn(new SliceImpl<>(List.of(parent)));
 
         // [When]
@@ -323,6 +366,5 @@ class CommentServiceTest {
                 .isInstanceOf(ServiceException.class)
                 .hasMessageContaining("존재하지 않는 댓글입니다.");
         verify(commentLikeRepository, never()).save(any());
-        verify(commentRepository, never()).incrementLikeCount(anyLong());
     }
 }

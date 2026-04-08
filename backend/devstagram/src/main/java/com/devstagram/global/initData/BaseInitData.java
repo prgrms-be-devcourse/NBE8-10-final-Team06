@@ -1,6 +1,7 @@
 package com.devstagram.global.initData;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -188,6 +189,7 @@ public class BaseInitData implements ApplicationRunner {
         createPostInteractions(users, posts);
         createStoryInteractions(users);
         createArchivedStoryForAdmin(userByEmail(ADMIN_EMAIL));
+        createAdminStoryExpiringInOneMinute(userByEmail(ADMIN_EMAIL));
         createDmRoomsAndMessages(posts);
     }
 
@@ -577,6 +579,21 @@ public class BaseInitData implements ApplicationRunner {
         storyService.softDeleteStory(archived.getId(), admin.getId());
     }
 
+    /** admin 전용 — 만료 시각을 명시해 약 1분 뒤 만료되는 활성 스토리(만료·배너 UI 검증용) */
+    private void createAdminStoryExpiringInOneMinute(User admin) {
+        String url = "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400";
+        storyRepository.save(Story.builder()
+                .user(admin)
+                .content("만료 1분 전 데모 스토리 — 스토리 만료·노출 제한 테스트용")
+                .thumbnailUrl(url)
+                .expiredAt(LocalDateTime.now().plusMinutes(1))
+                .storyMedia(StoryMedia.builder()
+                        .mediaType(MediaType.jpg)
+                        .sourceUrl(url)
+                        .build())
+                .build());
+    }
+
     // ──────────────────────────────────────────────
     // DM
     // ──────────────────────────────────────────────
@@ -593,7 +610,10 @@ public class BaseInitData implements ApplicationRunner {
     }
 
     private Story resolveSampleStoryForDmLink(User admin) {
-        return storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(admin.getId()).stream()
+
+        LocalDateTime now = LocalDateTime.now();
+
+        return storyRepository.findActiveNonExpiredByUserIdOrderByCreatedAtAsc(admin.getId(), now).stream()
                 .findFirst()
                 .orElseGet(() -> storyRepository.findAll().stream()
                         .filter(s -> !s.isDeleted())
