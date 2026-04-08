@@ -80,13 +80,19 @@ jobs:
       # EC2 서버에서 Blue-Green 무중단 배포 실행
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@master
+        env:
+          PKG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PKG_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: VERSION
+          envs: VERSION,PKG_TOKEN,PKG_USER
           script: |
             cd /home/ec2-user
+
+            # GHCR 비공개 이미지 pull 허용 (EC2 Docker 로그인)
+            echo "$PKG_TOKEN" | sudo docker login ghcr.io -u "$PKG_USER" --password-stdin
             
             # [Step 0] 애플리케이션 실행을 위한 .env 환경 변수 생성
             echo "SPRING_PROFILES_ACTIVE=prod" > .env
