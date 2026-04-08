@@ -1,7 +1,10 @@
 package com.devstagram.domain.technology.service;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -107,12 +110,37 @@ public class TechScoreService {
             return Collections.emptyList();
         }
 
-        // 1. PostTechnology 엔티티 리스트에서 Technology ID들만 추출
         List<Long> techIds =
                 postTechTags.stream().map(pt -> pt.getTechnology().getId()).toList();
 
-        // 2. 해당 기술 ID들 중 하나라도 '50점 이상'의 점수를 가진 유저들을 중복 없이 조회
-        // (UserTechScoreRepository에 추가한 쿼리 메서드 호출)
         return userTechScoreRepository.findUsersByTechIdsAndScoreGreaterThanEqual(techIds, 50);
+    }
+
+    /**
+     * 기술 ID 목록으로 관심 유저 조회 (비동기 컨텍스트에서 JPA 엔티티 없이 호출 시 사용)
+     */
+    @Transactional(readOnly = true)
+    public List<User> findUsersByTechIds(List<Long> techIds) {
+        if (techIds == null || techIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return userTechScoreRepository.findUsersByTechIdsAndScoreGreaterThanEqual(techIds, 50);
+    }
+
+    /**
+     * userId → 매칭된 techId Set 맵 반환
+     * 용도: 피드 배달 시 유저별 매칭 태그 수(matchCount) 계산
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Set<Long>> findUserTechMapByTechIds(List<Long> techIds) {
+        if (techIds == null || techIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Long, Set<Long>> result = new HashMap<>();
+        userTechScoreRepository
+                .findAllByTechIdsAndScoreGreaterThanEqual(techIds, 50)
+                .forEach(uts -> result.computeIfAbsent(uts.getUser().getId(), k -> new HashSet<>())
+                        .add(uts.getTechnology().getId()));
+        return result;
     }
 }
