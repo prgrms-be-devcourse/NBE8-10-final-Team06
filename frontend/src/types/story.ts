@@ -24,6 +24,8 @@ export interface StoryFeedResponse {
 export interface StoryDetailResponse {
   storyId: number;
   userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
   createdAt: string;
   expiredAt: string;
   content: string;
