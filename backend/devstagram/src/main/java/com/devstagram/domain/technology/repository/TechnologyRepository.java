@@ -20,9 +20,6 @@ public interface TechnologyRepository extends JpaRepository<Technology, Long> {
     @Query("select t from Technology t join fetch t.category where t.id in :ids")
     List<Technology> findAllByIdsWithCategory(@Param("ids") List<Long> ids);
 
-    /**
-     * 기술 이름으로 단건 조회
-     */
     Optional<Technology> findByName(String name);
 
     /**

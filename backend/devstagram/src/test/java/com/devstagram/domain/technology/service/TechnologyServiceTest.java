@@ -2,6 +2,7 @@ package com.devstagram.domain.technology.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -15,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.devstagram.domain.technology.dto.TechCategoryCreateReq;
 import com.devstagram.domain.technology.dto.TechCategoryUpdateReq;
 import com.devstagram.domain.technology.entity.TechCategory;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
@@ -30,7 +32,7 @@ class TechnologyServiceTest {
     private TechCategoryRepository techCategoryRepository;
 
     @Test
-    @DisplayName("카테고리 삭제")
+    @DisplayName("카테고리 삭제 - soft delete 처리")
     void deleteCategory_SoftDelete_Success() {
         // given
         Long categoryId = 1L;
@@ -45,7 +47,28 @@ class TechnologyServiceTest {
         technologyService.deleteCategory(categoryId);
 
         // then
-        verify(techCategoryRepository, times(1)).delete(category);
+        assertThat(category.isDeleted()).isTrue();
+        verify(techCategoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("이미 삭제된 카테고리를 다시 삭제하면 early return")
+    void deleteCategory_AlreadyDeleted_EarlyReturn() {
+        // given
+        Long categoryId = 1L;
+        TechCategory category = TechCategory.builder()
+                .id(categoryId)
+                .name("Backend")
+                .color("#000000")
+                .build();
+        ReflectionTestUtils.setField(category, "isDeleted", true);
+        given(techCategoryRepository.findById(categoryId)).willReturn(Optional.of(category));
+
+        // when
+        technologyService.deleteCategory(categoryId);
+
+        // then
+        verify(techCategoryRepository, never()).delete(any());
     }
 
     @Test
@@ -100,5 +123,32 @@ class TechnologyServiceTest {
         // then
         assertThat(category.getName()).isEqualTo("New Name");
         assertThat(category.getColor()).isEqualTo("#FFFFFF");
+    }
+
+    @Test
+    @DisplayName("중복된 카테고리 이름으로 생성 시 ServiceException이 발생한다")
+    void createCategory_DuplicateName_Fail() {
+        // given
+        TechCategoryCreateReq req = new TechCategoryCreateReq("Backend", "#000000");
+        given(techCategoryRepository.existsByName("Backend")).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> technologyService.createCategory(req))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("이미 존재하는 카테고리");
+    }
+
+    @Test
+    @DisplayName("카테고리 생성 성공")
+    void createCategory_Success() {
+        // given
+        TechCategoryCreateReq req = new TechCategoryCreateReq("Backend", "#000000");
+        given(techCategoryRepository.existsByName("Backend")).willReturn(false);
+
+        // when
+        technologyService.createCategory(req);
+
+        // then
+        verify(techCategoryRepository, times(1)).save(any(TechCategory.class));
     }
 }

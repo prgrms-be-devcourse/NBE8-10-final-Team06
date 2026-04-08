@@ -46,6 +46,10 @@ public class TechnologyService {
                 .findById(req.categoryId())
                 .orElseThrow(() -> new ServiceException("404-C-1", "카테고리를 찾을 수 없습니다."));
 
+        if (category.isDeleted()) {
+            throw new ServiceException("400-T-1", "삭제된 카테고리에는 기술을 추가할 수 없습니다.");
+        }
+
         String iconUrl = null;
 
         if (icon != null && !icon.isEmpty()) {
@@ -65,6 +69,10 @@ public class TechnologyService {
 
     @Transactional
     public void createCategory(TechCategoryCreateReq req) {
+        if (techCategoryRepository.existsByName(req.name())) {
+            throw new ServiceException("400-C-1", "이미 존재하는 카테고리 이름입니다.");
+        }
+
         TechCategory techCategory =
                 TechCategory.builder().name(req.name()).color(req.color()).build();
 
@@ -80,6 +88,10 @@ public class TechnologyService {
         TechCategory category = techCategoryRepository
                 .findById(req.categoryId())
                 .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 카테고리입니다."));
+
+        if (category.isDeleted()) {
+            throw new ServiceException("400-T-2", "삭제된 카테고리로 기술을 변경할 수 없습니다.");
+        }
 
         technology.update(category, req.name(), req.iconUrl(), req.color());
     }
@@ -113,6 +125,10 @@ public class TechnologyService {
                 .findById(categoryId)
                 .orElseThrow(() -> new ServiceException("404-C-1", "존재하지 않는 카테고리입니다."));
 
-        techCategoryRepository.delete(category);
+        if (category.isDeleted()) {
+            return;
+        }
+
+        category.softDelete();
     }
 }
