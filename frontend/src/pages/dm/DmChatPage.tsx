@@ -1,6 +1,6 @@
 // src/pages/dm/DmChatPage.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { dmApi } from '../../api/dm';
 import { authApi } from '../../api/auth';
@@ -53,6 +53,7 @@ import {
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 import { scrollDmChatPaneToBottom } from '../../util/dmScroll';
 import { notifyDmSelfReadSent, resetDmReadEchoSuppress } from '../../util/dmReadEchoSuppress';
+import { type DmLocationState, isDmPath, sanitizeBackTarget } from '../../util/dmNavigation';
 
 /**
  * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
@@ -113,10 +114,26 @@ function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | nul
 const DmChatPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = (location.state as DmLocationState | null) ?? null;
+  const from = sanitizeBackTarget(locationState?.from, '/dm');
+  const listFrom = sanitizeBackTarget(locationState?.listFrom, '/');
+
   /** `navigate('/dm')` 는 히스토리에 목록을 한 번 더 쌓아 목록→뒤로 시 다시 채팅방으로 들어가는 루프를 만듦 → pop */
   const goBackFromChatRoom = useCallback(() => {
-    navigate(-1);
-  }, [navigate]);
+    if (from === '/dm') {
+      navigate('/dm', {
+        replace: true,
+        state: { from: isDmPath(listFrom) ? '/' : listFrom } satisfies DmLocationState,
+      });
+      return;
+    }
+    if (isDmPath(from)) {
+      navigate('/dm', { replace: true, state: { from: '/' } satisfies DmLocationState });
+      return;
+    }
+    navigate(from, { replace: true });
+  }, [navigate, from, listFrom]);
   const { userId, setSessionUserId, nickname: myNickname, isLoggedIn } = useAuthStore();
   /** JWT sub + /auth/me 로 확정한 본인 id — 스토어 userId 오염·me 지연 시에도 말풍선·typing 이 맞게 */
   const [selfIdFromJwt, setSelfIdFromJwt] = useState<number | null>(() => readJwtSubAsUserId());
