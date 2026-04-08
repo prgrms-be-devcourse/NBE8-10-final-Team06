@@ -1,0 +1,85 @@
+# 수동 실행: Actions 탭 → "Start EC2 (manual)" → Run workflow
+# 시크릿: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY 필수
+# 리전: workflow region 기본값 ap-northeast-2(서울), 또는 AWS_REGION 시크릿
+# 인스턴스: instance_id 입력 / EC2_INSTANCE_ID / EC2_HOST(퍼블릭 IP·도메인, 해당 리전에서 조회)
+# ※ IAM에 ec2:StartInstances, ec2:DescribeInstances 필요 (S3 전용 키면 실패)
+name: Start EC2 (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_id:
+        description: 인스턴스 ID (비우면 EC2_INSTANCE_ID → EC2_HOST로 조회)
+        required: false
+        type: string
+      region:
+        description: AWS 리전 (서울=ap-northeast-2, 도쿄=ap-northeast-1)
+        required: false
+        default: ap-northeast-2
+        type: string
+
+jobs:
+  start-ec2:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region || secrets.AWS_REGION || 'ap-northeast-2' }}
+
+      - name: Resolve instance ID
+        id: resolve
+        env:
+          INPUT_INSTANCE_ID: ${{ inputs.instance_id }}
+          SECRET_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          set -euo pipefail
+          IID="${INPUT_INSTANCE_ID:-}"
+          if [ -z "$IID" ]; then
+            IID="${SECRET_INSTANCE_ID:-}"
+          fi
+          if [ -z "$IID" ] && [ -n "${EC2_HOST:-}" ]; then
+            HOST_TRIMMED="$(echo -n "$EC2_HOST" | tr -d '[:space:]')"
+            if [[ "$HOST_TRIMMED" =~ ^i-[0-9a-f]{8,17}$ ]]; then
+              IID="$HOST_TRIMMED"
+            else
+              IP="$HOST_TRIMMED"
+              if ! [[ "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                IP="$(dig +short "$HOST_TRIMMED" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)"
+              fi
+              if [ -n "$IP" ]; then
+                IID="$(aws ec2 describe-instances \
+                  --filters "Name=ip-address,Values=$IP" \
+                  --query 'Reservations[0].Instances[0].InstanceId' \
+                  --output text 2>/dev/null || true)"
+                if [ "$IID" = "None" ] || [ -z "$IID" ]; then
+                  IID=""
+                fi
+              fi
+            fi
+          fi
+          if [ -z "$IID" ]; then
+            echo "::error::instance_id 입력, 또는 시크릿 EC2_INSTANCE_ID, 또는 EC2_HOST(퍼블릭 IP/퍼블릭 DNS) 중 하나가 필요합니다."
+            exit 1
+          fi
+          echo "instance_id=$IID" >> "$GITHUB_OUTPUT"
+
+      - name: Start EC2 instance
+        env:
+          INSTANCE_ID: ${{ steps.resolve.outputs.instance_id }}
+        run: |
+          aws ec2 start-instances --instance-ids "$INSTANCE_ID"
+          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+
+      - name: Describe instance
+        env:
+          INSTANCE_ID: ${{ steps.resolve.outputs.instance_id }}
+        run: |
+          aws ec2 describe-instances --instance-ids "$INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].[InstanceId,State.Name,PublicIpAddress,PrivateIpAddress]' \
+            --output table
