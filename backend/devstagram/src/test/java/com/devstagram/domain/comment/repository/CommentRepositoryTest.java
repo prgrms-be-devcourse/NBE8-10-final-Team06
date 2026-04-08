@@ -64,8 +64,7 @@ class CommentRepositoryTest {
         em.flush();
         em.clear();
 
-        Slice<Comment> result =
-                commentRepository.findCommentsWithUserAndImageByPostId(post.getId(), PageRequest.of(0, 10));
+        Slice<Comment> result = commentRepository.findCommentsWithUserByPostId(post.getId(), PageRequest.of(0, 10));
 
         // then (createdAt이 동일 시각이면 desc 정렬 순서가 비결정적일 수 있음)
         assertThat(result.getContent()).hasSize(2);

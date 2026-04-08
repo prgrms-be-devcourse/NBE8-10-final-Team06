@@ -264,7 +264,7 @@ class PostServiceTest {
         Slice<Comment> commentEntitySlice = new SliceImpl<>(List.of(realComment), PageRequest.of(pageNumber, 10), true);
 
         given(postRepository.findPost(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class)))
+        given(commentRepository.findCommentsWithUserByPostId(eq(postId), any(Pageable.class)))
                 .willReturn(commentEntitySlice);
 
         // 2. When
@@ -278,7 +278,7 @@ class PostServiceTest {
 
         // 4. Verify
         verify(postRepository).findPost(postId); // findById -> findPostWithDetails
-        verify(commentRepository).findCommentsWithUserAndImageByPostId(eq(postId), any(Pageable.class));
+        verify(commentRepository).findCommentsWithUserByPostId(eq(postId), any(Pageable.class));
     }
 
     @Test

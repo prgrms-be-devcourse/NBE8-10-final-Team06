@@ -147,7 +147,7 @@ public class PostService {
                 CommentConstants.COMMENT_PAGE_SIZE,
                 Sort.by(Sort.Direction.DESC, CommentConstants.DEFAULT_SORT_FIELD));
 
-        Slice<Comment> comments = commentRepository.findCommentsWithUserAndImageByPostId(postId, pageable);
+        Slice<Comment> comments = commentRepository.findCommentsWithUserByPostId(postId, pageable);
 
         Set<Long> likedCommentIds = getLikedCommentIds(memberId, comments.getContent());
 
