@@ -30,8 +30,8 @@ class CommentLikeRepositoryTest {
     private TestEntityManager em;
 
     @Test
-    @DisplayName("[댓글 좋아요]")
-    void existsByCommentIdAndUserId_Success() {
+    @DisplayName("[댓글 좋아요 조회]")
+    void findByCommentIdAndUserId_Success() {
         // 1. given
         User user = User.builder()
                 .nickname("testUser")
@@ -56,7 +56,9 @@ class CommentLikeRepositoryTest {
         em.clear();
 
         // 2. when
-        boolean exists = commentLikeRepository.existsByCommentIdAndUserId(comment.getId(), user.getId());
+        boolean exists = commentLikeRepository
+                .findByCommentIdAndUserId(comment.getId(), user.getId())
+                .isPresent();
 
         // 3. then
         assertThat(exists).isTrue();

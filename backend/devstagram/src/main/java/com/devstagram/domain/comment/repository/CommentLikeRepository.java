@@ -14,8 +14,6 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> 
 
     Optional<CommentLike> findByCommentIdAndUserId(Long commentId, Long userId);
 
-    boolean existsByCommentIdAndUserId(Long commentId, Long userId);
-
     // 현재 사용자가 특정 댓글들에 좋아요를 눌렀는지 일괄 조회 (N+1 방지용)
     @Query("SELECT cl.comment.id FROM CommentLike cl " + "WHERE cl.user.id = :userId AND cl.comment.id IN :commentIds")
     Set<Long> findAllCommentIdsByUserIdAndCommentIds(
