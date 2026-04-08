@@ -17,8 +17,10 @@ import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUser;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
+@Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/api/follows")
 public class FollowController {
@@ -28,7 +30,17 @@ public class FollowController {
     // 팔로우 실행
     @PostMapping("/{toUserId}")
     public RsData<FollowResponse> follow(@PathVariable Long toUserId, @AuthenticationPrincipal SecurityUser loginUser) {
+        log.info(
+                "[FOLLOW API] POST /api/follows/{} by userId={}",
+                toUserId,
+                loginUser != null ? loginUser.getId() : null);
         FollowResponse response = followService.follow(loginUser.getId(), toUserId);
+        log.info(
+                "[FOLLOW API] follow done: toUserId={}, isFollowing={}, followerCount={}, followingCount={}",
+                response.toUserId(),
+                response.isFollowing(),
+                response.followerCount(),
+                response.followingCount());
         return RsData.success("팔로우가 완료되었습니다.", response);
     }
 
@@ -36,7 +48,17 @@ public class FollowController {
     @DeleteMapping("/{toUserId}")
     public RsData<FollowResponse> unfollow(
             @PathVariable Long toUserId, @AuthenticationPrincipal SecurityUser loginUser) {
+        log.info(
+                "[FOLLOW API] DELETE /api/follows/{} by userId={}",
+                toUserId,
+                loginUser != null ? loginUser.getId() : null);
         FollowResponse response = followService.unfollow(loginUser.getId(), toUserId);
+        log.info(
+                "[FOLLOW API] unfollow done: toUserId={}, isFollowing={}, followerCount={}, followingCount={}",
+                response.toUserId(),
+                response.isFollowing(),
+                response.followerCount(),
+                response.followingCount());
         return RsData.success("언팔로우가 완료되었습니다.", response);
     }
 

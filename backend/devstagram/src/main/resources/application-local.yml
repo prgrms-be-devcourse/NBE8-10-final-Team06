@@ -27,8 +27,17 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-    show-sql: true
+        format_sql: false
+    show-sql: false
+
+logging:
+  level:
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
+    org.springframework.orm.jpa: INFO
+    com.devstagram.domain.user.controller.FollowController: INFO
+    com.devstagram.domain.user.service.FollowService: INFO
 
 storage:
   location: ./uploads
