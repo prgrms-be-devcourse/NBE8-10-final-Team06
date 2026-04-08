@@ -19,7 +19,10 @@ import jakarta.persistence.LockModeType;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    // 전체 피드 조회: 삭제되지 않은 게시글만 최신순으로
+    // 전체 피드 조회: 삭제되지 않은 게시글 + 탈퇴하지 않은 유저의 게시글만 최신순으로
+    @Query("select p from Post p join p.user u "
+            + "where p.isDeleted = false and u.isDeleted = false "
+            + "order by p.createdAt desc")
     Slice<Post> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
 
     // 비관적 잠금: 단건 조회 시 사용
@@ -36,17 +39,21 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :postId")
     void decrementLikeCount(@Param("postId") Long postId);
 
-    // 상세조회
-    @Query("select p from Post p " + "join fetch p.user " + "where p.id = :id and p.isDeleted = false")
-    Optional<Post> findPost(@Param("id") Long id);
-
-    // 특정 ID 리스트 조회: 삭제되지 않은 것만 (N+1 방지용 fetch join)
-    @Query("select distinct p from Post p "
-            + "join fetch p.user "
+    // 상세 조회: 페치 조인
+    @Query("select distinct p from Post p " + "join fetch p.user u "
             + "left join fetch p.mediaList "
             + "left join fetch p.techTags pt "
             + "left join fetch pt.technology "
-            + "where p.id in :ids and p.isDeleted = false")
+            + "where p.id = :id and p.isDeleted = false and u.isDeleted = false")
+    Optional<Post> findPostWithDetails(@Param("id") Long id);
+
+    // 특정 ID 리스트 조회: 삭제되지 않은 것만 + 탈퇴하지 않은 유저 (N+1 방지용 fetch join)
+    @Query("select distinct p from Post p "
+            + "join fetch p.user u "
+            + "left join fetch p.mediaList "
+            + "left join fetch p.techTags pt "
+            + "left join fetch pt.technology "
+            + "where p.id in :ids and p.isDeleted = false and u.isDeleted = false")
     List<Post> findAllByIdInAndIsDeletedFalse(@Param("ids") List<Long> ids);
 
     // 특정 유저의 게시글(프로필 그리드): 삭제되지 않은 것만
