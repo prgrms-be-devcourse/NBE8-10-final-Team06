@@ -870,7 +870,7 @@ const DmChatPage: React.FC = () => {
                 key={msg.id < 0 ? `tmp-${msg.id}-${idx}` : msg.id}
                 msg={msg}
                 isMe={isMe}
-                isReadByPeer={msg.id > 0 && msg.id <= lastReadIdByOpponent}
+                showReadStatus={msg.id > 0 && msg.id <= lastReadIdByOpponent}
                 senderLabel={peerSenderLabel}
                 peerProfile={
                   peer
@@ -943,6 +943,7 @@ const DmChatPage: React.FC = () => {
 
       <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
+          <ImageIcon size={24} color="#262626" style={{ cursor: 'pointer' }} />
           <input
             type="text"
             value={inputValue}
@@ -953,6 +954,31 @@ const DmChatPage: React.FC = () => {
           />
           <button type="submit" disabled={!inputValue.trim()} style={{ background: 'none', border: 'none', color: inputValue.trim() ? '#0095f6' : '#b2dffc', fontWeight: 'bold', fontSize: '1rem' }}>보내기</button>
         </form>
+        <div
+          style={{
+            marginTop: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '0.72rem',
+            color: '#8e8e8e',
+            paddingLeft: '4px',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            aria-hidden
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              flexShrink: 0,
+              backgroundColor: isConnected ? '#22c55e' : '#f59e0b',
+            }}
+          />
+          <span>{isConnected ? '실시간 연결됨 (SockJS + STOMP)' : '실시간 재연결 중…'}</span>
+        </div>
       </footer>
 
       <DmRoomInfoModal open={showRoomInfo} onClose={() => setShowRoomInfo(false)} room={currentRoom ?? null} />

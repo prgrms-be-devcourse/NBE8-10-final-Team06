@@ -1,8 +1,6 @@
 package com.devstagram.global.initData;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -540,50 +538,20 @@ public class BaseInitData implements ApplicationRunner {
         Post samplePost = posts.getFirst();
         Story sampleStory = resolveSampleStoryForDmLink(admin);
 
-        DmRoom adminUser1Room = seedDmRoomAdminUser1(admin, user1, samplePost, sampleStory);
-        Story expiringForDmDemo = seedAdminStoryExpiringInOneMinute(admin);
-        long vSec =
-                expiringForDmDemo.getCreatedAt().atZone(ZoneId.systemDefault()).toEpochSecond();
-        dmRepository.save(Dm.create(
-                adminUser1Room,
-                admin,
-                MessageType.STORY,
-                "devstagram://story?id=" + expiringForDmDemo.getId() + "&v=" + vSec + "&u=" + admin.getId(),
-                expiringForDmDemo.getThumbnailUrl(),
-                true));
+        seedDmRoomAdminUser1(admin, user1, samplePost, sampleStory);
         seedDmGroupDemoRoom(admin, user1, user2);
     }
 
-    /**
-     * admin 소유·만료 약 1분 후 — user1과의 DM에 공유 링크를 심어 스토리/DM 만료 UX를 확인하기 위한 시드.
-     */
-    private Story seedAdminStoryExpiringInOneMinute(User admin) {
-        String url = "https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400";
-        StoryMedia media =
-                StoryMedia.builder().mediaType(MediaType.jpg).sourceUrl(url).build();
-        Story story = Story.builder()
-                .user(admin)
-                .content("DM 데모 — 만료 약 1분 남음 (admin→user1 공유)")
-                .thumbnailUrl(url)
-                .storyMedia(media)
-                .expiredAt(LocalDateTime.now().plusMinutes(1))
-                .build();
-        return storyRepository.save(story);
-    }
-
     private Story resolveSampleStoryForDmLink(User admin) {
-        LocalDateTime now = LocalDateTime.now();
-        return storyRepository.findActiveNonExpiredByUserIdOrderByCreatedAtAsc(admin.getId(), now).stream()
+        return storyRepository.findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(admin.getId()).stream()
                 .findFirst()
                 .orElseGet(() -> storyRepository.findAll().stream()
                         .filter(s -> !s.isDeleted())
-                        .filter(s ->
-                                s.getExpiredAt() != null && s.getExpiredAt().isAfter(now))
                         .findFirst()
                         .orElseThrow());
     }
 
-    private DmRoom seedDmRoomAdminUser1(User admin, User user1, Post samplePost, Story sampleStory) {
+    private void seedDmRoomAdminUser1(User admin, User user1, Post samplePost, Story sampleStory) {
         DmRoom room1v1 = DmRoom.create1v1Room(user1.getNickname());
         dmRoomRepository.save(room1v1);
         dmRoomUserRepository.save(DmRoomUser.create(room1v1, admin, new Date()));
@@ -602,15 +570,16 @@ public class BaseInitData implements ApplicationRunner {
                 room1v1,
                 user1,
                 MessageType.STORY,
-                "devstagram://story?id="
-                        + sampleStory.getId()
-                        + "&v="
-                        + System.currentTimeMillis()
-                        + "&u="
-                        + admin.getId(),
+                "devstagram://story?id=" + sampleStory.getId() + "&v=" + System.currentTimeMillis(),
                 "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200",
                 true));
-        return room1v1;
+        dmRepository.save(Dm.create(
+                room1v1,
+                admin,
+                MessageType.IMAGE,
+                "https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400",
+                null,
+                true));
     }
 
     private void seedDmGroupDemoRoom(User admin, User user1, User user2) {

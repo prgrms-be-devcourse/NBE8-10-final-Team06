@@ -47,6 +47,12 @@ function flushRefreshQueue(err: unknown) {
 
 async function runRefreshOnce(): Promise<void> {
   await refreshClient.post('/auth/refresh');
+  // 새 accessToken 쿠키를 localStorage 에 즉시 반영 (만료 토큰이 남아 STOMP 인증 실패하는 것 방지)
+  // syncAuthTokensFromCookies 는 쿠키→localStorage 를 항상 덮어쓰도록 수정됨
+  const { syncAuthTokensFromCookies } = await import('../util/authStorageSync');
+  syncAuthTokensFromCookies();
+  // STOMP 재연결 트리거 — DmChatPage 등이 구독해 stompAuthRevision 을 올림
+  window.dispatchEvent(new CustomEvent('auth:token-refreshed'));
 }
 
 // 요청 인터셉터 — 쿠키만 사용(브라우저 전송). Bearer / X-API-KEY / localStorage 동기화 없음.

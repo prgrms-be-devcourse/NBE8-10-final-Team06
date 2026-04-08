@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.zset.Aggregate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -57,7 +58,7 @@ class FeedServiceTest {
         Post post = Post.builder().title("테스트 제목").content("테스트 내용").build();
         ReflectionTestUtils.setField(post, "id", 100L);
         double expectedScore = 1500.0;
-        when(scoringStrategy.calculateScore(any(), anyBoolean(), anyBoolean())).thenReturn(expectedScore);
+        when(scoringStrategy.calculateGlobalScore(any())).thenReturn(expectedScore);
 
         // when
         feedService.registerPostToGlobalFeed(post);
@@ -74,24 +75,24 @@ class FeedServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         String userFeedKey = "feed:user:1";
         String globalFeedKey = "posts:global:scores";
-        String tempKey = "temp:feed:1";
 
         Set<ZSetOperations.TypedTuple<String>> mockResults = new LinkedHashSet<>();
         mockResults.add(ZSetOperations.TypedTuple.of("102", 2000.0));
         mockResults.add(ZSetOperations.TypedTuple.of("101", 1800.0));
 
-        when(zSetOperations.reverseRangeWithScores(eq(tempKey), anyLong(), anyLong()))
+        when(zSetOperations.reverseRangeWithScores(anyString(), anyLong(), anyLong()))
                 .thenReturn(mockResults);
 
         // when
         Map<Long, Double> result = feedService.getHybridFeedWithScores(memberId, pageable);
 
         // then
-        verify(zSetOperations).unionAndStore(userFeedKey, globalFeedKey, tempKey);
-        verify(redisTemplate).expire(eq(tempKey), any(Duration.class));
+        verify(zSetOperations)
+                .unionAndStore(eq(userFeedKey), eq(List.of(globalFeedKey)), anyString(), eq(Aggregate.SUM), any());
+        verify(redisTemplate, times(2)).expire(anyString(), any(Duration.class));
         assertThat(result).hasSize(2);
         assertThat(result.get(102L)).isEqualTo(2000.0);
-        verify(redisTemplate).delete(tempKey);
+        verify(redisTemplate).delete(anyString());
     }
 
     @Test
@@ -104,7 +105,7 @@ class FeedServiceTest {
         ReflectionTestUtils.setField(post, "id", testId);
 
         double likeWeight = 10.0;
-        when(scoringStrategy.getLikeDelta(true)).thenReturn(likeWeight);
+        when(scoringStrategy.getLikeDelta(any(Post.class), eq(true))).thenReturn(likeWeight);
 
         // when
         feedService.updatePostScoreInGlobalFeed(post, true);

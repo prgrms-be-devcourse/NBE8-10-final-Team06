@@ -28,6 +28,7 @@ import com.devstagram.global.security.CustomAuthenticationFilter;
 import com.devstagram.global.security.JwtProvider;
 import com.devstagram.global.security.SecurityUser;
 import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.storage.StorageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jsonwebtoken.Claims;
@@ -82,7 +83,8 @@ class DmControllerAuthHeaderTest {
     void dmController_usesSecurityContextUserId() {
         DmService dmService = mock(DmService.class);
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        DmController dmController = new DmController(dmService, messagingTemplate);
+        StorageService storageService = mock(StorageService.class);
+        DmController dmController = new DmController(dmService, messagingTemplate, storageService);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -101,7 +103,8 @@ class DmControllerAuthHeaderTest {
     void dmController_getRooms_returnsRsDataSuccess() {
         DmService dmService = mock(DmService.class);
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        DmController dmController = new DmController(dmService, messagingTemplate);
+        StorageService storageService = mock(StorageService.class);
+        DmController dmController = new DmController(dmService, messagingTemplate, storageService);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -122,7 +125,8 @@ class DmControllerAuthHeaderTest {
     void leave1v1Room_success() {
         DmService dmService = mock(DmService.class);
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        DmController dmController = new DmController(dmService, messagingTemplate);
+        StorageService storageService = mock(StorageService.class);
+        DmController dmController = new DmController(dmService, messagingTemplate, storageService);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -142,7 +146,8 @@ class DmControllerAuthHeaderTest {
     void leaveGroupRoom_success() {
         DmService dmService = mock(DmService.class);
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-        DmController dmController = new DmController(dmService, messagingTemplate);
+        StorageService storageService = mock(StorageService.class);
+        DmController dmController = new DmController(dmService, messagingTemplate, storageService);
 
         SecurityUser securityUser = new SecurityUser(
                 1L, "a@a.com", "nick", "apiKey", "pw", List.of(new SimpleGrantedAuthority("ROLE_USER")));

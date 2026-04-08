@@ -4,11 +4,14 @@ import java.util.List;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.dm.dto.*;
+import com.devstagram.domain.dm.entity.MessageType;
 import com.devstagram.domain.dm.service.DmService;
 import com.devstagram.global.rsdata.RsData;
 import com.devstagram.global.security.SecurityUtil;
+import com.devstagram.global.storage.StorageService;
 
 @RestController
 @RequestMapping("/api/dm")
@@ -16,10 +19,12 @@ public class DmController {
 
     private final DmService dmService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final StorageService storageService;
 
-    public DmController(DmService dmService, SimpMessagingTemplate messagingTemplate) {
+    public DmController(DmService dmService, SimpMessagingTemplate messagingTemplate, StorageService storageService) {
         this.dmService = dmService;
         this.messagingTemplate = messagingTemplate;
+        this.storageService = storageService;
     }
 
     /**
@@ -81,6 +86,26 @@ public class DmController {
         dmService.leave1v1Room(currentUserId, roomId);
 
         return RsData.success("1:1 채팅방을 나갔습니다.");
+    }
+
+    /**
+     * DM 이미지 전송
+     * - 이미지 파일을 업로드하고 IMAGE 타입 메시지로 저장·브로드캐스트한다.
+     */
+    @PostMapping("/rooms/{roomId}/images")
+    public RsData<DmMessageResponse> sendImage(
+            @PathVariable("roomId") Long roomId, @RequestParam("file") MultipartFile file) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        String imageUrl = storageService.store(file);
+
+        DmSendMessageRequest request = new DmSendMessageRequest(MessageType.IMAGE, imageUrl, null);
+        DmMessageResponse saved = dmService.sendMessage(currentUserId, roomId, request);
+
+        WebSocketEventPayload<DmMessageResponse> payload = new WebSocketEventPayload<>("message", saved);
+        messagingTemplate.convertAndSend("/topic/dm." + roomId, payload);
+
+        return RsData.success(saved);
     }
 
     // 그룹 채팅방 나가기 (나만 퇴장 + 퇴장 메시지 발송)
