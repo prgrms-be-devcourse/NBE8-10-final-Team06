@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Camera, ChevronLeft, X } from 'lucide-react';
 import { postApi } from '../../api/post';
@@ -10,6 +10,7 @@ import { resolveAssetUrl } from '../../util/assetUrl';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
 import MarkdownContent from '../../components/common/MarkdownContent';
+import PostMarkdownFormatToolbar from '../../components/post/PostMarkdownFormatToolbar';
 
 type ExistingMediaItem = {
   sourceUrl: string;
@@ -88,6 +89,7 @@ const PostEditPage: React.FC = () => {
   const [activeContentTab, setActiveContentTab] = useState<'write' | 'preview'>('write');
   const [showCodeLangModal, setShowCodeLangModal] = useState(false);
   const [codeLangQuery, setCodeLangQuery] = useState('');
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
   /** 게시글에 붙어 있던 태그 메타(마스터 목록에 없을 때 이름 표시용) */
   const [postTechStacks, setPostTechStacks] = useState<TechTagRes[]>([]);
 
@@ -300,8 +302,30 @@ const PostEditPage: React.FC = () => {
         <h2 style={{ flex: 1, textAlign: 'center', fontSize: '1rem', fontWeight: 'bold', marginRight: '28px' }}>정보 수정</h2>
       </header>
 
-      <main style={{ maxWidth: '600px', margin: '20px auto', padding: '0 15px' }}>
-        <form onSubmit={handleSubmit} style={{ backgroundColor: '#fff', border: '1px solid #dbdbdb', borderRadius: '8px', padding: '20px' }}>
+      <main style={{ maxWidth: '920px', margin: '20px auto', padding: '0 15px' }}>
+        <div className="post-editor-main-row">
+          {activeContentTab === 'write' && (
+            <aside className="post-markdown-remote-shell" aria-label="본문 마크다운 서식">
+              <PostMarkdownFormatToolbar
+                textareaRef={contentTextareaRef}
+                value={content}
+                setValue={setContent}
+                onRequestWriteMode={() => setActiveContentTab('write')}
+              />
+            </aside>
+          )}
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              backgroundColor: '#fff',
+              border: '1px solid #dbdbdb',
+              borderRadius: '8px',
+              padding: '20px',
+              flex: '0 1 600px',
+              width: 'min(100%, 600px)',
+              minWidth: 0,
+            }}
+          >
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600' }}>사진</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
@@ -375,6 +399,7 @@ const PostEditPage: React.FC = () => {
             </div>
             {activeContentTab === 'write' ? (
               <textarea
+                ref={contentTextareaRef}
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 rows={18}
@@ -472,6 +497,7 @@ const PostEditPage: React.FC = () => {
             {submitting ? '수정 중...' : '수정 완료'}
           </button>
         </form>
+        </div>
         {showCodeLangModal && (
           <div
             role="dialog"

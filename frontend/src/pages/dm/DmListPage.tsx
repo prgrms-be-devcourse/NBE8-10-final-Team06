@@ -10,12 +10,16 @@ import { UserSearchResponse } from '../../types/user';
 import type { DmRoomSummaryResponse } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
+import { isDmSharedStoryContentExpired } from '../../util/dmStoryShareExpiry';
 
 function dmMessagePreview(room: DmRoomSummaryResponse): string {
   const msg = room.lastMessage;
   if (!msg) return '대화 내용이 없습니다.';
   if (msg.type === 'POST') return '게시글을 공유했습니다.';
-  if (msg.type === 'STORY') return '스토리를 공유했습니다.';
+  if (msg.type === 'STORY') {
+    if (!msg.valid || isDmSharedStoryContentExpired(msg.content)) return '만료된 스토리입니다.';
+    return '스토리를 공유했습니다.';
+  }
   if (msg.type === 'IMAGE') return '사진을 공유했습니다.';
   return msg.content;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { technologyApi } from '../../api/technology';
@@ -9,6 +9,7 @@ import BottomNav from '../../components/layout/BottomNav';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
 import { isTechAdminSession } from '../../util/techAdmin';
+import { resolveAssetUrl } from '../../util/assetUrl';
 
 const TechManagePage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,8 +23,9 @@ const TechManagePage: React.FC = () => {
 
   const [createName, setCreateName] = useState('');
   const [createColor, setCreateColor] = useState('');
-  const [createIconUrl, setCreateIconUrl] = useState('');
+  const [createIconFile, setCreateIconFile] = useState<File | null>(null);
   const [createCategoryId, setCreateCategoryId] = useState<number | null>(null);
+  const createIconInputRef = useRef<HTMLInputElement>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
@@ -98,19 +100,21 @@ const TechManagePage: React.FC = () => {
       categoryId: createCategoryId,
       name: createName.trim(),
       color: createColor.trim(),
-      iconUrl: createIconUrl.trim(),
     };
-    if (!req.name || !req.color || !req.iconUrl) {
-      alert('이름/색상/iconUrl을 입력해 주세요.');
+    if (!req.name || !req.color) {
+      alert('이름/색상을 입력해 주세요.');
       return;
     }
     try {
-      const res = await technologyApi.createTech(req);
+      const res = await technologyApi.createTech(req, createIconFile);
       if (isRsDataSuccess(res)) {
         alert('기술이 생성되었습니다.');
         setCreateName('');
         setCreateColor('');
-        setCreateIconUrl('');
+        setCreateIconFile(null);
+        if (createIconInputRef.current) {
+          createIconInputRef.current.value = '';
+        }
         setEditingId(null);
         await refresh();
       } else {
@@ -125,7 +129,7 @@ const TechManagePage: React.FC = () => {
     setEditingId(tech.id);
     setEditName(tech.name);
     setEditColor(tech.color);
-    setEditIconUrl('');
+    setEditIconUrl((tech.iconUrl ?? '').trim());
     setEditCategoryId(categories[0]?.id ?? null);
   };
 
@@ -316,12 +320,13 @@ const TechManagePage: React.FC = () => {
                   </select>
                 </label>
                 <label style={{ display: 'block', fontSize: 12, color: '#8e8e8e' }}>
-                  iconUrl
+                  아이콘 이미지(선택)
                   <input
-                    value={createIconUrl}
-                    onChange={(e) => setCreateIconUrl(e.target.value)}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: 6, marginTop: 6 }}
-                    placeholder="https://.../icon.png"
+                    ref={createIconInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setCreateIconFile(e.target.files?.[0] ?? null)}
+                    style={{ width: '100%', padding: '8px 0', marginTop: 6, fontSize: 13 }}
                   />
                 </label>
               </div>
@@ -360,7 +365,17 @@ const TechManagePage: React.FC = () => {
                         {!isEditing ? (
                           <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ width: 14, height: 14, borderRadius: 4, background: tech.color, display: 'inline-block' }} />
+                              {tech.iconUrl ? (
+                                <img
+                                  src={resolveAssetUrl(tech.iconUrl)}
+                                  alt=""
+                                  width={28}
+                                  height={28}
+                                  style={{ borderRadius: 6, objectFit: 'cover', border: `1px solid ${tech.color}40` }}
+                                />
+                              ) : (
+                                <span style={{ width: 28, height: 28, borderRadius: 6, background: tech.color, display: 'inline-block' }} />
+                              )}
                               <div>
                                 <div style={{ fontWeight: 800 }}>{tech.name}</div>
                                 <div style={{ fontSize: 12, color: '#8e8e8e' }}>#{tech.id}</div>
@@ -418,12 +433,12 @@ const TechManagePage: React.FC = () => {
                               </select>
                             </label>
                             <label style={{ display: 'block', fontSize: 12, color: '#8e8e8e' }}>
-                              iconUrl(필수)
+                              iconUrl(수정 API용, 필수)
                               <input
                                 value={editIconUrl}
                                 onChange={(e) => setEditIconUrl(e.target.value)}
                                 style={{ width: '100%', padding: '10px', border: '1px solid #dbdbdb', borderRadius: 6, marginTop: 6, background: '#fff' }}
-                                placeholder="https://.../icon.png"
+                                placeholder="스토리지에 저장된 아이콘 URL"
                               />
                             </label>
 

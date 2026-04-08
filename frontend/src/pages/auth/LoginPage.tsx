@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { getApiErrorMessage } from '../../util/apiError';
 import { isRsDataSuccess } from '../../util/rsData';
 import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
+import { syncAuthTokensFromCookies } from '../../util/authStorageSync';
 
 const LoginPage: React.FC = () => {
   const [formData, setFormData] = useState<LoginRequest>({ email: '', password: '' });
@@ -36,6 +37,7 @@ const LoginPage: React.FC = () => {
         if (isRsDataSuccess(meRes) && meRes.data) {
           const { nickname, id } = meRes.data;
           setLogin(nickname, id);
+          syncAuthTokensFromCookies();
           void syncMyProfileImageFromUserApi();
           navigate('/');
         } else {

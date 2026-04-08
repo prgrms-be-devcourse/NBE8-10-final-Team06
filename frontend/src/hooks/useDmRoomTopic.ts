@@ -39,6 +39,7 @@ import {
   stompMessageBodyToString,
 } from '../util/dmWebSocketPayload';
 import { parseAllInboundDmTypingEvents } from '../util/dmTypingInbound';
+import { consumeIfDmSelfReadEcho } from '../util/dmReadEchoSuppress';
 
 export type UseDmRoomTopicParams = {
   roomId: string | undefined;
@@ -231,7 +232,7 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
       }
 
       const readId = parseBackendReadFromTopicBody(payloadBody);
-      if (readId != null) {
+      if (readId != null && !consumeIfDmSelfReadEcho(readId)) {
         setLastReadIdByOpponent((prev) => Math.max(prev, readId));
       }
     };

@@ -23,6 +23,8 @@ export interface TechTagRes {
   id: number;
   name: string;
   color: string;
+  /** 스토리지 업로드 등으로 설정된 아이콘 URL; 없으면 null/생략될 수 있음 */
+  iconUrl?: string | null;
 }
 
 /**

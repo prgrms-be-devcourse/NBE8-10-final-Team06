@@ -59,5 +59,7 @@ export interface StoryCreateRequest {
 export interface StoryCreateResponse {
   storyId: number;
   userId: number;
-  mediaUrl: string;
+  /** 백엔드 응답에 없을 수 있음 — 없으면 공유 링크용 시각은 클라이언트에서 보정 */
+  createdAt?: string;
+  mediaUrl?: string;
 }

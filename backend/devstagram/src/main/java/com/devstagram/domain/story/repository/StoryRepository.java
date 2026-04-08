@@ -12,9 +12,18 @@ import com.devstagram.domain.story.entity.Story;
 import com.devstagram.domain.user.entity.User;
 
 public interface StoryRepository extends JpaRepository<Story, Long> {
-
-    // 활성 스토리 조회
-    List<Story> findAllByUserIdAndIsDeletedFalseOrderByCreatedAtAsc(Long userId);
+    // 소프트삭제 안 됨 + 아직 만료 시각 전인 조건까지 필터링해서 스토리 조회
+    // 스케줄러 : 메분 0초에 삭제 -> 스케줄러가 삭제하기 전이면 만료 스토리가 남아있을 수 있음
+    // -> 스토리 조회 조건에서부터 만료 시간 추가
+    @Query("""
+        SELECT s FROM Story s
+        WHERE s.user.id = :userId
+        AND s.isDeleted = false
+        AND s.expiredAt > :now
+        ORDER BY s.createdAt ASC
+        """)
+    List<Story> findActiveNonExpiredByUserIdOrderByCreatedAtAsc(
+            @Param("userId") Long userId, @Param("now") LocalDateTime now);
 
     // 만료된 스토리 조회
     List<Story> findAllByUserIdAndIsDeletedTrueOrderByCreatedAtDesc(Long userId);

@@ -161,6 +161,28 @@ function mergeDmMessageNestedWithEnvelope(
   return { ...nested, ...picked };
 }
 
+function dmRowHasEffectiveThumbnail(row: Record<string, unknown>): boolean {
+  for (const k of ['thumbnail', 'thumbnailUrl', 'thumbnail_url'] as const) {
+    const v = row[k];
+    if (typeof v === 'string' && v.trim() !== '') return true;
+  }
+  return false;
+}
+
+/** 래퍼 루트에만 썸네일이 있을 때 `data` 병합 후 유실 방지 */
+function applyDmEnvelopeThumbnailFallback(
+  merged: Record<string, unknown>,
+  envelope: Record<string, unknown>
+): Record<string, unknown> {
+  if (dmRowHasEffectiveThumbnail(merged)) return merged;
+  const fb =
+    envelope.thumbnail ?? envelope.thumbnailUrl ?? envelope.thumbnail_url;
+  if (typeof fb === 'string' && fb.trim() !== '') {
+    return { ...merged, thumbnail: fb.trim() };
+  }
+  return merged;
+}
+
 /**
  * REST/STOMP 한 겹 래핑 `{ data: { id, content, ... } }` + 바깥에 senderId 만 있는 형태 평탄화.
  */
@@ -175,7 +197,7 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
     isRecord(nested) &&
     (nested.id != null || nested.messageId != null || nested.message_id != null)
   ) {
-    return mergeDmMessageNestedWithEnvelope(nested, r);
+    return applyDmEnvelopeThumbnailFallback(mergeDmMessageNestedWithEnvelope(nested, r), r);
   }
   // 일부 직렬화에서 `data` 가 객체가 아니라 JSON 문자열로 옴 → id 없는 래퍼만 남아 메시지가 통째로 드롭되던 문제
   if (!hasTopMessageId && typeof nested === 'string') {
@@ -187,7 +209,7 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
           isRecord(inner) &&
           (inner.id != null || inner.messageId != null || inner.message_id != null)
         ) {
-          return mergeDmMessageNestedWithEnvelope(inner, r);
+          return applyDmEnvelopeThumbnailFallback(mergeDmMessageNestedWithEnvelope(inner, r), r);
         }
       } catch {
         /* ignore */
@@ -207,7 +229,11 @@ function coerceDmMessageRowForNormalize(raw: unknown): Record<string, unknown> {
       isRecord(inner) &&
       (inner.id != null || inner.messageId != null || inner.message_id != null)
     ) {
-      return mergeDmMessageNestedWithEnvelope(mergeDmMessageNestedWithEnvelope(inner, r), nested);
+      const mid = mergeDmMessageNestedWithEnvelope(
+        mergeDmMessageNestedWithEnvelope(inner, r),
+        nested
+      );
+      return applyDmEnvelopeThumbnailFallback(applyDmEnvelopeThumbnailFallback(mid, nested), r);
     }
   }
   return r;
@@ -307,12 +333,27 @@ export function normalizeDmMessagesFromApi(rows: unknown[] | undefined): DmMessa
     if (rawId == null || rawId === '') continue;
     const idNum = Number(rawId);
     if (!Number.isFinite(idNum) || idNum <= 0) continue;
+    const thumbRaw =
+      r.thumbnail ??
+      r.thumbnailUrl ??
+      r.thumbnail_url ??
+      r.imageUrl ??
+      r.image_url ??
+      r.thumbUrl ??
+      r.thumb_url;
+    const thumbStr =
+      typeof thumbRaw === 'string' && thumbRaw.trim() !== '' ? thumbRaw.trim() : null;
+
+    const msgType = coerceDmMessageTypeFromApi(r.type);
+    const contentStr = String(r.content ?? '');
+    const normalizedValid = r.valid !== false;
+
     out.push({
       id: idNum,
-      type: coerceDmMessageTypeFromApi(r.type),
-      content: String(r.content ?? ''),
-      thumbnail: (r.thumbnail as string | null | undefined) ?? null,
-      valid: r.valid !== false,
+      type: msgType,
+      content: contentStr,
+      thumbnail: thumbStr,
+      valid: normalizedValid,
       createdAt: normalizeCreatedAtFromApi(r.createdAt ?? r.created_at),
       senderId: pickDmSenderIdFromRow(r),
     });

@@ -30,6 +30,7 @@ const PostDetailPage: React.FC = () => {
   const [showLikers, setShowLikers] = useState(false);
   const [showDmShare, setShowDmShare] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
   const [comments, setComments] = useState<CommentInfoResponse[]>([]);
   const [commentsLast, setCommentsLast] = useState(true);
   const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
@@ -75,18 +76,26 @@ const PostDetailPage: React.FC = () => {
   }, [currentMediaIndex, post?.id]);
 
   const handleLike = async () => {
-    if (!post) return;
+    if (!post || isLiking) return;
+    const postIdNum = post.id;
     try {
-      const res = await postApi.toggleLike(post.id);
+      setIsLiking(true);
+      const res = await postApi.toggleLike(postIdNum);
       if (res.resultCode.includes('-S-')) {
-        const isNowLiked = !post.isLiked;
-        setPost(prev => prev ? ({
-          ...prev,
-          isLiked: isNowLiked,
-          likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1)
-        }) : null);
+        setPost((prev) => {
+          if (!prev) return null;
+          const isNowLiked = !prev.isLiked;
+          return {
+            ...prev,
+            isLiked: isNowLiked,
+            likeCount: isNowLiked ? prev.likeCount + 1 : Math.max(0, prev.likeCount - 1),
+          };
+        });
       }
     } catch (err) { console.error(err); }
+    finally {
+      setIsLiking(false);
+    }
   };
 
   const handleScrap = async () => {
@@ -326,9 +335,9 @@ const PostDetailPage: React.FC = () => {
 
             <div style={{ padding: '15px', borderTop: '1px solid #efefef' }}>
               <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', alignItems: 'center' }}>
-                <Heart size={24} onClick={handleLike} style={{ cursor: 'pointer', color: post.isLiked ? 'red' : 'black' }} fill={post.isLiked ? 'red' : 'none'} />
+                <Heart size={24} onClick={handleLike} style={{ cursor: isLiking ? 'not-allowed' : 'pointer', color: post.isLiked ? 'red' : 'black', opacity: isLiking ? 0.6 : 1 }} fill={post.isLiked ? 'red' : 'none'} />
                 <MessageCircle size={24} />
-                <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
+                <button type="button" title="공유하기" aria-label="공유하기" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
                   <Forward size={24} />
                 </button>
                 <Bookmark size={24} onClick={handleScrap} style={{ cursor: 'pointer', marginLeft: 'auto', color: post.isScrapped ? '#ffd700' : 'black' }} fill={post.isScrapped ? '#ffd700' : 'none'} />
@@ -419,7 +428,7 @@ const PostDetailPage: React.FC = () => {
                 <Heart
                   size={22}
                   onClick={handleLike}
-                  style={{ cursor: 'pointer', color: post.isLiked ? '#ed4956' : '#64748b' }}
+                  style={{ cursor: isLiking ? 'not-allowed' : 'pointer', color: post.isLiked ? '#ed4956' : '#64748b', opacity: isLiking ? 0.6 : 1 }}
                   fill={post.isLiked ? '#ed4956' : 'none'}
                 />
                 <button
@@ -441,7 +450,7 @@ const PostDetailPage: React.FC = () => {
                 <MessageCircle size={22} style={{ color: '#64748b' }} />
                 댓글 {post.commentCount}
               </span>
-              <button type="button" title="DM으로 공유" aria-label="DM으로 공유" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
+              <button type="button" title="공유하기" aria-label="공유하기" onClick={() => setShowDmShare(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex' }}>
                 <Forward size={22} style={{ color: '#64748b' }} />
               </button>
               <Bookmark

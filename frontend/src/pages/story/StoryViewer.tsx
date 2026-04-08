@@ -590,7 +590,8 @@ const StoryViewer: React.FC = () => {
         )}
         <button
           type="button"
-          title="DM으로 공유"
+          title="공유하기"
+          aria-label="공유하기"
           onClick={() => setShowDmShare(true)}
           style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px' }}
         >

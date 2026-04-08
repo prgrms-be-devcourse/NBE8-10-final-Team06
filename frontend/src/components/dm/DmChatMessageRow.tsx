@@ -1,41 +1,120 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import type { DmMessageResponse } from '../../types/dm';
 import { resolveDmAttachment } from '../../util/dmAttachment';
-import { resolveAssetUrl } from '../../util/assetUrl';
+import { applyImageFallback, resolveAssetUrl } from '../../util/assetUrl';
+import { getDmPostShareTitle } from '../../util/dmPostShareTitle';
+import {
+  getDmPostShareThumbnailUrl,
+  getDmStoryShareThumbnailUrl,
+  isDmSharedStoryActiveOnServer,
+} from '../../util/dmShareThumbnails';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
 import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
-
-const checkIsExpired = (content: string, type: string) => {
-  if (type !== 'STORY') return false;
-  const match = content.match(/v=(\d+)/);
-  if (!match) return false;
-  const createdTime = parseInt(match[1]);
-  const now = Date.now();
-  const createdMillis = createdTime < 10000000000 ? createdTime * 1000 : createdTime;
-  return now - createdMillis > 24 * 60 * 60 * 1000;
-};
+import { isDmSharedStoryContentExpired } from '../../util/dmStoryShareExpiry';
 
 const AttachmentCard = ({
   type,
   isValid,
   isMe,
   onClick,
+  thumbnailSrc,
+  footerText,
 }: {
   type: 'post' | 'story';
   isValid: boolean;
   isMe: boolean;
   onClick: () => void;
+  thumbnailSrc: string;
+  footerText: string;
 }) => {
   const isExpired = !isValid;
+  const isExpiredStory = isExpired && type === 'story';
   const frameBorder = isMe ? '2px solid #0095f6' : '1px solid #d8d8d8';
   const frameBg = isExpired ? '#f0f0f0' : isMe ? '#f0f8ff' : '#fafafa';
+  const showThumb = Boolean(thumbnailSrc) && !isExpired;
+  /** 썸네일 없는 정상 게시글 — 흰 카드 + 좌하단 제목만 */
+  const postImageless = type === 'post' && !isExpired && !String(thumbnailSrc ?? '').trim();
+
+  if (postImageless) {
+    return (
+      <div
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        style={{
+          width: '240px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          border: frameBorder,
+          backgroundColor: '#ffffff',
+          marginTop: '5px',
+          position: 'relative',
+          cursor: 'pointer',
+          boxSizing: 'border-box',
+          minHeight: '108px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          padding: '12px',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            fontSize: '0.7rem',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            padding: '3px 8px',
+            borderRadius: '12px',
+            fontWeight: 'bold',
+          }}
+        >
+          게시물
+        </div>
+        <div
+          style={{
+            fontSize: '0.95rem',
+            fontWeight: 600,
+            color: '#262626',
+            textAlign: 'left',
+            lineHeight: 1.35,
+            paddingTop: '22px',
+            wordBreak: 'break-word',
+          }}
+        >
+          {footerText}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       onClick={isExpired ? undefined : onClick}
+      role={isExpired ? undefined : 'button'}
+      tabIndex={isExpired ? undefined : 0}
+      onKeyDown={
+        isExpired
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+      }
       style={{
         width: '240px',
         borderRadius: '12px',
@@ -44,22 +123,39 @@ const AttachmentCard = ({
         cursor: isExpired ? 'default' : 'pointer',
         backgroundColor: frameBg,
         marginTop: '5px',
-        opacity: isExpired ? 0.6 : 1,
+        opacity: isExpired && !isExpiredStory ? 0.6 : 1,
         position: 'relative',
       }}
     >
       <div
         style={{
-          height: '140px',
+          height: isExpiredStory ? '70px' : '140px',
           backgroundColor: '#efefef',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          filter: isExpired ? 'grayscale(1)' : 'none',
+          filter: isExpired && !isExpiredStory ? 'grayscale(1)' : 'none',
+          position: 'relative',
         }}
       >
-        {type === 'post' ? <ImageIcon size={40} color="#8e8e8e" /> : <PlayCircle size={40} color="#0095f6" />}
-        {isExpired && (
+        {showThumb ? (
+          <img
+            src={thumbnailSrc}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+            onError={(e) => applyImageFallback(e, thumbnailSrc)}
+          />
+        ) : isExpiredStory ? null : type === 'post' ? (
+          <ImageIcon size={40} color="#8e8e8e" />
+        ) : (
+          <PlayCircle size={40} color="#0095f6" />
+        )}
+        {isExpired && !isExpiredStory && (
           <div
             style={{
               position: 'absolute',
@@ -70,6 +166,8 @@ const AttachmentCard = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
+              padding: '8px',
+              textAlign: 'center',
             }}
           >
             <AlertCircle size={32} color="#ed4956" />
@@ -93,8 +191,20 @@ const AttachmentCard = ({
         </div>
       </div>
       <div style={{ padding: '12px', borderTop: '1px solid #efefef' }}>
-        <div style={{ fontSize: '0.85rem', color: isExpired ? '#8e8e8e' : '#262626', fontWeight: '600' }}>
-          {isExpired ? '볼 수 없는 콘텐츠입니다' : type === 'post' ? '게시물 보기' : '스토리 보기'}
+        <div
+          style={{
+            fontSize: isExpiredStory ? '1.05rem' : '0.85rem',
+            color: isExpired ? '#8e8e8e' : '#262626',
+            fontWeight: '600',
+            textAlign: isExpiredStory ? 'left' : undefined,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: isExpiredStory ? 'block' : '-webkit-box',
+            WebkitLineClamp: isExpiredStory ? undefined : 2,
+            WebkitBoxOrient: isExpiredStory ? undefined : 'vertical',
+          }}
+        >
+          {isExpired ? (type === 'story' ? '만료된 스토리' : '볼 수 없는 콘텐츠입니다') : footerText}
         </div>
       </div>
     </div>
@@ -130,15 +240,114 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   const location = useLocation();
   const storyNavState = { state: { [STORY_FROM_STATE_KEY]: `${location.pathname}${location.search}` } };
   const attachmentData = resolveDmAttachment(msg);
+  /** 서버 활성 목록에 없으면 false — API 실패 시 null 유지(만료로 오인 방지) */
+  const [serverStoryListed, setServerStoryListed] = useState<boolean | null>(null);
+
   const isValid =
     msg.valid &&
-    !checkIsExpired(
-      msg.content,
-      attachmentData?.type === 'story' ? 'STORY' : attachmentData?.type === 'post' ? 'POST' : ''
-    );
+    !(attachmentData?.type === 'story' && isDmSharedStoryContentExpired(msg.content)) &&
+    !(attachmentData?.type === 'story' && serverStoryListed === false);
+
+  useEffect(() => {
+    setServerStoryListed(null);
+    if (attachmentData?.type !== 'story') return;
+    const sid = Number(attachmentData.id);
+    const authorM = msg.content.match(/(?:^|[?&])u=(\d+)/);
+    const authorUserId = authorM ? Number(authorM[1]) : NaN;
+    if (!Number.isFinite(sid) || sid <= 0 || !Number.isFinite(authorUserId) || authorUserId <= 0) return;
+    let cancelled = false;
+    void isDmSharedStoryActiveOnServer(sid, authorUserId).then((active) => {
+      if (cancelled || active === null) return;
+      setServerStoryListed(active);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentData?.type, attachmentData?.id, msg.content, msg.id]);
+
+  const [postShareTitle, setPostShareTitle] = useState<string | null>(null);
+  const [fetchedShareThumb, setFetchedShareThumb] = useState<string | null>(null);
+
+  const serverThumbRaw =
+    msg.thumbnail && String(msg.thumbnail).trim() !== '' ? String(msg.thumbnail).trim() : '';
+
+  useEffect(() => {
+    if (attachmentData?.type !== 'post') {
+      setPostShareTitle(null);
+      return;
+    }
+    const pid = Number(attachmentData.id);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      setPostShareTitle(null);
+      return;
+    }
+    let cancelled = false;
+    void getDmPostShareTitle(pid).then((t) => {
+      if (!cancelled) setPostShareTitle(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentData?.type, attachmentData?.id]);
+
+  useEffect(() => {
+    setFetchedShareThumb(null);
+    if (!attachmentData || !isValid) return;
+    if (serverThumbRaw !== '') return;
+
+    if (attachmentData.type === 'post') {
+      const pid = Number(attachmentData.id);
+      if (!Number.isFinite(pid) || pid <= 0) return;
+      let cancelled = false;
+      void getDmPostShareThumbnailUrl(pid).then((url) => {
+        if (!cancelled && url) setFetchedShareThumb(url);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (attachmentData.type === 'story') {
+      const sid = Number(attachmentData.id);
+      const authorM = msg.content.match(/(?:^|[?&])u=(\d+)/);
+      const authorUserId = authorM ? Number(authorM[1]) : NaN;
+      if (!Number.isFinite(sid) || sid <= 0 || !Number.isFinite(authorUserId) || authorUserId <= 0) {
+        return;
+      }
+      let cancelled = false;
+      void getDmStoryShareThumbnailUrl(sid, authorUserId).then((url) => {
+        if (!cancelled && url) setFetchedShareThumb(url);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [
+    attachmentData?.type,
+    attachmentData?.id,
+    isValid,
+    msg.content,
+    serverThumbRaw,
+  ]);
+
+  const attachmentThumbSrc =
+    serverThumbRaw !== ''
+      ? resolveAssetUrl(serverThumbRaw)
+      : fetchedShareThumb
+        ? resolveAssetUrl(fetchedShareThumb)
+        : '';
+
+  const attachmentFooterText =
+    attachmentData?.type === 'post'
+      ? postShareTitle && postShareTitle.trim() !== ''
+        ? postShareTitle.trim()
+        : '게시물 보기'
+      : '스토리 보기';
 
   const openAttachment = async () => {
     if (!attachmentData) return;
+    /** 서버 valid=false(만료·삭제) 또는 클라이언트 24h 만료 추정 시 열기 금지 */
+    if (!isValid) return;
     if (attachmentData.type === 'post') {
       navigate(`/post/${attachmentData.id}`);
       return;
@@ -169,46 +378,55 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   const trimmedLabel = senderLabel?.trim() ?? '';
   const showPeerSenderName = !isMe && trimmedLabel.length > 0;
 
-  const [imgError, setImgError] = useState(false);
+  const imageSrc = msg.type === 'IMAGE' ? resolveAssetUrl((msg.content ?? '').trim()) : '';
 
-  const bubbleBlock = msg.type === 'IMAGE' ? (
-    <div style={{ marginTop: '4px', borderRadius: '12px', overflow: 'hidden', maxWidth: '240px' }}>
-      {imgError ? (
-        <div style={{ width: '240px', height: '160px', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px' }}>
-          <ImageIcon size={32} color="#8e8e8e" />
-        </div>
-      ) : (
-        <img
-          src={resolveAssetUrl(msg.content)}
-          alt="공유 이미지"
-          onError={() => setImgError(true)}
-          style={{ display: 'block', maxWidth: '240px', maxHeight: '320px', width: '100%', objectFit: 'cover', borderRadius: '12px', cursor: 'pointer' }}
-          onClick={() => window.open(resolveAssetUrl(msg.content), '_blank')}
-        />
-      )}
-    </div>
-  ) : !attachmentData ? (
-    <div
-      style={{
-        padding: '12px 16px',
-        borderRadius: '22px',
-        fontSize: '0.95rem',
-        wordBreak: 'break-word',
-        ...bubble,
-      }}
-    >
-      {msg.content}
-    </div>
-  ) : (
-    <AttachmentCard
-      type={attachmentData.type as 'post' | 'story'}
-      isValid={isValid}
-      isMe={isMe}
-      onClick={() => {
-        void openAttachment();
-      }}
-    />
-  );
+  const bubbleBlock =
+    msg.type === 'IMAGE' ? (
+      <div
+        style={{
+          maxWidth: '260px',
+          borderRadius: '18px',
+          overflow: 'hidden',
+          border: isMe ? '2px solid #0095f6' : '1px solid #d8d8d8',
+          backgroundColor: '#efefef',
+          boxShadow: isMe ? '0 1px 3px rgba(0, 149, 246, 0.35)' : '0 1px 2px rgba(0,0,0,0.05)',
+        }}
+      >
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt="전송한 이미지"
+            style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '320px', objectFit: 'cover' }}
+            onError={(e) => applyImageFallback(e, msg.content)}
+          />
+        ) : (
+          <div style={{ padding: '16px', fontSize: '0.85rem', color: '#8e8e8e' }}>이미지를 불러올 수 없습니다.</div>
+        )}
+      </div>
+    ) : !attachmentData ? (
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '22px',
+          fontSize: '0.95rem',
+          wordBreak: 'break-word',
+          ...bubble,
+        }}
+      >
+        {msg.content}
+      </div>
+    ) : (
+      <AttachmentCard
+        type={attachmentData.type as 'post' | 'story'}
+        isValid={isValid}
+        isMe={isMe}
+        thumbnailSrc={attachmentThumbSrc}
+        footerText={attachmentFooterText}
+        onClick={() => {
+          void openAttachment();
+        }}
+      />
+    );
 
   return (
     <div
@@ -285,7 +503,8 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
               <span
                 style={{
                   fontSize: '0.7rem',
-                  color: showReadStatus ? 'transparent' : 'rgba(255,255,255,0.9)',
+                  /* 말풍선 왼쪽(흰 배경)에 붙으므로 흰 글자는 대비가 없음 → 미읽음만 진한 색 */
+                  color: showReadStatus ? 'transparent' : '#0095f6',
                   fontWeight: 'bold',
                   minWidth: '0.6rem',
                 }}
