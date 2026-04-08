@@ -48,6 +48,27 @@ public interface DmRoomUserRepository extends JpaRepository<DmRoomUser, Long> {
             """)
     Optional<Long> find1v1RoomId(@Param("userA") Long userA, @Param("userB") Long userB);
 
+    /**
+     * currentUser 가 이미 나간 상태에서 otherUser 가 혼자 남아있는 1:1 방 ID 조회.
+     * - room.isGroup = false
+     * - otherUser 는 현재 참여자
+     * - currentUser 는 현재 참여자가 아님 (나간 상태)
+     */
+    @Query("""
+            select r.id
+            from DmRoom r
+            join DmRoomUser ru on ru.dmRoom.id = r.id
+            where r.isGroup = false
+              and ru.user.id = :otherUserId
+              and not exists (
+                select ru2 from DmRoomUser ru2
+                where ru2.dmRoom.id = r.id
+                  and ru2.user.id = :currentUserId
+              )
+            """)
+    Optional<Long> find1v1RoomWhereUserLeft(
+            @Param("currentUserId") Long currentUserId, @Param("otherUserId") Long otherUserId);
+
     // 특정 채팅방의 모든 참여자 정보 일괄 삭제
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM DmRoomUser dru WHERE dru.dmRoom.id = :roomId")

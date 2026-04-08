@@ -71,16 +71,6 @@ const extractCodeBlockLangs = (raw: string): string[] => {
   return Array.from(langs);
 };
 
-type ExistingMediaItem = {
-  sourceUrl: string;
-  previewUrl: string;
-};
-
-type NewFileItem = {
-  file: File;
-  previewUrl: string;
-};
-
 const PostEditPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();

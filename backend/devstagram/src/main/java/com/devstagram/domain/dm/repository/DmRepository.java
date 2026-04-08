@@ -51,6 +51,22 @@ public interface DmRepository extends JpaRepository<Dm, Long> {
 
     long countByDmRoom_IdAndIdGreaterThan(Long roomId, Long lastReadId);
 
+    /**
+     * 이 채팅방에서 메시지를 보낸 적 있지만 현재 DmRoomUser 에 없는(나간) 사용자 ID 목록.
+     * 1:1 방에서 상대방이 메시지를 보낼 때 나간 유저를 자동 재참여시키기 위해 사용한다.
+     */
+    @Query("""
+            SELECT DISTINCT d.sender.id
+            FROM Dm d
+            WHERE d.dmRoom.id = :roomId
+              AND NOT EXISTS (
+                SELECT ru FROM DmRoomUser ru
+                WHERE ru.dmRoom.id = :roomId
+                  AND ru.user.id = d.sender.id
+              )
+            """)
+    List<Long> findSenderIdsNotInRoom(@Param("roomId") Long roomId);
+
     // 채팅방 삭제 시, 해당 채팅방의 모든 메시지를 일괄 삭제
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM Dm d WHERE d.dmRoom.id = :roomId")

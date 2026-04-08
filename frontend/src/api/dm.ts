@@ -40,4 +40,15 @@ export const dmApi = {
   // 그룹 채팅방 나가기
   leaveGroupRoom: (roomId: number) =>
     client.delete<RsData<string>>(`/dm/rooms/group/${roomId}`).then(res => res.data),
+
+  // DM 이미지 전송 (multipart upload → IMAGE 타입 메시지 저장 + WS 브로드캐스트)
+  sendImage: (roomId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return client
+      .post<RsData<import('../types/dm').DmMessageResponse>>(`/dm/rooms/${roomId}/images`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((res) => res.data);
+  },
 };
