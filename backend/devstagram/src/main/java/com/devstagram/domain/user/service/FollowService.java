@@ -63,8 +63,10 @@ public class FollowService {
 
         boolean hadRelation = followRepository.existsByFromUserIdAndToUserId(fromUserId, toUserId);
         if (!hadRelation) {
-            log.warn("[FOLLOW SERVICE] unfollow requested but relation not found: fromUserId={}, toUserId={}",
-                    fromUserId, toUserId);
+            log.warn(
+                    "[FOLLOW SERVICE] unfollow requested but relation not found: fromUserId={}, toUserId={}",
+                    fromUserId,
+                    toUserId);
         }
         int deletedRows = followRepository.deleteAllByFromUserIdAndToUserId(fromUserId, toUserId);
         if (deletedRows > 0) {
@@ -75,8 +77,11 @@ public class FollowService {
         }
 
         FollowResponse response = createFollowResponse(toUserId, fromUserId, false);
-        log.info("[FOLLOW SERVICE] unfollow done: relationExisted={}, deletedRows={}, response={}",
-                hadRelation, deletedRows, response);
+        log.info(
+                "[FOLLOW SERVICE] unfollow done: relationExisted={}, deletedRows={}, response={}",
+                hadRelation,
+                deletedRows,
+                response);
         return response;
     }
 

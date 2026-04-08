@@ -39,11 +39,10 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
      */
     @Modifying
     @Query("delete from Follow f where f.fromUser.id = :fromUserId and f.toUser.id = :toUserId")
-    int deleteAllByFromUserIdAndToUserId(
-            @Param("fromUserId") Long fromUserId, @Param("toUserId") Long toUserId);
+    int deleteAllByFromUserIdAndToUserId(@Param("fromUserId") Long fromUserId, @Param("toUserId") Long toUserId);
 
     // 팔로우 여부 확인용
-    @Query("select case when count(f) > 0 then true else false end from Follow f where f.fromUser.id = :fromUserId and f.toUser.id = :toUserId")
-    boolean existsByFromUserIdAndToUserId(
-            @Param("fromUserId") Long fromUserId, @Param("toUserId") Long toUserId);
+    @Query(
+            "select case when count(f) > 0 then true else false end from Follow f where f.fromUser.id = :fromUserId and f.toUser.id = :toUserId")
+    boolean existsByFromUserIdAndToUserId(@Param("fromUserId") Long fromUserId, @Param("toUserId") Long toUserId);
 }
