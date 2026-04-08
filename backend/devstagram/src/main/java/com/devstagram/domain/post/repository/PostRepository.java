@@ -45,7 +45,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             + "left join fetch p.techTags pt "
             + "left join fetch pt.technology "
             + "where p.id = :id and p.isDeleted = false and u.isDeleted = false")
-    Optional<Post> findPostWithDetails(@Param("id") Long id);
+    Optional<Post> findPost(@Param("id") Long id);
 
     // 특정 ID 리스트 조회: 삭제되지 않은 것만 + 탈퇴하지 않은 유저 (N+1 방지용 fetch join)
     @Query("select distinct p from Post p "
