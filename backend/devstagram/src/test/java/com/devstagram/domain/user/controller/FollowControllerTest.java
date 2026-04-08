@@ -141,6 +141,31 @@ class FollowControllerTest {
     }
 
     @Test
+    @DisplayName("언팔로우 멱등 — 이미 관계 없을 때도 200 및 isFollowing false")
+    void unfollowIdempotentWhenNotFollowing() throws Exception {
+        mvc.perform(delete("/api/follows/" + otherUser.getId()).cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isFollowing").value(false))
+                .andExpect(jsonPath("$.data.followerCount").value(0))
+                .andExpect(jsonPath("$.data.followingCount").value(0));
+    }
+
+    @Test
+    @DisplayName("언팔로우 후 status=false 이어야 한다")
+    void unfollowThenStatusFalse() throws Exception {
+        mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete("/api/follows/" + otherUser.getId()).cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isFollowing").value(false));
+
+        mvc.perform(get("/api/follows/" + otherUser.getId() + "/status").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
+    }
+
+    @Test
     @DisplayName("팔로워/팔로잉 수 조회 테스트")
     void countTest() throws Exception {
         mvc.perform(post("/api/follows/" + otherUser.getId()).cookie(authCookie));
