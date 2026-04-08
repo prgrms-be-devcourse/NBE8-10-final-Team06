@@ -40,8 +40,14 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("select p from Post p " + "join fetch p.user " + "where p.id = :id and p.isDeleted = false")
     Optional<Post> findPost(@Param("id") Long id);
 
-    // 특정 ID 리스트 조회: 삭제되지 않은 것만
-    List<Post> findAllByIdInAndIsDeletedFalse(List<Long> ids);
+    // 특정 ID 리스트 조회: 삭제되지 않은 것만 (N+1 방지용 fetch join)
+    @Query("select distinct p from Post p "
+            + "join fetch p.user "
+            + "left join fetch p.mediaList "
+            + "left join fetch p.techTags pt "
+            + "left join fetch pt.technology "
+            + "where p.id in :ids and p.isDeleted = false")
+    List<Post> findAllByIdInAndIsDeletedFalse(@Param("ids") List<Long> ids);
 
     // 특정 유저의 게시글(프로필 그리드): 삭제되지 않은 것만
     Slice<Post> findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(Long userId, Pageable pageable);

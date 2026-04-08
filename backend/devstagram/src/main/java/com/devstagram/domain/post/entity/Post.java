@@ -72,7 +72,6 @@ public class Post extends BaseEntity {
         newTechnologies.forEach(this::addTechTag);
     }
 
-    @Builder
     public Post(String content, String title, User user) {
         this.user = user;
         this.title = title;
