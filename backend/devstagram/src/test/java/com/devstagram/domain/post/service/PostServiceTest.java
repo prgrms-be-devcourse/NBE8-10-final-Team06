@@ -1,6 +1,7 @@
 package com.devstagram.domain.post.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.*;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,8 @@ import com.devstagram.domain.post.dto.PostDetailRes;
 import com.devstagram.domain.post.dto.PostFeedRes;
 import com.devstagram.domain.post.dto.PostUpdateReq;
 import com.devstagram.domain.post.entity.Post;
+import com.devstagram.domain.post.entity.PostLike;
+import com.devstagram.domain.post.entity.PostScrap;
 import com.devstagram.domain.post.repository.PostLikeRepository;
 import com.devstagram.domain.post.repository.PostRepository;
 import com.devstagram.domain.post.repository.PostScrapRepository;
@@ -36,6 +39,7 @@ import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.domain.technology.service.TechScoreService;
 import com.devstagram.domain.user.entity.User;
 import com.devstagram.domain.user.repository.UserRepository;
+import com.devstagram.global.exception.ServiceException;
 import com.devstagram.global.storage.StorageService;
 
 @ExtendWith(MockitoExtension.class)
@@ -311,5 +315,90 @@ class PostServiceTest {
         assertThat(result.getContent().get(0).nickname()).isEqualTo("원작자");
 
         verify(postScrapRepository).findActivePostsByUserId(userId, pageable);
+    }
+
+    @Test
+    @DisplayName("[게시글 좋아요 성공]")
+    void togglePostLike_Success() {
+        // given
+        Long postId = 1L;
+        Long memberId = 1L;
+        User user = mock(User.class);
+        Post post = Post.builder().title("제목").content("내용").user(user).build();
+        ReflectionTestUtils.setField(post, "id", postId);
+
+        given(userRepository.findById(memberId)).willReturn(Optional.of(user));
+        given(postRepository.findByIdWithLock(postId)).willReturn(Optional.of(post));
+        given(postLikeRepository.findByPostIdAndUserId(postId, memberId)).willReturn(Optional.empty());
+
+        // when
+        boolean result = postService.togglePostLike(postId, memberId);
+
+        // then
+        assertThat(result).isTrue();
+        verify(postLikeRepository).save(any(PostLike.class));
+        verify(postRepository).incrementLikeCount(postId);
+    }
+
+    @Test
+    @DisplayName("[삭제된 게시글 좋아요 실패]")
+    void togglePostLike_Fail_DeletedPost() {
+        // given
+        Long postId = 1L;
+        Long memberId = 1L;
+        User user = mock(User.class);
+        Post deletedPost = Post.builder().title("제목").content("내용").user(user).build();
+        ReflectionTestUtils.setField(deletedPost, "isDeleted", true);
+
+        given(userRepository.findById(memberId)).willReturn(Optional.of(user));
+        given(postRepository.findByIdWithLock(postId)).willReturn(Optional.of(deletedPost));
+
+        // when & then
+        assertThatThrownBy(() -> postService.togglePostLike(postId, memberId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("404");
+        verify(postLikeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("[게시글 스크랩 성공]")
+    void toggleScrap_Success() {
+        // given
+        Long postId = 1L;
+        Long memberId = 1L;
+        User user = mock(User.class);
+        Post post = Post.builder().title("제목").content("내용").user(user).build();
+        ReflectionTestUtils.setField(post, "id", postId);
+
+        given(userRepository.findById(memberId)).willReturn(Optional.of(user));
+        given(postRepository.findByIdWithLock(postId)).willReturn(Optional.of(post));
+        given(postScrapRepository.findByUserIdAndPostId(memberId, postId)).willReturn(Optional.empty());
+
+        // when
+        boolean result = postService.toggleScrap(postId, memberId);
+
+        // then
+        assertThat(result).isTrue();
+        verify(postScrapRepository).save(any(PostScrap.class));
+    }
+
+    @Test
+    @DisplayName("[삭제된 게시글 스크랩 실패]")
+    void toggleScrap_Fail_DeletedPost() {
+        // given
+        Long postId = 1L;
+        Long memberId = 1L;
+        User user = mock(User.class);
+        Post deletedPost = Post.builder().title("제목").content("내용").user(user).build();
+        ReflectionTestUtils.setField(deletedPost, "isDeleted", true);
+
+        given(userRepository.findById(memberId)).willReturn(Optional.of(user));
+        given(postRepository.findByIdWithLock(postId)).willReturn(Optional.of(deletedPost));
+
+        // when & then
+        assertThatThrownBy(() -> postService.toggleScrap(postId, memberId))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("404");
+        verify(postScrapRepository, never()).save(any());
     }
 }

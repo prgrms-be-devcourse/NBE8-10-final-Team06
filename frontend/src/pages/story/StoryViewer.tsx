@@ -290,12 +290,13 @@ const StoryViewer: React.FC = () => {
 
   const authorFeed = feed.find((u) => Number(u.userId) === Number(currentStory.userId));
   const authorNickname =
+    currentStory.nickname?.trim() ||
     authorFeed?.nickname?.trim() ||
     (loggedInUserId != null && Number(currentStory.userId) === Number(loggedInUserId)
       ? loggedInNickname?.trim() ?? ''
       : '') ||
     '';
-  const authorProfileImageUrl = authorFeed?.profileImageUrl ?? null;
+  const authorProfileImageUrl = currentStory.profileImageUrl ?? authorFeed?.profileImageUrl ?? null;
   const authorLabel = authorNickname || (isOwner ? '나' : `User ${currentStory.userId}`);
 
   const goToProfileByNickname = (nickname: string) => {
