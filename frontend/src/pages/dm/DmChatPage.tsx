@@ -40,6 +40,7 @@ import {
   dmStompAppTyping,
 } from '../../util/dmStompDestinations';
 import { isRsSuccess } from '../../util/rsData';
+import { getApiErrorMessage } from '../../util/apiError';
 import { mergePollSliceIntoMessages } from '../../util/dmMessagesMerge';
 import { readJwtSubAsUserId } from '../../util/jwtUserId';
 import { syncAuthTokensFromCookies } from '../../util/authStorageSync';
@@ -52,7 +53,6 @@ import {
 } from '../../util/dmTypingClient';
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 import { scrollDmChatPaneToBottom } from '../../util/dmScroll';
-import { notifyDmSelfReadSent, resetDmReadEchoSuppress } from '../../util/dmReadEchoSuppress';
 
 /**
  * 채팅창 REST 동기화: 백엔드는 DM 전송을 STOMP 만 제공하므로, WS `message` 프레임이 누락돼도
@@ -62,45 +62,6 @@ const DM_POLL_INTERVAL_IN_ROOM_MS = 2_500;
 const DM_POLL_INTERVAL_IN_ROOM_DISCONNECTED_MS = 2_000;
 /** 맨 아래에서 이만큼 이상 떨어지면 “아래로” 버튼 표시 */
 const DM_SCROLL_JUMP_BUTTON_THRESHOLD_PX = 120;
-const DM_OPP_READ_CURSOR_LS_KEY = 'devstagram-dm-opponent-read-cursor-v1';
-
-function readOpponentReadCursorMap(): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(DM_OPP_READ_CURSOR_LS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (!parsed || typeof parsed !== 'object') return {};
-    const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      const n = Number(v);
-      if (Number.isFinite(n) && n > 0) out[k] = n;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-function readOpponentReadCursor(roomIdNum: number): number {
-  if (!Number.isFinite(roomIdNum) || roomIdNum <= 0) return 0;
-  const map = readOpponentReadCursorMap();
-  return Number(map[String(roomIdNum)] ?? 0);
-}
-
-function writeOpponentReadCursor(roomIdNum: number, messageId: number): void {
-  if (!Number.isFinite(roomIdNum) || roomIdNum <= 0) return;
-  if (!Number.isFinite(messageId) || messageId <= 0) return;
-  const key = String(roomIdNum);
-  const map = readOpponentReadCursorMap();
-  const prev = Number(map[key] ?? 0);
-  if (messageId <= prev) return;
-  map[key] = messageId;
-  try {
-    localStorage.setItem(DM_OPP_READ_CURSOR_LS_KEY, JSON.stringify(map));
-  } catch {
-    /* ignore */
-  }
-}
 
 /** /auth/me(MyInfoResponse) data.id 와 일부 환경의 userId 별칭 */
 function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | null {
@@ -113,10 +74,6 @@ function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | nul
 const DmChatPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  /** `navigate('/dm')` 는 히스토리에 목록을 한 번 더 쌓아 목록→뒤로 시 다시 채팅방으로 들어가는 루프를 만듦 → pop */
-  const goBackFromChatRoom = useCallback(() => {
-    navigate(-1);
-  }, [navigate]);
   const { userId, setSessionUserId, nickname: myNickname, isLoggedIn } = useAuthStore();
   /** JWT sub + /auth/me 로 확정한 본인 id — 스토어 userId 오염·me 지연 시에도 말풍선·typing 이 맞게 */
   const [selfIdFromJwt, setSelfIdFromJwt] = useState<number | null>(() => readJwtSubAsUserId());
@@ -266,6 +223,8 @@ const DmChatPage: React.FC = () => {
 
   const [messages, setMessages] = useState<DmMessageResponse[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   /** STOMP typing 이벤트 — 말풍선 좌우는 렌더 시 `senderId`(userId) 로 `computeDmMessageIsMe` 와 동일 규칙 적용 */
   const [remoteTyping, setRemoteTyping] = useState<{ userId: number; text: string } | null>(null);
   const [isMeTyping, setIsMeTyping] = useState(false);
@@ -301,14 +260,14 @@ const DmChatPage: React.FC = () => {
   }, [remoteTyping, currentRoom?.isGroup, headerPeer, participantByUserId]);
 
   const [isLoading, setIsLoading] = useState(true);
+  /** 초기 메시지 로드 실패(권한 없음·404 등) — 폴링 생략 및 안내 UI */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasNext, setHasNext] = useState(false);
   const [lastReadIdByOpponent, setLastReadIdByOpponent] = useState<number>(0);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
-  const [isImageSending, setIsImageSending] = useState(false);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // 채팅방 진입 전에도 JWT id 를 가능한 빨리 채워 말풍선 좌우 오판을 줄임(roomId effect 와 중복 호출되어도 무방)
   useEffect(() => {
@@ -325,13 +284,8 @@ const DmChatPage: React.FC = () => {
   /** 맨 아래 메시지가 바뀔 때만 스크롤(위쪽 과거 로드 시 마지막 id 동일 → 스크롤 유지) */
   const dmScrollLastTailKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const rid = Number(roomId);
-    const restored = Number.isFinite(rid) ? readOpponentReadCursor(rid) : 0;
     dmScrollLastTailKeyRef.current = null;
     setShowJumpToBottom(false);
-    setLastReadIdByOpponent(restored);
-    resetDmReadEchoSuppress();
-    lastStompReadPublishedIdRef.current = 0;
   }, [roomId]);
 
   const updateJumpButtonVisibility = useCallback(() => {
@@ -383,8 +337,6 @@ const DmChatPage: React.FC = () => {
   const messagesRefreshGenRef = useRef(0);
   const roomIdRef = useRef<string | undefined>(roomId);
   roomIdRef.current = roomId;
-  /** 동일 messageId 로 read 를 반복 publish 하지 않음 → 에코 억제 맵 시각이 갱신되지 않게 함 */
-  const lastStompReadPublishedIdRef = useRef(0);
 
   /** 상대 typing 직후 REST 동기화(디바운스) — 메시지 지연 완화 */
   const typingPollDebounceRef = useRef<number | null>(null);
@@ -409,16 +361,6 @@ const DmChatPage: React.FC = () => {
    * 메시지가 DB 에 저장되지 않을 수 있다. 쿠키→localStorage 반영은 1회만 검사한다.
    */
   const [stompAuthRevision, setStompAuthRevision] = useState(0);
-  /** PR#124: refreshClient 성공 후 `auth:token-refreshed` → STOMP 재연결로 최신 Bearer 사용 */
-  useEffect(() => {
-    const onTokenRefreshed = () => {
-      syncAuthTokensFromCookies();
-      setStompAuthRevision((n) => n + 1);
-    };
-    window.addEventListener('auth:token-refreshed', onTokenRefreshed);
-    return () => window.removeEventListener('auth:token-refreshed', onTokenRefreshed);
-  }, []);
-
   useEffect(() => {
     const id = window.setTimeout(() => {
       const before = (localStorage.getItem('accessToken') ?? '').trim();
@@ -430,6 +372,15 @@ const DmChatPage: React.FC = () => {
     }, 280);
     return () => window.clearTimeout(id);
   }, [isLoggedIn, userId]);
+
+  // token refresh 후 STOMP 재연결 — client.ts 가 갱신 성공 시 'auth:token-refreshed' 이벤트 발행
+  useEffect(() => {
+    const onTokenRefreshed = () => {
+      setStompAuthRevision((n) => n + 1);
+    };
+    window.addEventListener('auth:token-refreshed', onTokenRefreshed);
+    return () => window.removeEventListener('auth:token-refreshed', onTokenRefreshed);
+  }, []);
 
   const stompReconnectKey = useMemo(() => {
     syncAuthTokensFromCookies();
@@ -521,56 +472,19 @@ const DmChatPage: React.FC = () => {
     setHasNext(slice.hasNext);
   }, []);
 
-  /**
-   * STOMP 미연결이어도 `publish` 는 큐에 쌓였다가 onConnect 시 전송됨.
-   * `isConnected` 로 막으면 초기 로드 직후 read 가 영원히 안 나가 상대 읽음 표시가 갱신되지 않음.
-   */
   const sendReadEvent = useCallback(
     (messageId: number) => {
       const actor = effectiveSelfIdRef.current;
       const ridStr = roomId;
-      if (messageId <= 0 || !isResolvedDmUserId(actor) || !ridStr) {
-        return;
-      }
-      if (messageId === lastStompReadPublishedIdRef.current) {
-        return;
-      }
+      if (!isConnected || messageId <= 0 || !isResolvedDmUserId(actor) || !ridStr) return;
       const rid = Number(ridStr);
-      lastStompReadPublishedIdRef.current = messageId;
-      notifyDmSelfReadSent(messageId);
       publish(dmStompAppRead(rid), { roomId: rid, userId: actor, messageId });
     },
-    [roomId, publish]
+    [isConnected, roomId, publish]
   );
 
   const sendReadEventRef = useRef(sendReadEvent);
   sendReadEventRef.current = sendReadEvent;
-
-  const latestServerMessageId = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const id = messages[i]?.id;
-      if (typeof id === 'number' && id > 0) return id;
-    }
-    return 0;
-  }, [messages]);
-
-  /**
-   * `/auth/me` 전에는 read 가 스킵되고, STOMP 는 나중에 붙는다.
-   * tail id + 본인 id 가 준비된 뒤 read 를 다시 보내 상대 화면의 읽음 처리가 돌아가게 함.
-   */
-  useEffect(() => {
-    if (!roomId || latestServerMessageId <= 0) return;
-    if (!isResolvedDmUserId(bubbleSelfUserId)) return;
-    sendReadEvent(latestServerMessageId);
-  }, [roomId, bubbleSelfUserId, latestServerMessageId, sendReadEvent]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    const rid = Number(roomId);
-    if (!Number.isFinite(rid) || rid <= 0) return;
-    if (!Number.isFinite(lastReadIdByOpponent) || lastReadIdByOpponent <= 0) return;
-    writeOpponentReadCursor(rid, lastReadIdByOpponent);
-  }, [roomId, lastReadIdByOpponent]);
 
   // 로컬 카운트 초기화
   useEffect(() => {
@@ -648,26 +562,39 @@ const DmChatPage: React.FC = () => {
     messagesRefreshGenRef.current += 1;
     const gen = messagesRefreshGenRef.current;
     setIsLoading(true);
+    setLoadError(null);
     setMessages([]);
     setNextCursor(null);
     setHasNext(false);
-    dmApi.getMessages(Number(roomId)).then((res) => {
-      if (gen !== messagesRefreshGenRef.current) return;
-      if (isRsSuccess(res.resultCode) && res.data) {
-        const rid = Number(roomId);
-        mergeFreshSliceIntoMessages(rid, res.data);
-        const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-        if (normalized.length > 0) {
-          sendReadEventRef.current(normalized[0].id);
+
+    void (async () => {
+      try {
+        const res = await dmApi.getMessages(Number(roomId));
+        if (gen !== messagesRefreshGenRef.current) return;
+        if (isRsSuccess(res.resultCode) && res.data) {
+          const rid = Number(roomId);
+          mergeFreshSliceIntoMessages(rid, res.data);
+          const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
+          if (normalized.length > 0) {
+            sendReadEventRef.current(normalized[0].id);
+          }
+        } else {
+          const msg = typeof res.msg === 'string' && res.msg.trim() ? res.msg.trim() : '채팅방을 불러올 수 없습니다.';
+          setLoadError(msg);
         }
+      } catch (e) {
+        if (gen !== messagesRefreshGenRef.current) return;
+        setLoadError(getApiErrorMessage(e, '채팅방을 불러올 수 없습니다.'));
+      } finally {
+        if (gen === messagesRefreshGenRef.current) setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    })();
   }, [roomId, mergeFreshSliceIntoMessages]);
 
   // STOMP `message` 가 오지 않아도 getMessages 첫 페이지로 상대/본인 메시지를 맞춘다.
   useEffect(() => {
     if (!roomId) return;
+    if (loadError) return;
     const rid = Number(roomId);
     const intervalMs = isConnected
       ? DM_POLL_INTERVAL_IN_ROOM_MS
@@ -695,7 +622,7 @@ const DmChatPage: React.FC = () => {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [roomId, isConnected]);
+  }, [roomId, isConnected, loadError]);
 
   // 무한 스크롤 (이전 메시지 로드)
   const loadMoreMessages = useCallback(async () => {
@@ -837,6 +764,65 @@ const DmChatPage: React.FC = () => {
     setIsMeTyping(false);
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const actor = effectiveSelfIdRef.current;
+    if (!isResolvedDmUserId(actor)) {
+      alert('로그인 사용자 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    const rid = Number(roomId);
+    const previewUrl = URL.createObjectURL(file);
+    const tempId = optimisticMsgIdRef.current--;
+
+    // 낙관적 업데이트: blob URL로 즉시 미리보기 표시
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        type: 'IMAGE' as MessageType,
+        content: previewUrl,
+        thumbnail: null,
+        valid: true,
+        createdAt: new Date().toISOString(),
+        senderId: actor,
+      },
+    ]);
+
+    setIsUploadingImage(true);
+    try {
+      const res = await dmApi.sendImage(rid, file);
+      URL.revokeObjectURL(previewUrl);
+
+      if (isRsSuccess(res.resultCode) && res.data) {
+        // 서버 응답의 실제 메시지(실제 ID + 실제 URL)로 temp 교체
+        // → WebSocket이 같은 메시지를 브로드캐스트해도 ID 중복으로 무시됨
+        const serverMsg = res.data;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? serverMsg : m))
+        );
+      } else {
+        // 응답 없으면 temp 제거 후 폴링이 실제 메시지 반영
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        window.setTimeout(() => {
+          fetchDmPollMergeIfStillInRoom(rid, roomIdRef, setMessages, {
+            beforeMerge: (r, normalized) => pruneShareBackupByServer(r, normalized),
+          });
+        }, 500);
+      }
+    } catch {
+      alert('이미지 전송에 실패했습니다.');
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      URL.revokeObjectURL(previewUrl);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextVal = e.target.value;
     setInputValue(nextVal);
@@ -850,29 +836,6 @@ const DmChatPage: React.FC = () => {
     applyTypingForInputValue(v);
   };
 
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !roomId) return;
-    if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 전송할 수 있습니다.');
-      return;
-    }
-    const rid = Number(roomId);
-    if (!Number.isFinite(rid)) return;
-    setIsImageSending(true);
-    try {
-      const res = await dmApi.sendImage(rid, file);
-      if (!isRsSuccess(res.resultCode)) {
-        alert(res.msg ?? '이미지 전송에 실패했습니다.');
-      }
-    } catch {
-      alert('이미지 전송 중 오류가 발생했습니다.');
-    } finally {
-      setIsImageSending(false);
-    }
-  };
-
   const handleLeaveRoom = async () => {
     if (!window.confirm('방을 나가시겠습니까?')) return;
     try {
@@ -880,7 +843,7 @@ const DmChatPage: React.FC = () => {
         ? await dmApi.leaveGroupRoom(Number(roomId)) 
         : await dmApi.leave1v1Room(Number(roomId));
       if (isRsSuccess(res.resultCode)) {
-        goBackFromChatRoom();
+        navigate('/dm');
       }
     } catch (err) {
       alert('방 나가기 실패');
@@ -901,7 +864,7 @@ const DmChatPage: React.FC = () => {
     >
       <header style={{ height: '60px', borderBottom: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', backgroundColor: '#fff', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <button type="button" onClick={goBackFromChatRoom} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
+          <button onClick={() => navigate('/dm')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
@@ -932,20 +895,25 @@ const DmChatPage: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <button 
-            onClick={handleLeaveRoom}
-            style={{ color: '#ed4956', background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
-          >
-            나가기
-          </button>
-          <button
-            type="button"
-            aria-label="채팅방 정보"
-            onClick={() => setShowRoomInfo(true)}
-            style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', color: '#262626' }}
-          >
-            <Info size={24} />
-          </button>
+          {!loadError ? (
+            <>
+              <button
+                type="button"
+                onClick={handleLeaveRoom}
+                style={{ color: '#ed4956', background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                나가기
+              </button>
+              <button
+                type="button"
+                aria-label="채팅방 정보"
+                onClick={() => setShowRoomInfo(true)}
+                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', color: '#262626' }}
+              >
+                <Info size={24} />
+              </button>
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -974,7 +942,38 @@ const DmChatPage: React.FC = () => {
         <div ref={topObserverRef} style={{ height: '10px' }} />
         {isFetchingMore && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px' }}><Loader2 className="animate-spin" size={20} color="#8e8e8e" /></div>}
 
-        {isLoading && messages.length === 0 ? (
+        {loadError ? (
+          <div
+            role="alert"
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              textAlign: 'center',
+              gap: '16px',
+            }}
+          >
+            <p style={{ color: '#262626', fontSize: '1rem', lineHeight: 1.5, maxWidth: '320px' }}>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => navigate('/dm')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid #dbdbdb',
+                background: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
+                color: '#262626',
+              }}
+            >
+              채팅 목록으로
+            </button>
+          </div>
+        ) : isLoading && messages.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#8e8e8e', marginTop: '20px' }}>로드 중...</p>
         ) : (
           messages.map((msg, idx) => {
@@ -1064,34 +1063,23 @@ const DmChatPage: React.FC = () => {
         ) : null}
       </div>
 
-      <footer style={{ padding: '20px' }}>
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          aria-hidden
-          onChange={(ev) => {
-            void handleImageFileChange(ev);
-          }}
-        />
+      <footer style={{ padding: '20px', opacity: loadError ? 0.45 : 1, pointerEvents: loadError ? 'none' : 'auto' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageSelect}
+          />
           <button
             type="button"
-            aria-label="이미지 보내기"
-            disabled={isImageSending}
             onClick={() => imageInputRef.current?.click()}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: isImageSending ? 'not-allowed' : 'pointer',
-              opacity: isImageSending ? 0.5 : 1,
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            disabled={isUploadingImage}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: isUploadingImage ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
+            aria-label="이미지 전송"
           >
-            {isImageSending ? <Loader2 className="animate-spin" size={24} color="#262626" /> : <ImageIcon size={24} color="#262626" />}
+            <ImageIcon size={24} color={isUploadingImage ? '#b2dffc' : '#262626'} />
           </button>
           <input
             type="text"

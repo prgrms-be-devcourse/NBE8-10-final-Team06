@@ -68,8 +68,11 @@ export async function loadFollowListsAndCounts(
     const followersOk = isRsDataSuccess(followersRes);
     const followingsOk = isRsDataSuccess(followingsRes);
     let followers = followersOk ? followersRes.data ?? [] : [];
-    const viewerFollows =
-      opts?.viewerFollowsOwner !== undefined ? opts.viewerFollowsOwner : true;
+    const hintedViewerFollows =
+      opts?.viewerFollowsOwner !== undefined
+        ? opts.viewerFollowsOwner
+        : mergeFollowingHint(uid, true);
+    const viewerFollows = hintedViewerFollows;
     followers = filterViewerFromOwnersFollowersWhenUnfollowed(
       uid,
       opts?.viewerUserId ?? null,

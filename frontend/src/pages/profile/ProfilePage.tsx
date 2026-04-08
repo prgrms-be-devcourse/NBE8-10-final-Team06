@@ -653,6 +653,13 @@ const ProfilePage: React.FC = () => {
       followerCount: profile.followerCount,
     };
     const nextFollowing = !snapshot.isFollowing;
+    if (snapshot.isFollowing) {
+      const shouldUnfollow = window.confirm('팔로우를 해제하시겠습니까?');
+      if (!shouldUnfollow) {
+        followToggleLockRef.current = false;
+        return;
+      }
+    }
     const optimisticFollowers = Math.max(0, snapshot.followerCount + (nextFollowing ? 1 : -1));
 
     setIsFollowProcessing(true);
@@ -668,6 +675,7 @@ const ProfilePage: React.FC = () => {
         myUserId
       );
       if (r.ok) {
+        useFollowLocalStore.getState().setFollowingHint(Number(targetId), r.follow.isFollowing);
         if (!r.follow.isFollowing && myUserId != null) {
           setFollowers((prev) => prev.filter((f) => Number(f.userId) !== Number(myUserId)));
         }

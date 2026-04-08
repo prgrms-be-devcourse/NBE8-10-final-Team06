@@ -14,8 +14,10 @@ import com.devstagram.domain.user.repository.UserRepository;
 import com.devstagram.global.exception.ServiceException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FollowService {
@@ -25,6 +27,7 @@ public class FollowService {
 
     @Transactional
     public FollowResponse follow(Long fromUserId, Long toUserId) {
+        log.info("[FOLLOW SERVICE] follow start: fromUserId={}, toUserId={}", fromUserId, toUserId);
         if (fromUserId.equals(toUserId)) {
             throw new ServiceException("400-F-1", "자기 자신을 팔로우할 수 없습니다.");
         }
@@ -42,25 +45,39 @@ public class FollowService {
         userRepository.increaseFollowerCount(toUserId);
         userRepository.increaseFollowingCount(fromUserId);
 
-        return createFollowResponse(toUserId, fromUserId, true);
+        FollowResponse response = createFollowResponse(toUserId, fromUserId, true);
+        log.info("[FOLLOW SERVICE] follow success: {}", response);
+        return response;
     }
 
+    /**
+     * 언팔로우 — 관계가 없으면 400 대신 성공(멱등).
+     * 프론트·DB 간 일시 불일치, 중복 요청, 카운트만 남은 경우에도 UI가 '팔로우 해제'로 수렴하도록 한다.
+     */
     @Transactional
     public FollowResponse unfollow(Long fromUserId, Long toUserId) {
+        log.info("[FOLLOW SERVICE] unfollow start: fromUserId={}, toUserId={}", fromUserId, toUserId);
         if (fromUserId.equals(toUserId)) {
             throw new ServiceException("400-F-4", "자기 자신을 언팔로우할 수 없습니다.");
         }
 
-        Follow follow = followRepository
-                .findByFromUserIdAndToUserId(fromUserId, toUserId)
-                .orElseThrow(() -> new ServiceException("400-F-3", "팔로우 관계가 아닙니다."));
+        boolean hadRelation = followRepository.existsByFromUserIdAndToUserId(fromUserId, toUserId);
+        if (!hadRelation) {
+            log.warn("[FOLLOW SERVICE] unfollow requested but relation not found: fromUserId={}, toUserId={}",
+                    fromUserId, toUserId);
+        }
+        int deletedRows = followRepository.deleteAllByFromUserIdAndToUserId(fromUserId, toUserId);
+        if (deletedRows > 0) {
+            // 정상 데이터(유니크 제약 하)에서는 1회만 감소.
+            // 과거 중복 행이 있더라도 카운트 음수는 방지되어 있어 안전함.
+            userRepository.decreaseFollowerCount(toUserId);
+            userRepository.decreaseFollowingCount(fromUserId);
+        }
 
-        followRepository.delete(follow);
-
-        userRepository.decreaseFollowerCount(toUserId);
-        userRepository.decreaseFollowingCount(fromUserId);
-
-        return createFollowResponse(toUserId, fromUserId, false);
+        FollowResponse response = createFollowResponse(toUserId, fromUserId, false);
+        log.info("[FOLLOW SERVICE] unfollow done: relationExisted={}, deletedRows={}, response={}",
+                hadRelation, deletedRows, response);
+        return response;
     }
 
     // [공통 로직 추출]
