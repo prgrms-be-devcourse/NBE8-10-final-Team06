@@ -2,9 +2,12 @@ package com.devstagram.domain.feed.service;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.connection.zset.Aggregate;
+import org.springframework.data.redis.connection.zset.Weights;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Async;
@@ -30,25 +33,35 @@ public class FeedService {
     private static final String USER_FEED_PREFIX = "feed:user:";
     private static final String GLOBAL_FEED_KEY = "posts:global:scores";
     private static final int MAX_FEED_SIZE = 500;
-    private static final short TECH_MATCH_THRESHOLD = 50;
     private static final int TOP_K_LIMIT = 1000;
 
     // 업로드된 게시글을 개인 피드에 등록
     @Async("feedTaskExecutor")
-    public void deliverPostToFeeds(Post post) {
+    public void deliverPostToFeeds(Post post, List<Long> techIds) {
 
-        // 팔로워들과 기술태그 일치 사용자들을 먼저 set해서 가져옴
-        List<User> targetUsers = findTargetUsersForPost(post);
+        // 팔로워 ID 셋 (1번 쿼리)
+        Set<Long> followerIds = followRepository
+                .findAllByToUserId(post.getUser().getId())
+                .stream()
+                .map(f -> f.getFromUser().getId())
+                .collect(Collectors.toSet());
+
+        // userId → 매칭된 techId Set (1번 쿼리)
+        Map<Long, Set<Long>> userTechMap = techScoreService.findUserTechMapByTechIds(techIds);
+
+        // 합집합에서 작성자 제외
+        Set<Long> targetIds = new HashSet<>(followerIds);
+        targetIds.addAll(userTechMap.keySet());
+        targetIds.remove(post.getUser().getId());
 
         String postId = String.valueOf(post.getId());
 
-        // 기술태그인지 팔로우 계정인지 확인해서 점수 산정
-        for (User user : targetUsers) {
-            boolean isFollower = checkIfFollower(post.getUser(), user);
-            boolean isTechMatched = checkIfTechMatched(post, user);
-
-            double score = scoringStrategy.calculateScore(post, isFollower, isTechMatched);
-            pushToUserFeed(user.getId(), postId, score);
+        for (Long userId : targetIds) {
+            boolean isFollower = followerIds.contains(userId);
+            int matchCount = userTechMap.getOrDefault(userId, Set.of()).size();
+            boolean isTechMatched = matchCount > 0;
+            double score = scoringStrategy.calculatePersonalScore(post, isFollower, isTechMatched, matchCount);
+            pushToUserFeed(userId, postId, score);
         }
     }
 
@@ -64,26 +77,10 @@ public class FeedService {
         }
     }
 
-    // 팔로우 중인 계정인지 확인
-    private boolean checkIfFollower(User author, User reader) {
-        if (author.getId().equals(reader.getId())) return false;
-        return followRepository.existsByFromUserIdAndToUserId(reader.getId(), author.getId());
-    }
-
-    // 기술태그가 일치하는지 확인
-    private boolean checkIfTechMatched(Post post, User reader) {
-        Set<Long> postTechIds = post.getTechTags().stream()
-                .map(pt -> pt.getTechnology().getId())
-                .collect(Collectors.toSet());
-
-        Set<Long> interestedTechIds = techScoreService.getInterestedTechIds(reader.getId(), TECH_MATCH_THRESHOLD);
-        return !Collections.disjoint(postTechIds, interestedTechIds);
-    }
-
     // 사용자 공통 글로벌 점수에 등록
     public void registerPostToGlobalFeed(Post post) {
 
-        double baseScore = scoringStrategy.calculateScore(post, false, false);
+        double baseScore = scoringStrategy.calculateGlobalScore(post);
 
         redisTemplate.opsForZSet().add(GLOBAL_FEED_KEY, String.valueOf(post.getId()), baseScore);
     }
@@ -123,13 +120,20 @@ public class FeedService {
         redisTemplate.opsForZSet().remove(USER_FEED_PREFIX + authorId, stringPostId);
     }
 
+    // 피드 조회 시 DB에 없는 stale 항목 lazy cleanup
+    @Async("feedTaskExecutor")
+    public void removeStalePostsFromFeeds(Long memberId, List<Long> stalePostIds) {
+        Object[] staleValues = stalePostIds.stream().map(String::valueOf).toArray();
+        redisTemplate.opsForZSet().remove(USER_FEED_PREFIX + memberId, staleValues);
+        redisTemplate.opsForZSet().remove(GLOBAL_FEED_KEY, staleValues);
+    }
+
     // 좋아요 증감을 통한 글로벌 피드 점수 수정
     @Async("feedTaskExecutor")
     public void updatePostScoreInGlobalFeed(Post post, boolean isIncrement) {
         String postId = String.valueOf(post.getId());
 
-        // 가중치 가져오기
-        double delta = scoringStrategy.getLikeDelta(isIncrement);
+        double delta = scoringStrategy.getLikeDelta(post, isIncrement);
 
         // 글로벌 보관함 점수 업데이트
         redisTemplate.opsForZSet().incrementScore(GLOBAL_FEED_KEY, postId, delta);
@@ -145,11 +149,15 @@ public class FeedService {
     public Map<Long, Double> getHybridFeedWithScores(Long memberId, Pageable pageable) {
 
         String userFeedKey = USER_FEED_PREFIX + memberId;
-        String tempKey = "temp:feed:" + memberId; // 계산을 위한 임시 장부
+        String tempKey = "temp:feed:" + memberId + ":" + UUID.randomUUID();
 
-        // Redis ZUNION 실행
-        // 두 점수를 동등한 비율로 합산한다는 뜻
-        redisTemplate.opsForZSet().unionAndStore(userFeedKey, GLOBAL_FEED_KEY, tempKey);
+        // 마지막 접근 시각 기준 30일 후 만료 (비활성 유저 피드 자동 정리)
+        redisTemplate.expire(userFeedKey, Duration.ofDays(30));
+
+        // 개인 피드(최대 500) + 글로벌 피드(최대 1000) 합집합, 겹치면 높은 점수 채택
+        redisTemplate
+                .opsForZSet()
+                .unionAndStore(userFeedKey, List.of(GLOBAL_FEED_KEY), tempKey, Aggregate.SUM, Weights.of(1.2, 0.2));
 
         // 임시 키에 30초 정도 TTL 설정 (만약 삭제 로직이 실패해도 메모리를 보호하기 위함)
         redisTemplate.expire(tempKey, Duration.ofSeconds(30));

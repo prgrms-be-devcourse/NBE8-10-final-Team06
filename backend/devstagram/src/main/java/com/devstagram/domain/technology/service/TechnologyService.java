@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.technology.dto.*;
 import com.devstagram.domain.technology.entity.TechCategory;
@@ -11,6 +12,8 @@ import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechCategoryRepository;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
 import com.devstagram.global.exception.ServiceException;
+import com.devstagram.global.storage.StorageService;
+import com.devstagram.global.util.FileValidator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 public class TechnologyService {
     private final TechnologyRepository technologyRepository;
     private final TechCategoryRepository techCategoryRepository;
+    private final FileValidator fileValidator;
+    private final StorageService storageService;
 
     public List<TechTagRes> getAllTechTags() {
         List<Technology> technologyList = technologyRepository.findAllByOrderByNameAsc();
@@ -35,17 +40,24 @@ public class TechnologyService {
     }
 
     @Transactional
-    public void createTech(TechCreateReq req) {
+    public void createTech(TechCreateReq req, MultipartFile icon) {
 
         TechCategory category = techCategoryRepository
                 .findById(req.categoryId())
                 .orElseThrow(() -> new ServiceException("404-C-1", "카테고리를 찾을 수 없습니다."));
 
+        String iconUrl = null;
+
+        if (icon != null && !icon.isEmpty()) {
+            fileValidator.validateImage(icon);
+            iconUrl = storageService.store(icon);
+        }
+
         Technology technology = Technology.builder()
                 .category(category)
                 .name(req.name())
                 .color(req.color())
-                .iconUrl(req.iconUrl())
+                .iconUrl(iconUrl)
                 .build();
 
         technologyRepository.save(technology);

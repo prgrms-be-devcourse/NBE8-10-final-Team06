@@ -54,7 +54,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        if (accessor == null) return message;
+        if (accessor == null) {
+            return message;
+        }
 
         // CONNECT 가 아니면 JWT 재검증 없이, 이미 세션에 연결된 principal 만 현재 워커 스레드의 SecurityContext 에 맞춘다.
         if (StompCommand.CONNECT != accessor.getCommand()) {
@@ -63,9 +65,13 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         String token = extractToken(accessor);
-        if (token == null || token.isBlank()) return message;
+        if (token == null || token.isBlank()) {
+            return message;
+        }
 
-        if (!jwtProvider.isValid(token)) return message;
+        if (!jwtProvider.isValid(token)) {
+            return message;
+        }
 
         Claims payload = jwtProvider.payload(token);
         Long userId = Long.parseLong(payload.getSubject());
@@ -97,6 +103,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     /**
      * STOMP CONNECT 시 {@link StompHeaderAccessor#setUser} 로 저장해 둔 {@link Authentication} 을
      * <strong>이번 프레임을 처리 중인 스레드</strong>의 {@link SecurityContextHolder} 에 복사한다.
+     *
+     * 세션에 Principal 이 없는 경우(CONNECT 시 미인증)에는 현재 SEND 프레임의
+     * Authorization / accessToken 헤더로 재인증을 시도한다.
+     * 재인증 성공 시 세션 Principal 도 갱신해 이후 프레임에서도 유효하게 한다.
      */
     private void applySecurityFromSessionUser(StompHeaderAccessor accessor) {
         if (accessor == null || accessor.getCommand() == null) {
@@ -105,10 +115,40 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (accessor.getCommand() == StompCommand.CONNECT) {
             return;
         }
-        Object u = accessor.getUser();
-        // CONNECT 시 setUser 해 둔 Authentication; 없으면(미인증 세션 등) 복사 생략
-        if (u instanceof Authentication authentication) {
+        Object principal = accessor.getUser();
+        // CONNECT 시 setUser 해 둔 Authentication; 있으면 즉시 SecurityContext 복사
+        if (principal instanceof Authentication authentication) {
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            return;
+        }
+        // 세션 Principal 없음(CONNECT 미인증): 현재 프레임 헤더의 토큰으로 재인증 시도
+        authenticateFromFrameToken(accessor);
+    }
+
+    /**
+     * SEND 등 비-CONNECT 프레임의 native 헤더에서 JWT 를 꺼내 인증한다.
+     * 성공 시 SecurityContextHolder 와 세션 Principal 을 모두 설정한다.
+     */
+    private void authenticateFromFrameToken(StompHeaderAccessor accessor) {
+        String token = extractToken(accessor);
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        if (!jwtProvider.isValid(token)) {
+            return;
+        }
+        try {
+            Claims payload = jwtProvider.payload(token);
+            Long userId = Long.parseLong(payload.getSubject());
+            User user = userSecurityService.findById(userId);
+            SecurityUser securityUser = userSecurityService.toSecurityUser(user);
+            Authentication auth = new UsernamePasswordAuthenticationToken(
+                    securityUser, securityUser.getPassword(), securityUser.getAuthorities());
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            // 이후 같은 세션의 프레임에서도 재사용할 수 있도록 세션 Principal 갱신
+            accessor.setUser(auth);
+        } catch (Exception ignored) {
+            // 인증 실패: SecurityContext 는 비어있는 상태로 유지
         }
     }
 

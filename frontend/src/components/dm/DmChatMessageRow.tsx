@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Image as ImageIcon, PlayCircle, AlertCircle } from 'lucide-react';
 import { storyApi } from '../../api/story';
 import type { DmMessageResponse } from '../../types/dm';
 import { resolveDmAttachment } from '../../util/dmAttachment';
+import { resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { DM_BUBBLE_MINE, DM_BUBBLE_PEER } from './dmBubbleStyles';
 import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
@@ -168,7 +169,25 @@ export const DmChatMessageRow: React.FC<DmChatMessageRowProps> = ({
   const trimmedLabel = senderLabel?.trim() ?? '';
   const showPeerSenderName = !isMe && trimmedLabel.length > 0;
 
-  const bubbleBlock = !attachmentData ? (
+  const [imgError, setImgError] = useState(false);
+
+  const bubbleBlock = msg.type === 'IMAGE' ? (
+    <div style={{ marginTop: '4px', borderRadius: '12px', overflow: 'hidden', maxWidth: '240px' }}>
+      {imgError ? (
+        <div style={{ width: '240px', height: '160px', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '12px' }}>
+          <ImageIcon size={32} color="#8e8e8e" />
+        </div>
+      ) : (
+        <img
+          src={resolveAssetUrl(msg.content)}
+          alt="공유 이미지"
+          onError={() => setImgError(true)}
+          style={{ display: 'block', maxWidth: '240px', maxHeight: '320px', width: '100%', objectFit: 'cover', borderRadius: '12px', cursor: 'pointer' }}
+          onClick={() => window.open(resolveAssetUrl(msg.content), '_blank')}
+        />
+      )}
+    </div>
+  ) : !attachmentData ? (
     <div
       style={{
         padding: '12px 16px',

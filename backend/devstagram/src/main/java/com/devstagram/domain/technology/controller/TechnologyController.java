@@ -2,8 +2,10 @@ package com.devstagram.domain.technology.controller;
 
 import java.util.List;
 
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.devstagram.domain.technology.dto.*;
 import com.devstagram.domain.technology.service.TechnologyService;
@@ -32,10 +34,13 @@ public class TechnologyController {
         return RsData.success("전체 기술 카테고리 조회 성공", categories);
     }
 
-    @PostMapping()
+    @PostMapping(consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     @PreAuthorize("hasRole('ADMIN')")
-    public RsData<Void> createTech(@Valid @RequestBody TechCreateReq req) {
-        technologyService.createTech(req);
+    public RsData<Void> createTech(
+            @Valid @RequestPart("request") TechCreateReq req,
+            @RequestPart(value = "icon", required = false) MultipartFile icon) {
+
+        technologyService.createTech(req, icon);
 
         return RsData.success("기술태그 생성 성공", null);
     }
