@@ -40,7 +40,6 @@ import {
   dmStompAppTyping,
 } from '../../util/dmStompDestinations';
 import { isRsSuccess } from '../../util/rsData';
-import { getApiErrorMessage } from '../../util/apiError';
 import { mergePollSliceIntoMessages } from '../../util/dmMessagesMerge';
 import { readJwtSubAsUserId } from '../../util/jwtUserId';
 import { syncAuthTokensFromCookies } from '../../util/authStorageSync';
@@ -260,8 +259,6 @@ const DmChatPage: React.FC = () => {
   }, [remoteTyping, currentRoom?.isGroup, headerPeer, participantByUserId]);
 
   const [isLoading, setIsLoading] = useState(true);
-  /** 초기 메시지 로드 실패(권한 없음·404 등) — 폴링 생략 및 안내 UI */
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasNext, setHasNext] = useState(false);
@@ -562,39 +559,26 @@ const DmChatPage: React.FC = () => {
     messagesRefreshGenRef.current += 1;
     const gen = messagesRefreshGenRef.current;
     setIsLoading(true);
-    setLoadError(null);
     setMessages([]);
     setNextCursor(null);
     setHasNext(false);
-
-    void (async () => {
-      try {
-        const res = await dmApi.getMessages(Number(roomId));
-        if (gen !== messagesRefreshGenRef.current) return;
-        if (isRsSuccess(res.resultCode) && res.data) {
-          const rid = Number(roomId);
-          mergeFreshSliceIntoMessages(rid, res.data);
-          const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
-          if (normalized.length > 0) {
-            sendReadEventRef.current(normalized[0].id);
-          }
-        } else {
-          const msg = typeof res.msg === 'string' && res.msg.trim() ? res.msg.trim() : '채팅방을 불러올 수 없습니다.';
-          setLoadError(msg);
+    dmApi.getMessages(Number(roomId)).then((res) => {
+      if (gen !== messagesRefreshGenRef.current) return;
+      if (isRsSuccess(res.resultCode) && res.data) {
+        const rid = Number(roomId);
+        mergeFreshSliceIntoMessages(rid, res.data);
+        const normalized = normalizeDmMessagesFromApi(res.data.messages ?? []);
+        if (normalized.length > 0) {
+          sendReadEventRef.current(normalized[0].id);
         }
-      } catch (e) {
-        if (gen !== messagesRefreshGenRef.current) return;
-        setLoadError(getApiErrorMessage(e, '채팅방을 불러올 수 없습니다.'));
-      } finally {
-        if (gen === messagesRefreshGenRef.current) setIsLoading(false);
       }
-    })();
+      setIsLoading(false);
+    });
   }, [roomId, mergeFreshSliceIntoMessages]);
 
   // STOMP `message` 가 오지 않아도 getMessages 첫 페이지로 상대/본인 메시지를 맞춘다.
   useEffect(() => {
     if (!roomId) return;
-    if (loadError) return;
     const rid = Number(roomId);
     const intervalMs = isConnected
       ? DM_POLL_INTERVAL_IN_ROOM_MS
@@ -622,7 +606,7 @@ const DmChatPage: React.FC = () => {
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [roomId, isConnected, loadError]);
+  }, [roomId, isConnected]);
 
   // 무한 스크롤 (이전 메시지 로드)
   const loadMoreMessages = useCallback(async () => {
@@ -895,25 +879,21 @@ const DmChatPage: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {!loadError ? (
-            <>
-              <button
-                type="button"
-                onClick={handleLeaveRoom}
-                style={{ color: '#ed4956', background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                나가기
-              </button>
-              <button
-                type="button"
-                aria-label="채팅방 정보"
-                onClick={() => setShowRoomInfo(true)}
-                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', color: '#262626' }}
-              >
-                <Info size={24} />
-              </button>
-            </>
-          ) : null}
+          <button
+            type="button"
+            onClick={handleLeaveRoom}
+            style={{ color: '#ed4956', background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}
+          >
+            나가기
+          </button>
+          <button
+            type="button"
+            aria-label="채팅방 정보"
+            onClick={() => setShowRoomInfo(true)}
+            style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', display: 'flex', color: '#262626' }}
+          >
+            <Info size={24} />
+          </button>
         </div>
       </header>
 
@@ -942,38 +922,7 @@ const DmChatPage: React.FC = () => {
         <div ref={topObserverRef} style={{ height: '10px' }} />
         {isFetchingMore && <div style={{ display: 'flex', justifyContent: 'center', padding: '10px' }}><Loader2 className="animate-spin" size={20} color="#8e8e8e" /></div>}
 
-        {loadError ? (
-          <div
-            role="alert"
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px',
-              textAlign: 'center',
-              gap: '16px',
-            }}
-          >
-            <p style={{ color: '#262626', fontSize: '1rem', lineHeight: 1.5, maxWidth: '320px' }}>{loadError}</p>
-            <button
-              type="button"
-              onClick={() => navigate('/dm')}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: '1px solid #dbdbdb',
-                background: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600,
-                color: '#262626',
-              }}
-            >
-              채팅 목록으로
-            </button>
-          </div>
-        ) : isLoading && messages.length === 0 ? (
+        {isLoading && messages.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#8e8e8e', marginTop: '20px' }}>로드 중...</p>
         ) : (
           messages.map((msg, idx) => {
@@ -1063,7 +1012,7 @@ const DmChatPage: React.FC = () => {
         ) : null}
       </div>
 
-      <footer style={{ padding: '20px', opacity: loadError ? 0.45 : 1, pointerEvents: loadError ? 'none' : 'auto' }}>
+      <footer style={{ padding: '20px' }}>
         <form onSubmit={handleSendMessage} style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #dbdbdb', borderRadius: '30px', padding: '10px 20px' }}>
           <input
             ref={imageInputRef}
