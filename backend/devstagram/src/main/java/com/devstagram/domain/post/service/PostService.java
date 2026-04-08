@@ -349,6 +349,10 @@ public class PostService {
                 .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
 
+        if (post.isDeleted()) {
+            throw new ServiceException("404-P-2", "삭제된 게시글에는 좋아요를 누를 수 없습니다.");
+        }
+
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
 
         if (existingLike.isPresent()) {
