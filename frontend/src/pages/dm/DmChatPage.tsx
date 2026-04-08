@@ -113,6 +113,10 @@ function readMeUserId(data: AuthMeResponse & { userId?: unknown }): number | nul
 const DmChatPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  /** `navigate('/dm')` 는 히스토리에 목록을 한 번 더 쌓아 목록→뒤로 시 다시 채팅방으로 들어가는 루프를 만듦 → pop */
+  const goBackFromChatRoom = useCallback(() => {
+    navigate(-1);
+  }, [navigate]);
   const { userId, setSessionUserId, nickname: myNickname, isLoggedIn } = useAuthStore();
   /** JWT sub + /auth/me 로 확정한 본인 id — 스토어 userId 오염·me 지연 시에도 말풍선·typing 이 맞게 */
   const [selfIdFromJwt, setSelfIdFromJwt] = useState<number | null>(() => readJwtSubAsUserId());
@@ -876,7 +880,7 @@ const DmChatPage: React.FC = () => {
         ? await dmApi.leaveGroupRoom(Number(roomId)) 
         : await dmApi.leave1v1Room(Number(roomId));
       if (isRsSuccess(res.resultCode)) {
-        navigate('/dm');
+        goBackFromChatRoom();
       }
     } catch (err) {
       alert('방 나가기 실패');
@@ -897,7 +901,7 @@ const DmChatPage: React.FC = () => {
     >
       <header style={{ height: '60px', borderBottom: '1px solid #dbdbdb', display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'space-between', backgroundColor: '#fff', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <button onClick={() => navigate('/dm')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
+          <button type="button" onClick={goBackFromChatRoom} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} /></button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{

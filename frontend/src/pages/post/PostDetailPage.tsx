@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle, Bookmark, ChevronLeft, ChevronRight, Trash2, Edit, Forward } from 'lucide-react';
 import { postApi } from '../../api/post';
 import { commentApi } from '../../api/comment';
@@ -16,9 +16,17 @@ import { buildPostSharePayload } from '../../util/dmDeepLinks';
 import { isRsDataSuccess } from '../../util/rsData';
 import MarkdownContent from '../../components/common/MarkdownContent';
 
+/** 삭제 후 이동: 오픈 리다이렉트 방지 — 앱 내부 상대 경로만 허용 */
+function sanitizePostDeleteReturnPath(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 const PostDetailPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [post, setPost] = useState<PostDetailResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -131,7 +139,9 @@ const PostDetailPage: React.FC = () => {
     try {
       setIsDeletingPost(true);
       await postApi.deleteSafe(post.id);
-      navigate('/', { replace: true });
+      const st = location.state as { postDetailReturn?: unknown } | null | undefined;
+      const back = sanitizePostDeleteReturnPath(st?.postDetailReturn);
+      navigate(back ?? '/', { replace: true });
       return;
     } catch (err: unknown) {
       alert(getApiErrorMessage(err, '삭제 실패'));
