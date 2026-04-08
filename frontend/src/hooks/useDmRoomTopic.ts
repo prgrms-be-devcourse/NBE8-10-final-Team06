@@ -39,6 +39,7 @@ import {
   stompMessageBodyToString,
 } from '../util/dmWebSocketPayload';
 import { parseAllInboundDmTypingEvents } from '../util/dmTypingInbound';
+import { consumeIfDmSelfReadEcho } from '../util/dmReadEchoSuppress';
 
 export type UseDmRoomTopicParams = {
   roomId: string | undefined;
@@ -134,12 +135,7 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           onNormalized: (normalized) => {
             if (gen !== messagesRefreshGenRef.current) return;
             if (normalized.length > 0) {
-              const latest = normalized[0];
-              const senderId = toDmPositiveUserId(latest.senderId);
-              // 공유 직후(내가 보낸 최신 메시지)에는 read 이벤트를 보내지 않아 즉시 읽힘 오판을 막는다.
-              if (senderId != null && senderId !== actorId) {
-                sendReadEventRef.current(latest.id);
-              }
+              sendReadEventRef.current(normalized[0].id);
             }
           },
         });
@@ -236,7 +232,7 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
       }
 
       const readId = parseBackendReadFromTopicBody(payloadBody);
-      if (readId != null) {
+      if (readId != null && !consumeIfDmSelfReadEcho(readId)) {
         setLastReadIdByOpponent((prev) => Math.max(prev, readId));
       }
     };

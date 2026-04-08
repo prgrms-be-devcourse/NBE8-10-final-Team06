@@ -1,4 +1,5 @@
 // src/api/dm.ts
+import { AxiosHeaders } from 'axios';
 import client from './client';
 import { RsData } from '../types/common';
 import { 
@@ -42,13 +43,25 @@ export const dmApi = {
     client.delete<RsData<string>>(`/dm/rooms/group/${roomId}`).then(res => res.data),
 
   // DM 이미지 전송 (multipart upload → IMAGE 타입 메시지 저장 + WS 브로드캐스트)
-  sendImage: (roomId: number, file: File) => {
+  sendImage: async (roomId: number, file: File) => {
     const form = new FormData();
     form.append('file', file);
-    return client
-      .post<RsData<import('../types/dm').DmMessageResponse>>(`/dm/rooms/${roomId}/images`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      .then((res) => res.data);
+    // axios 인스턴스 기본 Content-Type: application/json 이 FormData 를 덮어
+    // Spring 이 multipart 로 인식하지 못함 → 제거해 브라우저가 boundary 포함 헤더 설정
+    const res = await client.post<RsData<import('../types/dm').DmMessageResponse>>(
+      `/dm/rooms/${roomId}/images`,
+      form,
+      {
+        transformRequest: [
+          (data, headers) => {
+            if (data instanceof FormData && headers && typeof (headers as AxiosHeaders).delete === 'function') {
+              (headers as AxiosHeaders).delete('Content-Type');
+            }
+            return data;
+          },
+        ],
+      },
+    );
+    return res.data;
   },
 };
