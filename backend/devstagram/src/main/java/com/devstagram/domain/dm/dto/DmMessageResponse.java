@@ -1,7 +1,5 @@
 package com.devstagram.domain.dm.dto;
 
-import java.time.LocalDateTime;
-
 import com.devstagram.domain.dm.entity.MessageType;
 
 public record DmMessageResponse(
@@ -10,6 +8,6 @@ public record DmMessageResponse(
         String content,
         String thumbnail,
         boolean valid,
-        LocalDateTime createdAt,
+        String createdAt,
         Long senderId // 메시지 로드 시 나/상대방 구분을 위해 추가
         ) {}

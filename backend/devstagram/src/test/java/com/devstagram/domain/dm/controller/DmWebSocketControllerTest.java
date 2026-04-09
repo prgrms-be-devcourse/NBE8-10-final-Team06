@@ -66,7 +66,7 @@ class DmWebSocketControllerTest {
 
         DmSendMessageRequest req = new DmSendMessageRequest(MessageType.TEXT, "hello", null);
         DmMessageResponse saved =
-                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, LocalDateTime.now(), 1L);
+                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, "2026-04-09T07:13:39+09:00", 1L);
         when(dmService.sendMessage(1L, 1L, req)).thenReturn(saved);
 
         controller.message(stompSendMessageWithUser(securityUser), 1L, req);
@@ -87,7 +87,7 @@ class DmWebSocketControllerTest {
 
         DmSendMessageRequest req = new DmSendMessageRequest(MessageType.TEXT, "hello", null);
         DmMessageResponse saved =
-                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, LocalDateTime.now(), 1L);
+                new DmMessageResponse(10L, MessageType.TEXT, "hello", null, true, "2026-04-09T07:13:39+09:00", 1L);
         when(dmService.sendMessage(1L, 1L, req)).thenReturn(saved);
 
         controller.message(null, 1L, req);
