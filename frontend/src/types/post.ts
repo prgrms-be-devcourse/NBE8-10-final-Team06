@@ -99,8 +99,6 @@ export interface PostUpdateRequest {
   title: string;
   content: string;
   techIds: number[];
-  /** 미디어 변경 시 유지할 기존 미디어의 sourceUrl(서버가 내려준 값). 신규 파일은 multipart만 */
-  retainedMediaUrls?: string[];
 }
 
 /**

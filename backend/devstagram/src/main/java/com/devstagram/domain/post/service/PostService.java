@@ -275,99 +275,31 @@ public class PostService {
             post.updateTechTags(newTechs);
         }
 
-        if (req.retainedMediaUrls() != null || (files != null && !files.isEmpty())) {
-            applyPostMediaUpdate(post, req.retainedMediaUrls(), files);
-        }
-    }
+        if (files != null && !files.isEmpty()) {
 
-    /**
-     * retainedMediaUrls == null && files 비어있지 않음: 구 방식(전체 교체, 파일만 전송).<br>
-     * retainedMediaUrls != null: 유지 URL + (선택) 신규 파일만 업로드 — S3 등에 브라우저 fetch(CORS) 없이 반영.
-     */
-    private void applyPostMediaUpdate(Post post, List<String> retainedMediaUrls, List<MultipartFile> files) {
-
-        boolean hasRetainedList = retainedMediaUrls != null;
-        boolean hasNewFiles = files != null && !files.isEmpty();
-
-        List<PostMedia> oldMedias = new ArrayList<>(post.getMediaList());
-        List<String> oldFileNames =
-                oldMedias.stream().map(PostMedia::getSourceUrl).toList();
-        Map<String, PostMedia> urlToOld =
-                oldMedias.stream().collect(Collectors.toMap(PostMedia::getSourceUrl, m -> m, (a, b) -> a));
-
-        // 구 클라이언트: retained 없이 files만 → 기존과 동일하게 전면 교체
-        if (!hasRetainedList && hasNewFiles) {
             fileValidator.validateImages(files);
+
+            List<String> oldFileNames =
+                    post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
+
             post.getMediaList().clear();
+
             for (int i = 0; i < files.size(); i++) {
                 MultipartFile file = files.get(i);
+
                 String savedFileName = storageService.store(file);
-                post.getMediaList()
-                        .add(PostMedia.builder()
-                                .post(post)
-                                .sourceUrl(savedFileName)
-                                .mediaType(extractMediaType(file))
-                                .sequence((short) (i + 1))
-                                .build());
+
+                PostMedia postMedia = PostMedia.builder()
+                        .post(post)
+                        .sourceUrl(savedFileName)
+                        .mediaType(extractMediaType(file))
+                        .sequence((short) (i + 1))
+                        .build();
+
+                post.getMediaList().add(postMedia);
             }
+
             oldFileNames.forEach(storageService::delete);
-            return;
-        }
-
-        if (hasRetainedList) {
-            if (retainedMediaUrls.size() != new HashSet<>(retainedMediaUrls).size()) {
-                throw new ServiceException("400-P-2", "중복된 기존 미디어 URL이 있습니다.");
-            }
-            int total = retainedMediaUrls.size() + (hasNewFiles ? files.size() : 0);
-            if (total > 10) {
-                throw new ServiceException("400-F-5", "한 번에 최대 10개의 이미지만 업로드 가능합니다.");
-            }
-            for (String url : retainedMediaUrls) {
-                if (url == null || url.isBlank() || !urlToOld.containsKey(url)) {
-                    throw new ServiceException("400-P-1", "유효하지 않은 기존 미디어 URL입니다.");
-                }
-            }
-        }
-
-        if (hasNewFiles) {
-            fileValidator.validateImages(files);
-        }
-
-        post.getMediaList().clear();
-
-        int seq = 1;
-        if (hasRetainedList) {
-            for (String url : retainedMediaUrls) {
-                PostMedia old = urlToOld.get(url);
-                post.getMediaList()
-                        .add(PostMedia.builder()
-                                .post(post)
-                                .sourceUrl(url)
-                                .mediaType(old.getMediaType())
-                                .sequence((short) seq++)
-                                .build());
-            }
-        }
-
-        if (hasNewFiles) {
-            for (MultipartFile file : files) {
-                String savedFileName = storageService.store(file);
-                post.getMediaList()
-                        .add(PostMedia.builder()
-                                .post(post)
-                                .sourceUrl(savedFileName)
-                                .mediaType(extractMediaType(file))
-                                .sequence((short) seq++)
-                                .build());
-            }
-        }
-
-        Set<String> newUrls =
-                post.getMediaList().stream().map(PostMedia::getSourceUrl).collect(Collectors.toSet());
-        for (String oldUrl : oldFileNames) {
-            if (!newUrls.contains(oldUrl)) {
-                storageService.delete(oldUrl);
-            }
         }
     }
 

@@ -178,7 +178,7 @@ class PostServiceTest {
         Long userId = 1L;
         Long postId = 100L;
         List<Long> techIds = List.of(1L);
-        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", techIds, null);
+        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", techIds);
         List<org.springframework.web.multipart.MultipartFile> files = null; // 파일이 없는 경우 테스트
 
         User writer = mock(User.class);

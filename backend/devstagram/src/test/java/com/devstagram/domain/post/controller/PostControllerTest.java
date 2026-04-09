@@ -133,7 +133,7 @@ class PostControllerTest {
         // given
         Long postId = 1L;
         List<Long> expectedTechIds = List.of(1L, 2L);
-        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", expectedTechIds, null);
+        PostUpdateReq updateReq = new PostUpdateReq("수정된 제목", "수정된 내용", expectedTechIds);
         String updateJson = objectMapper.writeValueAsString(updateReq);
 
         MockMultipartFile requestPart =
