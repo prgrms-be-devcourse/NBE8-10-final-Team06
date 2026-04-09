@@ -36,7 +36,7 @@ export const postApi = {
   update: (postId: number, req: PostUpdateRequest, files?: File[]) => {
     const formData = new FormData();
     appendJsonRequestPart(formData, req);
-    if (files) appendFileParts(formData, files);
+    if (files && files.length > 0) appendFileParts(formData, files);
     return client.put<RsData<void>>(`/posts/${postId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }).then(res => res.data);

@@ -223,22 +223,6 @@ const PostEditPage: React.FC = () => {
     });
   };
 
-  const toFileName = (sourceUrl: string, index: number) => {
-    const withoutQuery = sourceUrl.split('?')[0];
-    const raw = withoutQuery.split('/').pop() || `existing-${index + 1}`;
-    return raw.trim() || `existing-${index + 1}`;
-  };
-
-  const fetchAsFile = async (media: ExistingMediaItem, index: number): Promise<File> => {
-    const response = await fetch(media.previewUrl);
-    if (!response.ok) {
-      throw new Error(`기존 이미지 다운로드 실패: ${response.status}`);
-    }
-    const blob = await response.blob();
-    const fileName = toFileName(media.sourceUrl, index);
-    return new File([blob], fileName, { type: blob.type || 'image/jpeg' });
-  };
-
   const insertCodeBlockTemplate = (lang: string) => {
     const template = `\n\`\`\`${lang}\n// code here\n\`\`\`\n`;
     setContent((prev) => `${prev}${template}`);
@@ -260,24 +244,20 @@ const PostEditPage: React.FC = () => {
 
     try {
       setSubmitting(true);
+      const mediaChanged = newFileItems.length > 0 || existingMedias.length !== initialMediaCount;
+      const totalMedia = existingMedias.length + newFileItems.length;
+      if (mediaChanged && totalMedia === 0) {
+        alert('현재는 이미지가 1개 이상 있어야 합니다. 최소 1개 이미지를 남기거나 새로 추가해주세요.');
+        return;
+      }
+
       const req: PostUpdateRequest = {
         title: nextTitle,
         content: nextContent,
         techIds: selectedTechIds,
+        ...(mediaChanged ? { retainedMediaUrls: existingMedias.map((m) => m.sourceUrl) } : {}),
       };
-      const mediaChanged = newFileItems.length > 0 || existingMedias.length !== initialMediaCount;
-      let filesForUpload: File[] | undefined;
-
-      if (mediaChanged) {
-        const keptExistingFiles = await Promise.all(
-          existingMedias.map((media, index) => fetchAsFile(media, index))
-        );
-        filesForUpload = [...keptExistingFiles, ...newFileItems.map((item) => item.file)];
-        if (filesForUpload.length === 0) {
-          alert('현재는 이미지가 1개 이상 있어야 합니다. 최소 1개 이미지를 남기거나 새로 추가해주세요.');
-          return;
-        }
-      }
+      const filesForUpload = mediaChanged ? newFileItems.map((item) => item.file) : undefined;
 
       const res = await postApi.update(Number(postId), req, filesForUpload);
       if (isRsDataSuccess(res)) {
