@@ -572,7 +572,6 @@ public class DmService {
 
     private String toKstString(LocalDateTime dateTime) {
         if (dateTime == null) return null;
-        return dateTime.atZone(ZoneId.of("Asia/Seoul"))
-                .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        return dateTime.atZone(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 }
