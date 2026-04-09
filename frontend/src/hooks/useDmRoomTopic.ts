@@ -223,6 +223,9 @@ export function useDmRoomTopic(p: UseDmRoomTopicParams): void {
           const selfNow = effectiveSelfIdRef.current;
           const sid = toDmPositiveUserId(newMsg.senderId);
           if (isResolvedDmUserId(selfNow) && sid != null && sid !== selfNow) {
+            // 상대가 새 메시지를 보냈다면, 최소한 해당 시점까지는 채팅을 확인한 것으로 간주해
+            // read 이벤트 누락/지연 시에도 내 메시지의 미읽음 배지("1")가 남지 않게 보정한다.
+            setLastReadIdByOpponent((prev) => Math.max(prev, newMsg.id));
             sendReadEventRef.current(newMsg.id);
           }
           if (sid != null && lastShownTypingUserIdRef.current === sid) {
