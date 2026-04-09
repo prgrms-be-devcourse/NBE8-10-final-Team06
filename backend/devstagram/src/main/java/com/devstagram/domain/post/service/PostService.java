@@ -282,6 +282,9 @@ public class PostService {
             List<String> oldFileNames =
                     post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
+            // orphanRemoval 의존 대신 명시적 삭제 (clear()만으로는 DELETE가 보장되지 않음)
+            postMediaRepository.deleteAll(post.getMediaList());
+            postMediaRepository.flush();
             post.getMediaList().clear();
 
             for (int i = 0; i < files.size(); i++) {
@@ -296,6 +299,7 @@ public class PostService {
                         .sequence((short) (i + 1))
                         .build();
 
+                postMediaRepository.save(postMedia);
                 post.getMediaList().add(postMedia);
             }
 
@@ -348,6 +352,10 @@ public class PostService {
         Post post = postRepository
                 .findByIdWithLock(postId)
                 .orElseThrow(() -> new ServiceException("404-P-1", "존재하지 않는 게시글입니다."));
+
+        if (post.isDeleted()) {
+            throw new ServiceException("404-P-2", "삭제된 게시글에는 좋아요를 누를 수 없습니다.");
+        }
 
         Optional<PostLike> existingLike = postLikeRepository.findByPostIdAndUserId(postId, memberId);
 

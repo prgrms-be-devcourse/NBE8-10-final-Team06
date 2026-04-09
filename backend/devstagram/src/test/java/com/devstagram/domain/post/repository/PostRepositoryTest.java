@@ -169,7 +169,7 @@ class PostRepositoryTest {
     }
 
     @Test
-    @DisplayName("[게시글 삭제]")
+    @DisplayName("[게시글 soft delete]")
     void deletePostTest() {
         // given
         Post post = Post.builder()
@@ -183,12 +183,16 @@ class PostRepositoryTest {
         Post savedPost = postRepository.save(post);
 
         // when
-        postRepository.delete(savedPost);
+        savedPost.softDelete();
         postRepository.flush();
 
         // then
-        boolean exists = postRepository.existsById(savedPost.getId());
-        assertThat(exists).isFalse();
+        boolean existsInDb = postRepository.existsById(savedPost.getId());
+        assertThat(existsInDb).isTrue();
+
+        Slice<Post> activePostsSlice = postRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(
+                org.springframework.data.domain.PageRequest.of(0, 10));
+        assertThat(activePostsSlice.getContent()).noneMatch(p -> p.getId().equals(savedPost.getId()));
     }
 
     @Test

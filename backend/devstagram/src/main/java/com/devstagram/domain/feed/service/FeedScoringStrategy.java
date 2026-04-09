@@ -12,7 +12,7 @@ public class FeedScoringStrategy {
     // ==============================
     // 📊 Global Score Weight
     // ==============================
-    private static final double LIKE_WEIGHT = 10.0;
+    private static final double LIKE_WEIGHT = 5.0;
 
     // ==============================
     // 🎯 Personal Score Weight
@@ -23,7 +23,8 @@ public class FeedScoringStrategy {
     // ==============================
     // ⏳ Time Decay
     // ==============================
-    private static final double GRAVITY = 1.5;
+    private static final double GRAVITY = 1.5; // 글로벌 피드 감쇄 속도
+    private static final double PERSONAL_GRAVITY = 0.8; // 개인 피드 감쇄 속도 (느린 감쇄)
     private static final double TIME_SMOOTHING = 2.0;
 
     // ==============================
@@ -48,7 +49,7 @@ public class FeedScoringStrategy {
             score += FOLLOWER_WEIGHT;
         }
 
-        return applyTimeDecay(post, score);
+        return applyTimeDecay(post, score, PERSONAL_GRAVITY);
     }
 
     // ==============================
@@ -64,6 +65,10 @@ public class FeedScoringStrategy {
     // ⏳ Time Decay 공통 함수
     // ==============================
     private double applyTimeDecay(Post post, double score) {
+        return applyTimeDecay(post, score, GRAVITY);
+    }
+
+    private double applyTimeDecay(Post post, double score, double gravity) {
         long postMillis =
                 post.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
 
@@ -71,6 +76,6 @@ public class FeedScoringStrategy {
 
         double hoursPassed = (double) (nowMillis - postMillis) / (1000.0 * 60 * 60);
 
-        return score / Math.pow(hoursPassed + TIME_SMOOTHING, GRAVITY);
+        return score / Math.pow(hoursPassed + TIME_SMOOTHING, gravity);
     }
 }

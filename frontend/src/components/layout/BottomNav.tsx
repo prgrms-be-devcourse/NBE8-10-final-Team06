@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Search, PlusSquare, MessageCircle, User, Film, ImagePlus } from 'lucide-react';
+import { buildPathWithSearch } from '../../util/dmNavigation';
 
 const BottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const currentPathWithSearch = buildPathWithSearch(location.pathname, location.search);
 
   const navItems = [
     { icon: <Home size={26} />, path: '/' },
@@ -115,7 +117,17 @@ const BottomNav: React.FC = () => {
           return (
             <button
               key={item.path}
-              onClick={item.onClick ? item.onClick : () => navigate(item.path)}
+              onClick={
+                item.onClick
+                  ? item.onClick
+                  : () => {
+                      if (item.path === '/dm') {
+                        navigate('/dm', { state: { from: currentPathWithSearch } });
+                        return;
+                      }
+                      navigate(item.path);
+                    }
+              }
               style={{
                 background: 'none',
                 border: 'none',

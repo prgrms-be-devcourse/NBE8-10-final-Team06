@@ -76,6 +76,7 @@ const StoryViewer: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [showDmShare, setShowDmShare] = useState(false);
   const [captionExpanded, setCaptionExpanded] = useState(false);
+  const [showTaggedUsers, setShowTaggedUsers] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const likeInFlightRef = useRef(false);
   const storyFetchGenRef = useRef(0);
@@ -182,6 +183,7 @@ const StoryViewer: React.FC = () => {
   const currentStoryIdForCaption = stories[currentIndex]?.storyId;
   useEffect(() => {
     setCaptionExpanded(false);
+    setShowTaggedUsers(false);
   }, [currentIndex, currentStoryIdForCaption]);
 
   /** 서버 만료 시각이 지나면 즉시 다음 장(미디어 404·recordView 실패와 무관하게 목록 정리) */
@@ -206,6 +208,7 @@ const StoryViewer: React.FC = () => {
       showMenu ||
       replyText.length > 0 ||
       showDmShare ||
+      showTaggedUsers ||
       captionExpanded
     ) {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -241,6 +244,7 @@ const StoryViewer: React.FC = () => {
     showMenu,
     replyText,
     showDmShare,
+    showTaggedUsers,
     captionExpanded,
     handleNext,
   ]);
@@ -344,13 +348,34 @@ const StoryViewer: React.FC = () => {
 
   const authorFeed = feed.find((u) => Number(u.userId) === Number(currentStory.userId));
   const authorNickname =
+    currentStory.nickname?.trim() ||
     authorFeed?.nickname?.trim() ||
     (loggedInUserId != null && Number(currentStory.userId) === Number(loggedInUserId)
       ? loggedInNickname?.trim() ?? ''
       : '') ||
     '';
-  const authorProfileImageUrl = authorFeed?.profileImageUrl ?? null;
+  const authorProfileImageUrl = currentStory.profileImageUrl ?? authorFeed?.profileImageUrl ?? null;
   const authorLabel = authorNickname || (isOwner ? '나' : `User ${currentStory.userId}`);
+  const taggedUserIds = currentStory.taggedUserIds ?? [];
+  const userMap = new Map<number, { nickname: string; profileImageUrl: string | null }>();
+  feed.forEach((u) => userMap.set(u.userId, { nickname: u.nickname, profileImageUrl: u.profileImageUrl }));
+  stories.forEach((s) => {
+    if (!userMap.has(s.userId)) {
+      userMap.set(s.userId, {
+        nickname: s.nickname ?? '',
+        profileImageUrl: s.profileImageUrl ?? null,
+      });
+    }
+  });
+  const taggedUsers = taggedUserIds.map((id) => {
+    const resolved = userMap.get(id);
+    return {
+      userId: id,
+      nickname: resolved?.nickname?.trim() || `User ${id}`,
+      profileImageUrl: resolved?.profileImageUrl ?? null,
+      hasKnownNickname: Boolean(resolved?.nickname?.trim()),
+    };
+  });
 
   const goToProfileByNickname = (nickname: string) => {
     const nick = nickname.trim();
@@ -516,6 +541,89 @@ const StoryViewer: React.FC = () => {
           <X size={28} />
         </button>
       </div>
+
+      {taggedUsers.length > 0 && (
+        <div style={{ position: 'absolute', top: '76px', width: '95%', maxWidth: '400px', zIndex: 2150, padding: '0 10px', boxSizing: 'border-box' }}>
+          <button
+            type="button"
+            aria-expanded={showTaggedUsers}
+            aria-label="태그된 유저 목록 토글"
+            onClick={() => setShowTaggedUsers((prev) => !prev)}
+            style={{
+              border: 'none',
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              color: '#fff',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              borderRadius: '999px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+            }}
+          >
+            태그 {taggedUsers.length}명 {showTaggedUsers ? '접기' : '보기'}
+          </button>
+
+          {showTaggedUsers && (
+            <div
+              style={{
+                marginTop: '8px',
+                maxHeight: '180px',
+                overflowY: 'auto',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                backdropFilter: 'blur(2px)',
+                padding: '8px',
+              }}
+            >
+              {taggedUsers.map((user) => (
+                <div
+                  key={user.userId}
+                  role={user.hasKnownNickname ? 'button' : undefined}
+                  tabIndex={user.hasKnownNickname ? 0 : undefined}
+                  onClick={() => {
+                    if (!user.hasKnownNickname) return;
+                    goToProfileByNickname(user.nickname);
+                  }}
+                  onKeyDown={(e) => {
+                    if (!user.hasKnownNickname) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      goToProfileByNickname(user.nickname);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    cursor: user.hasKnownNickname ? 'pointer' : 'default',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      backgroundColor: '#efefef',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ProfileAvatar
+                      fillContainer
+                      authorUserId={user.userId}
+                      profileImageUrl={user.profileImageUrl}
+                      nickname={user.nickname}
+                    />
+                  </div>
+                  <span style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>{user.nickname}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 미디어 + 문구(본문은 미디어 아래) */}
       <div

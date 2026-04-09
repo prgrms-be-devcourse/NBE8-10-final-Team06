@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, MessageSquare, X, Check } from 'lucide-react';
 import { dmApi } from '../../api/dm';
 import { userApi } from '../../api/user';
@@ -11,6 +11,7 @@ import type { DmRoomSummaryResponse } from '../../types/dm';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { formatDmPeerNickname } from '../../util/dmPeerDisplayName';
 import { isDmSharedStoryContentExpired } from '../../util/dmStoryShareExpiry';
+import { type DmLocationState, isDmPath, sanitizeBackTarget } from '../../util/dmNavigation';
 
 function dmMessagePreview(room: DmRoomSummaryResponse): string {
   const msg = room.lastMessage;
@@ -75,6 +76,19 @@ const DmListPage: React.FC = () => {
   const [groupName, setGroupName] = useState('');
   
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = (location.state as DmLocationState | null) ?? null;
+  const listFromCandidate = sanitizeBackTarget(locationState?.from, '/');
+  const listBackTarget = isDmPath(listFromCandidate) ? '/' : listFromCandidate;
+
+  const openRoom = (roomId: number) => {
+    navigate(`/dm/${roomId}`, {
+      state: {
+        from: '/dm',
+        listFrom: listBackTarget,
+      } satisfies DmLocationState,
+    });
+  };
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -160,7 +174,7 @@ const DmListPage: React.FC = () => {
       }
       if (res.resultCode.startsWith('200')) {
         closeCreateModal();
-        navigate(`/dm/${res.data.roomId}`);
+        openRoom(res.data.roomId);
       }
     } catch (err) {
       alert('채팅방 생성에 실패했습니다.');
@@ -184,7 +198,7 @@ const DmListPage: React.FC = () => {
     <div style={{ paddingBottom: '60px', backgroundColor: '#fafafa', minHeight: '100vh' }}>
       <header style={{ position: 'sticky', top: 0, backgroundColor: '#fff', borderBottom: '1px solid #dbdbdb', zIndex: 900 }}>
         <div className="app-shell" style={{ height: '60px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
-          <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} color="#262626" /></button>
+          <button onClick={() => navigate(listBackTarget, { replace: true })} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><ArrowLeft size={24} color="#262626" /></button>
           <strong style={{ fontSize: '1rem', fontWeight: 'bold' }}>메시지</strong>
           <button onClick={() => setShowCreateModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><Edit size={24} color="#262626" /></button>
         </div>
@@ -258,7 +272,7 @@ const DmListPage: React.FC = () => {
                     ? room.participants.find((p) => Number(p.userId) !== Number(myUserId))
                     : room.participants[0];
               return (
-                <div key={room.roomId} onClick={() => { markAsRead(room.roomId); navigate(`/dm/${room.roomId}`); }} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', cursor: 'pointer', justifyContent: 'space-between' }}>
+                <div key={room.roomId} onClick={() => { markAsRead(room.roomId); openRoom(room.roomId); }} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 20px', cursor: 'pointer', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1, minWidth: 0 }}>
                     <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#efefef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                       {peer ? (
