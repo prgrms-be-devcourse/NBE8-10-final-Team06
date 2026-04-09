@@ -282,6 +282,9 @@ public class PostService {
             List<String> oldFileNames =
                     post.getMediaList().stream().map(PostMedia::getSourceUrl).toList();
 
+            // orphanRemoval 의존 대신 명시적 삭제 (clear()만으로는 DELETE가 보장되지 않음)
+            postMediaRepository.deleteAll(post.getMediaList());
+            postMediaRepository.flush();
             post.getMediaList().clear();
 
             for (int i = 0; i < files.size(); i++) {
@@ -296,6 +299,7 @@ public class PostService {
                         .sequence((short) (i + 1))
                         .build();
 
+                postMediaRepository.save(postMedia);
                 post.getMediaList().add(postMedia);
             }
 
