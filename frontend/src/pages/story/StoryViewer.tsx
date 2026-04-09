@@ -15,8 +15,8 @@ import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { normalizeStoryExitPath } from '../../util/storyNavigation';
+import { isStoryPastExpiry, slideDurationMs } from '../../util/storyExpiry';
 
-const STORY_DURATION = 5000;
 /** 이 길이를 넘으면 말줄임 후 클릭 시 전문 토글 */
 const STORY_CAPTION_COLLAPSE_MAX = 40;
 
@@ -78,12 +78,24 @@ const StoryViewer: React.FC = () => {
   const [captionExpanded, setCaptionExpanded] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const likeInFlightRef = useRef(false);
+  const storyFetchGenRef = useRef(0);
+  /** 같은 마운트에서 피드는 한 번만 요청 (feed state와 무관하게 stale/deps 루프 방지) */
+  const needStoryFeedRef = useRef(true);
 
   const { userId: loggedInUserId, nickname: loggedInNickname, profileImageUrl: myProfileImageUrl } = useAuthStore();
   const setRooms = useDmStore((s) => s.setRooms);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
+  /** 타이머·미디어 onError 등에서 최신 목록/인덱스로 다음 장 처리 (stale closure 방지) */
+  const viewerStateRef = useRef({
+    currentIndex: 0,
+    stories: [] as StoryDetailResponse[],
+    feed: [] as StoryFeedResponse[],
+    targetUserId: 0,
+    loggedInUserId: null as number | null,
+  });
+  viewerStateRef.current = { currentIndex, stories, feed, targetUserId, loggedInUserId };
 
   const isImage = (mediaType: string) => {
     const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
@@ -96,38 +108,94 @@ const StoryViewer: React.FC = () => {
   useEffect(() => {
     const initData = async () => {
       if (!targetUserId) return;
+      const gen = ++storyFetchGenRef.current;
       setIsLoading(true);
-      setCurrentIndex(0); 
+      setCurrentIndex(0);
       setShowStats(false);
       setShowMenu(false);
       setReplyText('');
-      
+
       try {
-        if (feed.length === 0) {
+        if (needStoryFeedRef.current) {
           const feedRes = await storyApi.getFeed();
-          if (feedRes.resultCode.startsWith('200')) setFeed(feedRes.data);
+          if (gen !== storyFetchGenRef.current) return;
+          if (feedRes.resultCode.startsWith('200')) {
+            setFeed(feedRes.data);
+            needStoryFeedRef.current = false;
+          }
         }
         const res = await storyApi.getUserStories(targetUserId);
-        if (res.resultCode.startsWith('200') && res.data.length > 0) {
-          setStories(res.data);
-          const firstStoryId = res.data[0]?.storyId;
+        if (gen !== storyFetchGenRef.current) return;
+        const nowMs = Date.now();
+        const list = (res.data || []).filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
+        if (res.resultCode.startsWith('200') && list.length > 0) {
+          setStories(list);
+          const firstStoryId = list[0]?.storyId;
           if (firstStoryId) await storyApi.recordViewSafe(firstStoryId, targetUserId);
         } else {
           exitStoryViewer();
         }
-      } catch (error) {
+      } catch {
+        if (gen !== storyFetchGenRef.current) return;
         exitStoryViewer();
       } finally {
-        setIsLoading(false);
+        if (gen === storyFetchGenRef.current) setIsLoading(false);
       }
     };
-    initData();
+    void initData();
   }, [targetUserId, navigate, exitStoryViewer]);
+
+  const handleNext = useCallback(() => {
+    const { currentIndex: i, stories: list, feed: f, targetUserId: tid, loggedInUserId: lid } = viewerStateRef.current;
+    if (i < list.length - 1) {
+      const next = list[i + 1];
+      setCurrentIndex(i + 1);
+      setProgress(0);
+      void storyApi.recordViewSafe(next.storyId, tid);
+      return;
+    }
+    const feedUserIds = f.map((u) => u.userId);
+    let sequence = [...feedUserIds];
+    if (lid != null && !feedUserIds.includes(lid)) sequence = [lid, ...feedUserIds];
+    const currentIdx = sequence.indexOf(tid);
+    if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
+      navigate(`/story/${sequence[currentIdx + 1]}`);
+    } else {
+      exitStoryViewer();
+    }
+  }, [navigate, exitStoryViewer]);
+
+  const handlePrev = useCallback(() => {
+    const { currentIndex: i, feed: f, targetUserId: tid, loggedInUserId: lid } = viewerStateRef.current;
+    if (i > 0) {
+      setCurrentIndex(i - 1);
+      setProgress(0);
+      return;
+    }
+    const feedUserIds = f.map((u) => u.userId);
+    let sequence = [...feedUserIds];
+    if (lid != null && !feedUserIds.includes(lid)) sequence = [lid, ...feedUserIds];
+    const currentIdx = sequence.indexOf(tid);
+    if (currentIdx > 0) navigate(`/story/${sequence[currentIdx - 1]}`);
+  }, [navigate]);
 
   const currentStoryIdForCaption = stories[currentIndex]?.storyId;
   useEffect(() => {
     setCaptionExpanded(false);
   }, [currentIndex, currentStoryIdForCaption]);
+
+  /** 서버 만료 시각이 지나면 즉시 다음 장(미디어 404·recordView 실패와 무관하게 목록 정리) */
+  useEffect(() => {
+    if (isLoading || stories.length === 0) return;
+    const tick = () => {
+      const { currentIndex: i, stories: list } = viewerStateRef.current;
+      const s = list[i];
+      if (!s || !isStoryPastExpiry(s.expiredAt)) return;
+      handleNext();
+    };
+    const id = window.setInterval(tick, 400);
+    return () => window.clearInterval(id);
+  }, [currentIndex, stories, isLoading, handleNext]);
 
   useEffect(() => {
     if (
@@ -145,51 +213,37 @@ const StoryViewer: React.FC = () => {
       return;
     }
 
-    const remainingTime = STORY_DURATION * (1 - progress / 100);
+    const slideTotalMs = slideDurationMs(stories[currentIndex]?.expiredAt);
+    if (slideTotalMs <= 0) {
+      const z = window.setTimeout(() => handleNext(), 0);
+      return () => window.clearTimeout(z);
+    }
+
+    const remainingTime = slideTotalMs * (1 - progress / 100);
     timerRef.current = setTimeout(() => handleNext(), remainingTime);
 
-    const startTime = Date.now() - (STORY_DURATION * (progress / 100));
+    const startTime = Date.now() - slideTotalMs * (progress / 100);
     progressRef.current = setInterval(() => {
       const elapsedTime = Date.now() - startTime;
-      setProgress(Math.min((elapsedTime / STORY_DURATION) * 100, 100));
+      setProgress(Math.min((elapsedTime / slideTotalMs) * 100, 100));
     }, 10);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       if (progressRef.current) clearInterval(progressRef.current);
     };
-  }, [currentIndex, stories, isLoading, showStats, isPaused, showMenu, replyText, showDmShare, captionExpanded]);
-
-  const handleNext = () => {
-    if (currentIndex < stories.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      setProgress(0);
-      void storyApi.recordViewSafe(stories[currentIndex + 1].storyId, targetUserId);
-    } else {
-      const feedUserIds = feed.map(u => u.userId);
-      let sequence = [...feedUserIds];
-      if (loggedInUserId && !feedUserIds.includes(loggedInUserId)) sequence = [loggedInUserId, ...feedUserIds];
-      const currentIdx = sequence.indexOf(targetUserId);
-      if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
-        navigate(`/story/${sequence[currentIdx + 1]}`);
-      } else {
-        exitStoryViewer();
-      }
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-      setProgress(0);
-    } else {
-      const feedUserIds = feed.map(u => u.userId);
-      let sequence = [...feedUserIds];
-      if (loggedInUserId && !feedUserIds.includes(loggedInUserId)) sequence = [loggedInUserId, ...feedUserIds];
-      const currentIdx = sequence.indexOf(targetUserId);
-      if (currentIdx > 0) navigate(`/story/${sequence[currentIdx - 1]}`);
-    }
-  };
+  }, [
+    currentIndex,
+    stories,
+    isLoading,
+    showStats,
+    isPaused,
+    showMenu,
+    replyText,
+    showDmShare,
+    captionExpanded,
+    handleNext,
+  ]);
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -509,21 +563,30 @@ const StoryViewer: React.FC = () => {
           >
             {isImage(currentStory.mediaType) ? (
               <img
+                key={currentStory.storyId}
                 src={getFullUrl(currentStory.mediaUrl)}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 onError={(e) => {
                   const img = e.currentTarget;
-                  if (img.dataset.fallbackApplied === '1') return;
+                  if (img.dataset.fallbackApplied === '1') {
+                    img.onerror = null;
+                    handleNext();
+                    return;
+                  }
                   const fallback = getFallbackUrl(currentStory.mediaUrl);
                   if (fallback) {
                     img.dataset.fallbackApplied = '1';
                     img.src = fallback;
+                    return;
                   }
+                  img.onerror = null;
+                  handleNext();
                 }}
               />
             ) : (
               <video
+                key={currentStory.storyId}
                 src={getFullUrl(currentStory.mediaUrl)}
                 autoPlay
                 muted
@@ -531,13 +594,20 @@ const StoryViewer: React.FC = () => {
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 onError={(e) => {
                   const video = e.currentTarget;
-                  if (video.dataset.fallbackApplied === '1') return;
+                  if (video.dataset.fallbackApplied === '1') {
+                    video.onerror = null;
+                    handleNext();
+                    return;
+                  }
                   const fallback = getFallbackUrl(currentStory.mediaUrl);
                   if (fallback) {
                     video.dataset.fallbackApplied = '1';
                     video.src = fallback;
                     video.load();
+                    return;
                   }
+                  video.onerror = null;
+                  handleNext();
                 }}
               />
             )}
