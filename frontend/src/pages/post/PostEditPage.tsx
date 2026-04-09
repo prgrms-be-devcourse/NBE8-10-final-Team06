@@ -459,6 +459,12 @@ const PostEditPage: React.FC = () => {
                 })}
               </div>
             )}
+            {selectedTechIds.length > 0 && (
+              <div
+                aria-hidden="true"
+                style={{ borderTop: '1.5px solid #efefef', margin: '0 0 12px' }}
+              />
+            )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '8px' }}>
               {displayedTechs.length === 0 ? (
