@@ -9,18 +9,29 @@ import {
 } from '../types/story';
 import { RsData } from '../types/common';
 import { appendOptionalFormField } from '../util/formDataParts';
+import { storyLogRequestFailed } from '../util/storyDebug';
 
 export const storyApi = {
   // 스토리 피드(홈 바) 조회
   getFeed: async (): Promise<RsData<StoryFeedResponse[]>> => {
-    const res = await client.get<RsData<StoryFeedResponse[]>>('/story/feed');
-    return res.data;
+    try {
+      const res = await client.get<RsData<StoryFeedResponse[]>>('/story/feed');
+      return res.data;
+    } catch (err) {
+      storyLogRequestFailed('GET /story/feed', err);
+      throw err;
+    }
   },
 
   // 특정 유저의 활성화된 스토리 목록 조회
   getUserStories: async (targetUserId: number): Promise<RsData<StoryDetailResponse[]>> => {
-    const res = await client.get<RsData<StoryDetailResponse[]>>(`/story/user/${targetUserId}`);
-    return res.data;
+    try {
+      const res = await client.get<RsData<StoryDetailResponse[]>>(`/story/user/${targetUserId}`);
+      return res.data;
+    } catch (err) {
+      storyLogRequestFailed(`GET /story/user/${targetUserId} (작성자 userId)`, err);
+      throw err;
+    }
   },
 
   /**
@@ -34,14 +45,17 @@ export const storyApi = {
     return res.data;
   },
 
-  /** 시청 기록 전송(베스트 에포트). 실패해도 예외 없음 — 뷰어 재생 흐름용. */
+  /** 시청 기록 전송(베스트 에포트). 실패해도 예외를 밖으로 던지지 않음 — 뷰어·종료 시 플러시용. */
   recordViewSafe: async (storyId: number, targetUserId: number): Promise<void> => {
     try {
       await client.post<RsData<StoryDetailResponse>>(`/story/${storyId}/view`, null, {
         params: { targetUserId },
       });
-    } catch {
-      /* 백엔드 5xx 등 */
+    } catch (err) {
+      storyLogRequestFailed(
+        `POST /story/${storyId}/view?targetUserId=${targetUserId} (storyId=콘텐츠, targetUserId=작성자)`,
+        err
+      );
     }
   },
 

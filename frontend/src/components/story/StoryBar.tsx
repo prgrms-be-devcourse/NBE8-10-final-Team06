@@ -7,7 +7,7 @@ import { StoryFeedResponse, StoryDetailResponse } from '../../types/story';
 import { useAuthStore } from '../../store/useAuthStore';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
-import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
+import { STORY_FROM_STATE_KEY, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
 import { isStoryPastExpiry } from '../../util/storyExpiry';
 import { isRsDataSuccess } from '../../util/rsData';
 
@@ -72,9 +72,8 @@ const StoryBar: React.FC = () => {
         try {
           const myStoryRes = await storyApi.getUserStories(currentUserId);
           if (isRsDataSuccess(myStoryRes)) {
-            const nowMs = Date.now();
-            const list = (myStoryRes.data || []).filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
-            setMyStories(list);
+            /** 활성 목록은 서버 쿼리와 동일 — 클라 재필터는 시계 차이로 내 스토리 링이 사라지거나 남는 현상 유발 */
+            setMyStories(myStoryRes.data || []);
           } else {
             setMyStories([]);
           }
@@ -93,6 +92,12 @@ const StoryBar: React.FC = () => {
   useEffect(() => {
     void loadStoryBar();
   }, [loadStoryBar, location.pathname]);
+
+  useEffect(() => {
+    const onInvalidate = () => void loadStoryBar();
+    window.addEventListener(STORY_RING_INVALIDATE_EVENT, onInvalidate);
+    return () => window.removeEventListener(STORY_RING_INVALIDATE_EVENT, onInvalidate);
+  }, [loadStoryBar]);
 
   useEffect(() => {
     const onVis = () => {
