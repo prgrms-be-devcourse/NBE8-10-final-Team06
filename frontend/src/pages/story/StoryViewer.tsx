@@ -14,8 +14,9 @@ import { isRsDataSuccess } from '../../util/rsData';
 import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
-import { normalizeStoryExitPath } from '../../util/storyNavigation';
+import { normalizeStoryExitPath, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
 import { isStoryPastExpiry, slideDurationMs } from '../../util/storyExpiry';
+import { storyLogVerbose, storyWarnAlways } from '../../util/storyDebug';
 
 /** 이 길이를 넘으면 말줄임 후 클릭 시 전문 토글 */
 const STORY_CAPTION_COLLAPSE_MAX = 40;
@@ -58,10 +59,7 @@ const StoryViewer: React.FC = () => {
   if (storyReturnPathRef.current === undefined) {
     storyReturnPathRef.current = normalizeStoryExitPath(location.state);
   }
-  const exitStoryViewer = useCallback(() => {
-    navigate(storyReturnPathRef.current ?? '/');
-  }, [navigate]);
-  
+
   const [stories, setStories] = useState<StoryDetailResponse[]>([]);
   const [feed, setFeed] = useState<StoryFeedResponse[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -98,6 +96,14 @@ const StoryViewer: React.FC = () => {
   });
   viewerStateRef.current = { currentIndex, stories, feed, targetUserId, loggedInUserId };
 
+  const exitStoryViewer = useCallback(async () => {
+    const { stories: list, currentIndex: i, targetUserId: tid } = viewerStateRef.current;
+    const cur = list[i];
+    if (cur && tid) await storyApi.recordViewSafe(cur.storyId, tid);
+    navigate(storyReturnPathRef.current ?? '/');
+    queueMicrotask(() => window.dispatchEvent(new CustomEvent(STORY_RING_INVALIDATE_EVENT)));
+  }, [navigate]);
+
   const isImage = (mediaType: string) => {
     const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     return imageExtensions.includes(mediaType.toLowerCase());
@@ -108,7 +114,16 @@ const StoryViewer: React.FC = () => {
 
   useEffect(() => {
     const initData = async () => {
-      if (!targetUserId) return;
+      if (!Number.isFinite(targetUserId) || targetUserId < 1) {
+        storyWarnAlways('viewer:invalidRouteUserId', {
+          pathUserIdParam: targetUserIdStr,
+          parsed: targetUserId,
+          hint: '`/story/:userId`에는 스토리 작성자의 userId(숫자)가 와야 합니다. storyId와 바꿔 넣으면 다른 유저 조회가 되어 빈 목록·HTTP 404가 날 수 있습니다.',
+        });
+        setIsLoading(false);
+        navigate(storyReturnPathRef.current ?? '/');
+        return;
+      }
       const gen = ++storyFetchGenRef.current;
       setIsLoading(true);
       setCurrentIndex(0);
@@ -116,10 +131,20 @@ const StoryViewer: React.FC = () => {
       setShowMenu(false);
       setReplyText('');
 
+      storyLogVerbose('viewer:init:start', {
+        targetUserId,
+        exitTo: storyReturnPathRef.current ?? '/',
+      });
+
       try {
         if (needStoryFeedRef.current) {
           const feedRes = await storyApi.getFeed();
           if (gen !== storyFetchGenRef.current) return;
+          storyLogVerbose('viewer:feed', {
+            resultCode: feedRes.resultCode,
+            rowCount: feedRes.data?.length ?? 0,
+            userIds: (feedRes.data ?? []).map((r) => r.userId),
+          });
           if (feedRes.resultCode.startsWith('200')) {
             setFeed(feedRes.data);
             needStoryFeedRef.current = false;
@@ -127,26 +152,54 @@ const StoryViewer: React.FC = () => {
         }
         const res = await storyApi.getUserStories(targetUserId);
         if (gen !== storyFetchGenRef.current) return;
-        const nowMs = Date.now();
-        const list = (res.data || []).filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
+        /** 서버가 이미 만료·삭제를 걸러 줌. 클라이언트 재필터는 시계/타임존 차이로 목록이 비어 404·즉시 종료처럼 보일 수 있음 */
+        const list = res.data || [];
+        storyLogVerbose('viewer:userStories:response', {
+          resultCode: res.resultCode,
+          msg: res.msg,
+          count: list.length,
+          storyIds: list.map((s) => s.storyId),
+          authorUserIds: [...new Set(list.map((s) => s.userId))],
+        });
         if (res.resultCode.startsWith('200') && list.length > 0) {
+          const first = list[0];
+          if (first && Number(first.userId) !== Number(targetUserId)) {
+            storyWarnAlways('viewer:authorMismatch', {
+              routeTargetUserId: targetUserId,
+              firstStoryUserId: first.userId,
+              storyId: first.storyId,
+              hint: '목록 첫 장의 userId가 URL 작성자 id와 다릅니다. 백엔드·캐시 이슈 가능성을 확인하세요.',
+            });
+          }
           setStories(list);
           const firstStoryId = list[0]?.storyId;
           if (firstStoryId) await storyApi.recordViewSafe(firstStoryId, targetUserId);
         } else {
-          exitStoryViewer();
+          storyWarnAlways('viewer:emptyOrNonOk — 뷰어를 닫습니다', {
+            resultCode: res.resultCode,
+            msg: res.msg,
+            listLength: list.length,
+            targetUserId,
+            hint:
+              list.length === 0 && String(res.resultCode).startsWith('200')
+                ? '서버가 빈 배열을 반환했습니다(해당 시각 기준 활성 스토리 없음·만료·삭제). 다른 화면 목록과 시각/캐시가 어긋나지 않았는지, URL의 userId가 그 목록의 작성자 id와 같은지 확인하세요.'
+                : 'resultCode가 200이 아니거나 data가 비었습니다.',
+          });
+          void exitStoryViewer();
         }
-      } catch {
+      } catch (err) {
         if (gen !== storyFetchGenRef.current) return;
-        exitStoryViewer();
+        /** `getUserStories` 단계에서 이미 `[Story] GET /story/user/... HTTP 실패` 로그가 찍힘 */
+        storyLogVerbose('viewer:init aborted after error', { targetUserId, error: String(err) });
+        void exitStoryViewer();
       } finally {
         if (gen === storyFetchGenRef.current) setIsLoading(false);
       }
     };
     void initData();
-  }, [targetUserId, navigate, exitStoryViewer]);
+  }, [targetUserId, targetUserIdStr, navigate, exitStoryViewer]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     const { currentIndex: i, stories: list, feed: f, targetUserId: tid, loggedInUserId: lid } = viewerStateRef.current;
     if (i < list.length - 1) {
       const next = list[i + 1];
@@ -155,6 +208,8 @@ const StoryViewer: React.FC = () => {
       void storyApi.recordViewSafe(next.storyId, tid);
       return;
     }
+    const cur = list[i];
+    if (cur && tid) await storyApi.recordViewSafe(cur.storyId, tid);
     const feedUserIds = f.map((u) => u.userId);
     let sequence = [...feedUserIds];
     if (lid != null && !feedUserIds.includes(lid)) sequence = [lid, ...feedUserIds];
@@ -162,17 +217,19 @@ const StoryViewer: React.FC = () => {
     if (currentIdx !== -1 && currentIdx < sequence.length - 1) {
       navigate(`/story/${sequence[currentIdx + 1]}`);
     } else {
-      exitStoryViewer();
+      await exitStoryViewer();
     }
   }, [navigate, exitStoryViewer]);
 
-  const handlePrev = useCallback(() => {
-    const { currentIndex: i, feed: f, targetUserId: tid, loggedInUserId: lid } = viewerStateRef.current;
+  const handlePrev = useCallback(async () => {
+    const { currentIndex: i, stories: list, feed: f, targetUserId: tid, loggedInUserId: lid } = viewerStateRef.current;
     if (i > 0) {
       setCurrentIndex(i - 1);
       setProgress(0);
       return;
     }
+    const cur = list[i];
+    if (cur && tid) await storyApi.recordViewSafe(cur.storyId, tid);
     const feedUserIds = f.map((u) => u.userId);
     let sequence = [...feedUserIds];
     if (lid != null && !feedUserIds.includes(lid)) sequence = [lid, ...feedUserIds];
@@ -193,7 +250,7 @@ const StoryViewer: React.FC = () => {
       const { currentIndex: i, stories: list } = viewerStateRef.current;
       const s = list[i];
       if (!s || !isStoryPastExpiry(s.expiredAt)) return;
-      handleNext();
+      void handleNext();
     };
     const id = window.setInterval(tick, 400);
     return () => window.clearInterval(id);
@@ -218,12 +275,12 @@ const StoryViewer: React.FC = () => {
 
     const slideTotalMs = slideDurationMs(stories[currentIndex]?.expiredAt);
     if (slideTotalMs <= 0) {
-      const z = window.setTimeout(() => handleNext(), 0);
+      const z = window.setTimeout(() => void handleNext(), 0);
       return () => window.clearTimeout(z);
     }
 
     const remainingTime = slideTotalMs * (1 - progress / 100);
-    timerRef.current = setTimeout(() => handleNext(), remainingTime);
+    timerRef.current = setTimeout(() => void handleNext(), remainingTime);
 
     const startTime = Date.now() - slideTotalMs * (progress / 100);
     progressRef.current = setInterval(() => {
@@ -273,7 +330,7 @@ const StoryViewer: React.FC = () => {
   };
 
   const removeStoryFromList = (updated: StoryDetailResponse[]) => {
-    if (updated.length === 0) exitStoryViewer();
+    if (updated.length === 0) void exitStoryViewer();
     else {
       setStories(updated);
       setCurrentIndex((prev) => Math.min(prev, updated.length - 1));
@@ -537,7 +594,7 @@ const StoryViewer: React.FC = () => {
             )}
           </div>
         )}
-        <button type="button" onClick={() => exitStoryViewer()} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}>
+        <button type="button" onClick={() => void exitStoryViewer()} style={{ marginLeft: isOwner ? '0' : 'auto', background: 'none', border: 'none', color: '#fff' }}>
           <X size={28} />
         </button>
       </div>
@@ -679,7 +736,7 @@ const StoryViewer: React.FC = () => {
                   const img = e.currentTarget;
                   if (img.dataset.fallbackApplied === '1') {
                     img.onerror = null;
-                    handleNext();
+                    void handleNext();
                     return;
                   }
                   const fallback = getFallbackUrl(currentStory.mediaUrl);
@@ -689,7 +746,7 @@ const StoryViewer: React.FC = () => {
                     return;
                   }
                   img.onerror = null;
-                  handleNext();
+                  void handleNext();
                 }}
               />
             ) : (
@@ -704,7 +761,7 @@ const StoryViewer: React.FC = () => {
                   const video = e.currentTarget;
                   if (video.dataset.fallbackApplied === '1') {
                     video.onerror = null;
-                    handleNext();
+                    void handleNext();
                     return;
                   }
                   const fallback = getFallbackUrl(currentStory.mediaUrl);
@@ -715,12 +772,12 @@ const StoryViewer: React.FC = () => {
                     return;
                   }
                   video.onerror = null;
-                  handleNext();
+                  void handleNext();
                 }}
               />
             )}
-            <div onClick={handlePrev} style={{ position: 'absolute', left: 0, top: 0, width: '30%', height: '100%' }} />
-            <div onClick={handleNext} style={{ position: 'absolute', right: 0, top: 0, width: '70%', height: '100%' }} />
+            <div onClick={() => void handlePrev()} style={{ position: 'absolute', left: 0, top: 0, width: '30%', height: '100%' }} />
+            <div onClick={() => void handleNext()} style={{ position: 'absolute', right: 0, top: 0, width: '70%', height: '100%' }} />
           </div>
           {storyCaption.length > 0 ? (
             captionNeedsTruncate ? (
