@@ -99,7 +99,10 @@ public class StoryService {
 
         LocalDateTime now = LocalDateTime.now();
         List<Story> stories = storyRepository.findActiveNonExpiredByUserIdOrderByCreatedAtAsc(targetUserId, now);
-        // 특정 유저의 스토리 & 활성화된 스토리 찾아서 생성 시간순으로 정렬
+        // JPQL 경계·시각 레이스로 만료분이 섞일 수 있어, 응답 직전에 한 번 더 만료 시각으로 방어
+        stories = stories.stream()
+                .filter(s -> s.getExpiredAt() != null && s.getExpiredAt().isAfter(now))
+                .toList();
 
         if (stories.isEmpty()) {
             return Collections.emptyList();
