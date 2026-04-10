@@ -26,6 +26,7 @@ import TechDonutChart from '../../components/profile/TechDonutChart';
 import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../../util/profilePostCount';
 import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
+import { isStoryPastExpiry } from '../../util/storyExpiry';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -518,11 +519,7 @@ const ProfilePage: React.FC = () => {
           (storiesRes.resultCode?.includes('-S-') || storiesRes.resultCode?.startsWith('200')) &&
           Array.isArray(storiesRes.data);
         const nowMs = Date.now();
-        const notExpired = (storiesRes.data || []).filter((s) => {
-          if (!s.expiredAt) return true;
-          const t = Date.parse(s.expiredAt);
-          return !Number.isFinite(t) || t > nowMs;
-        });
+        const notExpired = (storiesRes.data || []).filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
         const hasActive = okStories && notExpired.length > 0;
         let feedUnread: boolean | null = null;
         if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {

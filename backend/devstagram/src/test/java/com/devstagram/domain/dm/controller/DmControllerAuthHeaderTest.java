@@ -162,7 +162,7 @@ class DmControllerAuthHeaderTest {
                         "나갔습니다.",
                         null,
                         true,
-                        java.time.LocalDateTime.now(),
+                        "2026-04-09T07:13:39+09:00",
                         1L);
         when(dmService.leaveGroupRoom(1L, 100L)).thenReturn(messageResponse);
 
