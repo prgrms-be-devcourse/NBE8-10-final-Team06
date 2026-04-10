@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { syncMyProfileImageFromUserApi } from '../../services/syncMyProfileImage';
 import { STORY_FROM_STATE_KEY, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
-import { isStoryPastExpiry } from '../../util/storyExpiry';
+import { filterStoriesNotPastExpiry, isStoryPastExpiry } from '../../util/storyExpiry';
 import { isRsDataSuccess } from '../../util/rsData';
 
 const STORY_RING_GRADIENT =
@@ -72,8 +72,7 @@ const StoryBar: React.FC = () => {
         try {
           const myStoryRes = await storyApi.getUserStories(currentUserId);
           if (isRsDataSuccess(myStoryRes)) {
-            /** 활성 목록은 서버 쿼리와 동일 — 클라 재필터는 시계 차이로 내 스토리 링이 사라지거나 남는 현상 유발 */
-            setMyStories(myStoryRes.data || []);
+            setMyStories(filterStoriesNotPastExpiry(myStoryRes.data || []));
           } else {
             setMyStories([]);
           }

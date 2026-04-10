@@ -26,6 +26,7 @@ import TechDonutChart from '../../components/profile/TechDonutChart';
 import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../../util/profilePostCount';
 import { STORY_FROM_STATE_KEY, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
+import { filterStoriesNotPastExpiry } from '../../util/storyExpiry';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -519,7 +520,8 @@ const ProfilePage: React.FC = () => {
         const okStories =
           (storiesRes.resultCode?.includes('-S-') || storiesRes.resultCode?.startsWith('200')) &&
           Array.isArray(storiesRes.data);
-        const hasActive = okStories && (storiesRes.data || []).length > 0;
+        const activeStories = filterStoriesNotPastExpiry(storiesRes.data || []);
+        const hasActive = okStories && activeStories.length > 0;
         let feedUnread: boolean | null = null;
         if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
           const row = (feedRes.data || []).find((f) => Number(f.userId) === uid);
