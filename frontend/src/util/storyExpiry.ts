@@ -13,6 +13,15 @@ export function isStoryPastExpiry(expiredAt: string | undefined | null, nowMs = 
   return end != null && nowMs >= end;
 }
 
+/** API가 만료분을 섞어내도 진행 바·썸네일 개수를 맞추기 위한 클라 방어 필터 */
+export function filterStoriesNotPastExpiry<T extends { expiredAt: string }>(
+  items: T[] | null | undefined,
+  nowMs = Date.now()
+): T[] {
+  if (!items?.length) return [];
+  return items.filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
+}
+
 export function slideDurationMs(expiredAt: string | undefined | null, nowMs = Date.now()): number {
   const end = storyExpiresAtMs(expiredAt);
   if (end == null) return STORY_VIEWER_SLIDE_MS;

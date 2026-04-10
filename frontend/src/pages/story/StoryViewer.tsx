@@ -15,7 +15,7 @@ import DmShareModal from '../../components/dm/DmShareModal';
 import { getAlternateAssetUrl, resolveAssetUrl } from '../../util/assetUrl';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { normalizeStoryExitPath, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
-import { isStoryPastExpiry, slideDurationMs } from '../../util/storyExpiry';
+import { filterStoriesNotPastExpiry, isStoryPastExpiry, slideDurationMs } from '../../util/storyExpiry';
 import { storyLogVerbose, storyWarnAlways } from '../../util/storyDebug';
 
 /** 이 길이를 넘으면 말줄임 후 클릭 시 전문 토글 */
@@ -152,13 +152,17 @@ const StoryViewer: React.FC = () => {
         }
         const res = await storyApi.getUserStories(targetUserId);
         if (gen !== storyFetchGenRef.current) return;
-        /** 서버가 이미 만료·삭제를 걸러 줌. 클라이언트 재필터는 시계/타임존 차이로 목록이 비어 404·즉시 종료처럼 보일 수 있음 */
-        const list = res.data || [];
+        const raw = res.data || [];
+        const nowMs = Date.now();
+        const list = filterStoriesNotPastExpiry(raw, nowMs);
+        const droppedExpired = raw.filter((s) => isStoryPastExpiry(s.expiredAt, nowMs));
         storyLogVerbose('viewer:userStories:response', {
           resultCode: res.resultCode,
           msg: res.msg,
-          count: list.length,
+          rawCount: raw.length,
+          activeAfterExpiryFilter: list.length,
           storyIds: list.map((s) => s.storyId),
+          droppedExpiredStoryIds: droppedExpired.map((s) => s.storyId),
           authorUserIds: [...new Set(list.map((s) => s.userId))],
         });
         if (res.resultCode.startsWith('200') && list.length > 0) {
@@ -179,10 +183,13 @@ const StoryViewer: React.FC = () => {
             resultCode: res.resultCode,
             msg: res.msg,
             listLength: list.length,
+            rawFromServer: raw.length,
             targetUserId,
             hint:
               list.length === 0 && String(res.resultCode).startsWith('200')
-                ? '서버가 빈 배열을 반환했습니다(해당 시각 기준 활성 스토리 없음·만료·삭제). 다른 화면 목록과 시각/캐시가 어긋나지 않았는지, URL의 userId가 그 목록의 작성자 id와 같은지 확인하세요.'
+                ? raw.length > 0
+                  ? '응답에 포함된 스토리가 모두 클라이언트 기준 만료(expiredAt)로 제외되었습니다. 진행 바에 만료분이 섞이지 않도록 필터했습니다.'
+                  : '서버가 빈 배열을 반환했습니다(활성 스토리 없음·삭제). URL의 userId가 목록 작성자 id와 같은지 확인하세요.'
                 : 'resultCode가 200이 아니거나 data가 비었습니다.',
           });
           void exitStoryViewer();

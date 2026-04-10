@@ -3,6 +3,7 @@ import { storyApi } from '../api/story';
 import type { PostDetailResponse } from '../types/post';
 import type { StoryDetailResponse } from '../types/story';
 import { isRsSuccess } from './rsData';
+import { filterStoriesNotPastExpiry } from './storyExpiry';
 
 /** `''` = 조회했으나 없음(캐시) */
 const postThumbCache = new Map<number, string>();
@@ -20,8 +21,9 @@ async function fetchActiveStoriesForAuthor(authorUserId: number): Promise<StoryD
   try {
     const res = await storyApi.getUserStories(authorUserId);
     if (!isRsSuccess(res.resultCode) || !Array.isArray(res.data)) return null;
-    authorActiveStoriesCache.set(authorUserId, { list: res.data, fetchedAt: now });
-    return res.data;
+    const list = filterStoriesNotPastExpiry(res.data, now);
+    authorActiveStoriesCache.set(authorUserId, { list, fetchedAt: now });
+    return list;
   } catch {
     return null;
   }
