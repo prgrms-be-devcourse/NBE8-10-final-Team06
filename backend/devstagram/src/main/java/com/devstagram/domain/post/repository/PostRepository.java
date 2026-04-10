@@ -41,7 +41,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // 상세 조회: 페치 조인
     @Query("select distinct p from Post p " + "join fetch p.user u "
-            + "left join fetch p.mediaList "
             + "left join fetch p.techTags pt "
             + "left join fetch pt.technology "
             + "where p.id = :id and p.isDeleted = false and u.isDeleted = false")
@@ -50,7 +49,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 특정 ID 리스트 조회: 삭제되지 않은 것만 + 탈퇴하지 않은 유저 (N+1 방지용 fetch join)
     @Query("select distinct p from Post p "
             + "join fetch p.user u "
-            + "left join fetch p.mediaList "
             + "left join fetch p.techTags pt "
             + "left join fetch pt.technology "
             + "where p.id in :ids and p.isDeleted = false and u.isDeleted = false")

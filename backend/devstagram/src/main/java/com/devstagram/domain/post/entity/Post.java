@@ -5,6 +5,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.hibernate.annotations.BatchSize;
+
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.user.entity.User;
@@ -51,6 +53,7 @@ public class Post extends BaseEntity {
     @Builder.Default
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequence ASC")
+    @BatchSize(size = 30)
     private List<PostMedia> mediaList = new ArrayList<>();
 
     // 현재 Post에 대한 PostTechnology 생성.
