@@ -292,7 +292,9 @@ const PostDetailPage: React.FC = () => {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
               <div style={{ marginBottom: '20px' }}>
-                <strong>{post.nickname}</strong> <span style={{ fontWeight: 'bold' }}>{post.title}</span>
+                <h1 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 700, lineHeight: 1.4 }}>
+                  {post.title}
+                </h1>
                 <div style={{ marginTop: '5px', fontSize: '0.9rem' }}>
                   <MarkdownContent content={post.content} />
                 </div>

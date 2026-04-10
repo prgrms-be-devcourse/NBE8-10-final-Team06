@@ -197,7 +197,7 @@ const PostCreatePage: React.FC = () => {
 
       if (isRsDataSuccess(res)) {
         alert('게시글이 생성되었습니다.');
-        navigate('/');
+        navigate(`/post/${res.data}`, { replace: true });
       }
     } catch (err: unknown) {
       console.error('게시글 생성 오류:', err);
@@ -369,6 +369,12 @@ const PostCreatePage: React.FC = () => {
                   );
                 })}
               </div>
+            )}
+            {selectedTechIds.length > 0 && (
+              <div
+                aria-hidden="true"
+                style={{ borderTop: '1.5px solid #efefef', margin: '0 0 12px' }}
+              />
             )}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', minHeight: '8px' }}>
