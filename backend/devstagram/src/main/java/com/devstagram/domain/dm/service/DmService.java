@@ -1,5 +1,8 @@
 package com.devstagram.domain.dm.service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -90,7 +93,7 @@ public class DmService {
                         dm.getContent(),
                         dm.getThumbnailUrl(),
                         dm.isValid(),
-                        dm.getCreatedAt(),
+                        toKstString(dm.getCreatedAt()),
                         dm.getSender().getId() // 누가 보냈는지까지 같이 담아서
                         ))
                 .collect(Collectors.toList());
@@ -256,7 +259,7 @@ public class DmService {
                                 last.getContent(),
                                 last.getThumbnailUrl(),
                                 last.isValid(),
-                                last.getCreatedAt(),
+                                toKstString(last.getCreatedAt()),
                                 last.getSender().getId());
                     }
 
@@ -366,7 +369,7 @@ public class DmService {
                 saved.getContent(),
                 saved.getThumbnailUrl(),
                 saved.isValid(),
-                saved.getCreatedAt(),
+                toKstString(saved.getCreatedAt()),
                 saved.getSender().getId());
     }
 
@@ -565,5 +568,10 @@ public class DmService {
         return dmRoomUserRepository
                 .findByDmRoom_IdAndUser_Id(roomId, userId)
                 .orElseThrow(() -> new ServiceException("404-F-1", "참여 중인 채팅방이 아닙니다."));
+    }
+
+    private String toKstString(LocalDateTime dateTime) {
+        if (dateTime == null) return null;
+        return dateTime.atZone(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 }
