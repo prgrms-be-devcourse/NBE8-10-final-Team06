@@ -25,8 +25,7 @@ import ProfileAvatar from '../../components/common/ProfileAvatar';
 import TechDonutChart from '../../components/profile/TechDonutChart';
 import { useProfileImageCacheStore } from '../../store/useProfileImageCacheStore';
 import { getProfilePostCountLabel } from '../../util/profilePostCount';
-import { STORY_FROM_STATE_KEY } from '../../util/storyNavigation';
-import { isStoryPastExpiry } from '../../util/storyExpiry';
+import { STORY_FROM_STATE_KEY, STORY_RING_INVALIDATE_EVENT } from '../../util/storyNavigation';
 
 const RESUME_MAP: Record<Resume, string> = {
   [Resume.UNSPECIFIED]: "미지정",
@@ -155,6 +154,8 @@ const ProfilePage: React.FC = () => {
     feedUnread: boolean | null;
   }>({ loaded: false, hasActiveStories: false, feedUnread: null });
   const profileStoryRingGen = useRef(0);
+  /** 스토리 뷰어 종료 후 프로필 무지개 링·피드 미열람 상태 재동기화 */
+  const [storyRingNonce, setStoryRingNonce] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -518,9 +519,7 @@ const ProfilePage: React.FC = () => {
         const okStories =
           (storiesRes.resultCode?.includes('-S-') || storiesRes.resultCode?.startsWith('200')) &&
           Array.isArray(storiesRes.data);
-        const nowMs = Date.now();
-        const notExpired = (storiesRes.data || []).filter((s) => !isStoryPastExpiry(s.expiredAt, nowMs));
-        const hasActive = okStories && notExpired.length > 0;
+        const hasActive = okStories && (storiesRes.data || []).length > 0;
         let feedUnread: boolean | null = null;
         if (feedRes.resultCode?.includes('-S-') || feedRes.resultCode?.startsWith('200')) {
           const row = (feedRes.data || []).find((f) => Number(f.userId) === uid);
@@ -532,7 +531,13 @@ const ProfilePage: React.FC = () => {
         setProfileStoryRing({ loaded: true, hasActiveStories: false, feedUnread: null });
       }
     })();
-  }, [isLoggedIn, profile?.userId, location.key]);
+  }, [isLoggedIn, profile?.userId, location.key, storyRingNonce]);
+
+  useEffect(() => {
+    const bump = () => setStoryRingNonce((n) => n + 1);
+    window.addEventListener(STORY_RING_INVALIDATE_EVENT, bump);
+    return () => window.removeEventListener(STORY_RING_INVALIDATE_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     if (!targetNickname || !myNickname) return;
