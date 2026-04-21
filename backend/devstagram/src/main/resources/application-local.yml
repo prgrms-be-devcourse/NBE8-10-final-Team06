@@ -49,7 +49,7 @@ custom:
     auth:
       enabled: true
       window-seconds: 60
-      login-ip-limit: 10000
+      login-ip-limit: 10
       login-email-limit: 10000
       signup-ip-limit: 10000
       check-email-ip-limit: 10000
