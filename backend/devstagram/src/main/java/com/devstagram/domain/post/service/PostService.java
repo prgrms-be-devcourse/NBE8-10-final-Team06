@@ -3,6 +3,8 @@ package com.devstagram.domain.post.service;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.devstagram.domain.post.entity.*;
+import com.devstagram.domain.post.repository.*;
 import org.springframework.data.domain.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,14 +21,6 @@ import com.devstagram.domain.comment.repository.CommentLikeRepository;
 import com.devstagram.domain.comment.repository.CommentRepository;
 import com.devstagram.domain.feed.service.FeedService;
 import com.devstagram.domain.post.dto.*;
-import com.devstagram.domain.post.entity.Post;
-import com.devstagram.domain.post.entity.PostLike;
-import com.devstagram.domain.post.entity.PostMedia;
-import com.devstagram.domain.post.entity.PostScrap;
-import com.devstagram.domain.post.repository.PostLikeRepository;
-import com.devstagram.domain.post.repository.PostMediaRepository;
-import com.devstagram.domain.post.repository.PostRepository;
-import com.devstagram.domain.post.repository.PostScrapRepository;
 import com.devstagram.domain.technology.entity.PostTechnology;
 import com.devstagram.domain.technology.entity.Technology;
 import com.devstagram.domain.technology.repository.TechnologyRepository;
@@ -57,6 +51,7 @@ public class PostService {
     private final FeedService feedService;
     private final FollowRepository followRepository;
     private final CommentLikeRepository commentLikeRepository;
+    private final PostSearchService postSearchService;
 
     @Transactional(readOnly = true)
     public Slice<PostFeedRes> getPostFeed(Long memberId, Pageable pageable) {
@@ -223,6 +218,8 @@ public class PostService {
                 .toList();
         feedService.deliverPostToFeeds(post, techIds);
 
+        postSearchService.index(toDocument(post));
+
         return post.getId();
     }
 
@@ -305,6 +302,8 @@ public class PostService {
 
             oldFileNames.forEach(storageService::delete);
         }
+
+        postSearchService.index(toDocument(post));
     }
 
     @Transactional
@@ -341,6 +340,9 @@ public class PostService {
 
         // Redis 정리 위임 (ID 리스트만 전달)
         feedService.removePostFromFeeds(postId, targetUserIds, userId);
+
+        // ES 색인 삭제
+        postSearchService.delete(postId);
     }
 
     @Transactional
@@ -445,5 +447,20 @@ public class PostService {
 
         return scrappedPosts.map(post -> PostFeedRes.from(
                 post, likedPostIds.contains(post.getId()), scrappedPostIds.contains(post.getId()), userId, 0.0));
+    }
+
+    private PostDocument toDocument(Post post) {
+        List<String> tags = post.getTechTags().stream()
+                .map(pt -> pt.getTechnology().getName())
+                .toList();
+
+        return new PostDocument(
+                post.getId(),
+                post.getTitle(),
+                post.getContent(),
+                tags,
+                post.getCreatedAt(),
+                post.getLikeCount().intValue()
+        );
     }
 }
