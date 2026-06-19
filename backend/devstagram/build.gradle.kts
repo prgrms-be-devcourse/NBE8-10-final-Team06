@@ -102,6 +102,9 @@ dependencies {
 	//프로메테우스
 	implementation ("org.springframework.boot:spring-boot-starter-actuator")
 	implementation ("io.micrometer:micrometer-registry-prometheus")
+
+    //엘라스틱서치
+    implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
 }
 
 tasks.withType<Test> {
