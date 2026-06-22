@@ -77,7 +77,7 @@ public class User extends BaseEntity {
     @Builder.Default
     @JdbcTypeCode(SqlTypes.VECTOR)
     @Array(length = 142)
-    @Column(name = "tech_vector", columnDefinition = "vector(142)")
+    @Column(name = "tech_vector", length = 568)
     private float[] techVector = new float[142];
 
     public void setUserInfo(UserInfo userInfo) {

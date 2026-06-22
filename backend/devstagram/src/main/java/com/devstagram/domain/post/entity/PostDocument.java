@@ -4,10 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
+import org.springframework.data.elasticsearch.annotations.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(indexName = "posts")
+@Setting(settingPath = "elastic/post-settings.json")
 public class PostDocument {
     @Id
     private Long id;
@@ -29,8 +29,8 @@ public class PostDocument {
     @Field(type = FieldType.Keyword)
     private List<String> tags = new ArrayList<>();
 
-    @Field(type = FieldType.Date)
-    private LocalDateTime createdAt;
+    @Field(type = FieldType.Date, format = DateFormat.date)
+    private LocalDate createdAt;
 
     @Field(type = FieldType.Integer)
     private int likeCount;

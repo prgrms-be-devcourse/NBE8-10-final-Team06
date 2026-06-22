@@ -459,7 +459,7 @@ public class PostService {
                 post.getTitle(),
                 post.getContent(),
                 tags,
-                post.getCreatedAt(),
+                post.getCreatedAt().toLocalDate(),
                 post.getLikeCount().intValue()
         );
     }
