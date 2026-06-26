@@ -58,4 +58,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // 특정 유저의 게시글(프로필 그리드): 삭제되지 않은 것만
     Slice<Post> findAllByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+    // Redis 재수화용: 활성 게시글 전체 + techTags fetch join
+    @Query("select distinct p from Post p "
+            + "join fetch p.user u "
+            + "left join fetch p.techTags pt "
+            + "left join fetch pt.technology "
+            + "where p.isDeleted = false and u.isDeleted = false")
+    List<Post> findAllActiveWithTechTags();
 }

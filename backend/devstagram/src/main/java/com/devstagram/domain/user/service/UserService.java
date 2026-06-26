@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import com.devstagram.domain.user.entity.UserDocument;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -46,6 +47,7 @@ public class UserService {
     private final PostRepository postRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final TechnologyRepository technologyRepository;
+    private final UserSearchService userSearchService;
 
     /**
      * 특정 사용자의 프로필 정보 조회
@@ -130,6 +132,14 @@ public class UserService {
                     .resume(request.resume())
                     .build());
         }
+
+        // ES 재색인
+        userSearchService.index(new UserDocument(
+                user.getId(),
+                user.getNickname(),
+                user.getProfileImageUrl(),
+                user.isDeleted()
+        ));
     }
 
     public Slice<UserSearchResponse> searchUsers(String keyword, Long currentUserId, Pageable pageable) {
@@ -137,17 +147,21 @@ public class UserService {
             return new SliceImpl<>(Collections.emptyList(), pageable, false);
         }
 
-        Slice<User> users = userRepository.findByNicknameContaining(keyword, pageable);
+        List<UserDocument> userDocs = userSearchService.search(keyword);
 
-        // 2. 검색된 각 유저에 대해 '내가 팔로우 중인지' 여부를 확인하며 DTO로 변환
-        return users.map(user -> {
-            boolean isFollowing = false;
-            if (currentUserId != null) {
-                isFollowing = followService.isFollowing(currentUserId, user.getId());
-            }
-            return UserSearchResponse.of(user, isFollowing);
-        });
+        List<UserSearchResponse> result = userDocs.stream()
+                .map(doc -> {
+                    boolean isFollowing = false;
+                    if (currentUserId != null) {
+                        isFollowing = followService.isFollowing(currentUserId, doc.getId());
+                    }
+                    return UserSearchResponse.of(doc, isFollowing);
+                })
+                .toList();
+
+        return new SliceImpl<>(result, pageable, false);
     }
+
 
     @Transactional
     public void withdraw(Long userId) {
@@ -158,6 +172,8 @@ public class UserService {
 
         // 이 코드가 실행되는 순간, 이 이벤트를 기다리던 리스너들이 동시에 동작합니다.
         eventPublisher.publishEvent(new UserWithdrawnEvent(userId));
+
+        userSearchService.delete(userId);
     }
 
     private List<TechScoreDto> getAllTechScoresFromVector(User user) {

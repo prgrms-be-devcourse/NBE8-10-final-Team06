@@ -1,5 +1,6 @@
 package com.devstagram.domain.user.service;
 
+import com.devstagram.domain.user.entity.UserDocument;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
+    private final UserSearchService userSearchService;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -40,6 +42,12 @@ public class AuthService {
 
         User user = request.toEntity(encodedPassword, encodedApiKey);
         userRepository.save(user);
+
+        userSearchService.index(new UserDocument(
+                user.getId(),
+                user.getNickname(),
+                user.getProfileImageUrl(),
+                user.isDeleted()));
 
         String publicApiKey = user.getId() + "." + uuid;
 

@@ -145,6 +145,11 @@ public class FeedService {
         }
     }
 
+    public boolean isGlobalFeedEmpty() {
+        Long size = redisTemplate.opsForZSet().size(GLOBAL_FEED_KEY);
+        return size == null || size == 0;
+    }
+
     // 개인 피드와 글로벌 피드를 일정한 비율로 혼합
     public Map<Long, Double> getHybridFeedWithScores(Long memberId, Pageable pageable) {
 
