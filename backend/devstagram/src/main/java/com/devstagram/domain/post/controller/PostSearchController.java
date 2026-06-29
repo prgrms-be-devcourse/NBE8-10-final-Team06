@@ -29,4 +29,18 @@ public class PostSearchController {
                 .map(PostSearchRes::from)
                 .toList();
     }
+
+    // 기술태그 필터 검색
+    // matchAll=false (기본): 선택한 태그 중 하나라도 포함된 게시글 (OR)
+    // matchAll=true: 선택한 태그를 모두 포함한 게시글 (AND)
+    @GetMapping("/by-tags")
+    public List<PostSearchRes> searchByTags(
+            @RequestParam List<String> tags,
+            @RequestParam(defaultValue = "false") boolean matchAll) {
+
+        return postSearchService.searchByTags(tags, matchAll)
+                .stream()
+                .map(PostSearchRes::from)
+                .toList();
+    }
 }
